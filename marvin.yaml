@@ -1,0 +1,20 @@
+marvin:
+  settings:
+    name: "mArvIn"
+    port: 3000
+    logLevel: "debug"
+  channels:
+    slack:
+      apiKey: xoxb-1234567890-1234567890-1234567890-1234567890
+  agents:
+    "agent-id":
+      model: "deepseek/deepseek-v4-flash"
+  models:
+    "deepseek/deepseek-v4-flash":
+      provider: "deepseek"
+      model: "deepseek-v4-flash"
+      baseUrl: "https://api.deepseek.com"
+    "qwen/qwen3.6-35b-a3b":
+      provider: "lmstudio"
+      model: "qwen/qwen3.6-35b-a3b"
+      baseUrl: "http://localhost:1234"
