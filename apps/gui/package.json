@@ -1,0 +1,17 @@
+{
+  "name": "@marvin/gui",
+  "version": "1.0.0",
+  "description": "GUI for mArvIn",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3"
+  }
+}

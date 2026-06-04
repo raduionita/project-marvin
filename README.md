@@ -1,15 +1,18 @@
 # mArvIn
-mArvIn - you AI sidekick
+mArvIn - your AI sidekick
 
 ## init
 ```bash
 git init
-npm init -y
-npm install -D typescript @types/node
-npx tsc --init
-tsc # compile/build
+pnpm init
+```
 
-npm install @slack/socket-mode @slack/web-api
+## build/test/run
+```bash
+pnpm install
+pnpm build
+pnpm test 
+pnpm start:app
 ```
 
 ## plan
@@ -19,3 +22,4 @@ npm install @slack/socket-mode @slack/web-api
 - agent heartbeat (run a prompt every X seconds)
 - agent memory (store messages, prompts, etc)
 - agent markdown files (from doc/templates)
+- token management (direct/string, env, file)

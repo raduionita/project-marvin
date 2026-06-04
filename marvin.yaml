@@ -5,7 +5,9 @@ marvin:
     logLevel: "debug"
   channels:
     slack:
-      apiKey: xoxb-1234567890-1234567890-1234567890-1234567890
+      enabled: true
+      appToken: xapp-1234567890-1234567890-1234567890-1234567890
+      botToken: xoxb-1234567890-1234567890-1234567890-1234567890
   agents:
     "agent-id":
       model: "deepseek/deepseek-v4-flash"

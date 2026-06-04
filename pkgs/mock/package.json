@@ -1,0 +1,21 @@
+{
+  "name": "@marvin/mock",
+  "version": "0.0.1",
+  "description": "Mock plugin for mArvIn",
+  "main": "out/index.js",
+  "types": "out/index.d.ts",
+  "private": true, 
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -watch"
+  },
+  "type": "module",
+  "files": ["out"],
+  "dependencies": {
+    "@marvin/common": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3"
+  }
+}

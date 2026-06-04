@@ -1,24 +1,20 @@
 {
   "name": "marvin",
   "version": "0.0.1",
-  "description": "mArvIn - you AI sidekick",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc",
-    "watch": "tsc -watch",
-    "lint": "echo \"Linting ready\""
-  },
-  "keywords": [],
-  "author": "",
+  "description": "mArvIn - your AI sidekick",
+  "keywords": ["marvin", "ai", "ai sidekick"],
+  "author": "Radu Ionita",
   "license": "ISC",
   "type": "module",
-  "devDependencies": {
-    "@types/node": "^25.9.1",
-    "typescript": "^6.0.3"
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean",
+    "start:app": "pnpm --filter @marvin/app start"
   },
-  "dependencies": {
-    "@slack/socket-mode": "^2.0.7",
-    "@slack/web-api": "^7.16.0"
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }
