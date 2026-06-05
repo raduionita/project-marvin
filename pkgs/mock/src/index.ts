@@ -1,4 +1,4 @@
-import { type Plugin } from '@marvin/common';
+import { type Plugin } from '@marvin/core';
 
 export default {
   attach: (settings?: Record<string, any>) => {

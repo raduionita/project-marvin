@@ -1,4 +1,4 @@
-import { type Plugin } from '@marvin/common';
+import { type Plugin } from '@marvin/core';
 
 process.on('unhandledRejection', (reason, p) => {
   console.error('Unhandled Rejection at: Promise', p, 'reason:', reason);

@@ -13,7 +13,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@marvin/common": "workspace:*"
+    "@marvin/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
