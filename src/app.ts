@@ -1,4 +1,8 @@
-import { type Plugin } from '@marvin/core';
+import { config } from 'dotenv'
+
+import { type Plugin } from './types.js';
+
+config({path: '.env', debug: false, quiet: true});
 
 process.on('unhandledRejection', (reason, p) => {
   console.error('Unhandled Rejection at: Promise', p, 'reason:', reason);
@@ -13,13 +17,13 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-async function loadPlugin(name:string): Promise<Plugin> {
-  const plugin = await import(`../../../pkgs/${name}/out/index.js`);
+async function loadChannel(name:string): Promise<Plugin> {
+  const plugin = await import(`../out/channels/${name}.js`);
   return plugin.default as Plugin;
 }
 
 (async () => {
-  const mock = await loadPlugin('mock');
+  const mock = await loadChannel('mock');
 
   console.log(mock);
 

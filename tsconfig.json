@@ -48,6 +48,6 @@
     "allowSyntheticDefaultImports": true,
 
     // misc
-    // "allowJs": true,
+    "allowJs": true,
   }
 }

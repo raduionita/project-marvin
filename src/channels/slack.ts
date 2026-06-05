@@ -1,7 +1,7 @@
 import { WebClient } from '@slack/web-api';
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 
-import { type Plugin } from '@marvin/core';
+import { type Plugin } from '../types.js';
 
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN || 'NO_SLACK_APP_TOKEN';
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || 'NO_SLACK_BOT_TOKEN';
