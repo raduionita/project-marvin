@@ -77,10 +77,11 @@ export abstract class Model {
   // apiKey is the API key for the model provider
   public apiKey: string = 'NO_API_KEY';
 
-  constructor(config: Partial<Model>) {
+  constructor(config: Config['models'][string]) {
     Object.assign(this, config);
   }
 
+  // sends messages to LLM model
   abstract chat(chat: Chat): Promise<any>;
 }
 

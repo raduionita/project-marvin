@@ -3,8 +3,8 @@ import { Chat, Model, Provider } from '../types.js';
 export class LmstudioModel extends Model {
   provider: Provider = 'lmstudio';
 
-  async chat(chat:Chat) : Promise<any> {
-    console.log('app', 'LocalModel.post');
+  async chat(chat: Chat) : Promise<any> {
+    console.log('[marvin]', 'LmstudioModel.chat', 'chat:', JSON.stringify(chat));
 
     // role: system, user, assistant
 
