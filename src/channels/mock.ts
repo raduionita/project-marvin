@@ -1,13 +1,15 @@
-import { type Plugin } from '../types.js';
+import { Context } from '../context.js';
+import { Channel } from '../types.js';
 
-export default {
-  attach: (settings?: Record<string, any>) => {
-    console.log('mock', 'attaching...', settings);
+export default class MockChannel implements Channel {
+  async attach(ctx: Context) : Promise<void> {
+    console.log('mock', 'attaching...', ctx.config.settings);
+    // done
     console.log('mock', 'attached!');
-  },
+  }
 
-  detach: () => {
+  async detach() {
     console.log('mock', 'detaching...');
     console.log('mock', 'detached');
   }
-} as Plugin;
+};

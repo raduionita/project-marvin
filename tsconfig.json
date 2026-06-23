@@ -1,16 +1,16 @@
 {
-  "include": ["src"],  
+  "include": ["src", "src/marvin.ts"],  
   
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     // File Layout
-    "rootDir": "./src",
+    "rootDir": "./",
     "outDir": "./out",
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
-    "module": "nodenext",
-    "moduleResolution": "NodeNext",
+    "module": "esnext",
+    // "moduleResolution": "NodeNext",
     "target": "esnext",
     "esModuleInterop": true,
     "types": ["node"],
@@ -40,14 +40,18 @@
     // Recommended Options
     "strict": true,
     "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
+    // "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
 
     // misc
     "allowJs": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }
