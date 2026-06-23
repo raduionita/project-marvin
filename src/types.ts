@@ -30,7 +30,7 @@ export interface Config {
     tools: string[];
     tasks: Record<string, {
       enabled: boolean;
-      interval: number;
+      schedule: number;
       maxSteps: number;
       input: string;
     }>;
@@ -60,7 +60,7 @@ export interface Task {
   enabled: boolean;
   schedule: number;
   maxSteps: number;
-  timeout: NodeJS.Timeout;
+  timeout: NodeJS.Timeout | null;
   input: string;
 }
 

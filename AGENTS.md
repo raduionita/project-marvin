@@ -70,13 +70,15 @@ After marvin is installed, marvin loads its config and data from:
 - Preserve existing style and conventions
 - Do not introduce new dependencies unless necessary
 - Explain any non-obvious tradeoff in the final response
+- After each major change, re-read the files, check for errors
 
 ## Workflow
 1. Inspect the relevant files
 2. Identify the smallest correct change
 3. Apply the change
-4. Validate the result
-5. Summarize what changed and why
+4. Reread the files, check for errors
+5. Validate the result
+6. Summarize what changed and why
 
 ## Constraints
 - Avoid unrelated cleanup

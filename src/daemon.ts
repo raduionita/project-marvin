@@ -8,7 +8,8 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 
 import { Context, loadContext } from './context.js';
 import { tryJsonParse } from './helpers.js';
-import { Config } from './types.js';
+import { Config, Model, Agent, Task, Chat } from './types.js';
+import { execTool } from './tools/index.js';
 
 function initHandlers(ctx: Context) {
   // SIGINT (Ctrl+C)
@@ -186,15 +187,84 @@ async function initChannels(ctx: Context) {
 }
 
 async function initModels(ctx: Context) {
-  // TODO: use config.models to create Model instances via models/index.ts loadModel
-  console.log('[marvin] Models initialization (TBD)');
+  console.log('[marvin]', 'initModels');
+  // dynamically load models from models/
+  for (const [id, model] of Object.entries(ctx.config.models)) {
+    if (!model.enabled) continue;
+    try {
+      const Module = await import(`./models/${model.provider}.js`);
+      const Class = (Module.default || (Module as any)[model.provider]) as new (config: any) => Model;
+      const instance = new Class(model);
+      
+      // save instance (needed by agents)
+      ctx.models[id] = instance;
+
+      console.log('[marvin]', 'initModels', `loaded: ${id} (${model.provider} ${model.model})`);
+    } catch (err) {
+      console.error('[marvin]', 'initModels', `failed: ${id} (${model.provider}${model.model})`, err);
+    }
+  }
 }
 
 async function initAgents(ctx: Context) {
   console.log('[marvin]', 'initAgents');
-  // TODO: use config.agents to load each agent
-  //   - agent.model = instance from initModels
-  //   - for each agent.tasks: start setTimeout + execTask
+
+  for (const [agentId, agent] of Object.entries(ctx.config.agents)) {
+    const model = ctx.models[agent.model];
+    if (!model) {
+      console.error('[marvin]', 'initAgents', `model not found for agent ${agentId}: ${agent.model}`);
+      continue;
+    }
+
+    const tasks: Record<string, Task> = {};
+    for (const [taskId, task] of Object.entries(agent.tasks)) {
+      tasks[taskId] = {
+        enabled: task.enabled,
+        schedule: task.schedule,
+        maxSteps: task.maxSteps,
+        input: task.input,
+        timeout: setTimeout(execTask, task.schedule, ctx, agentId, taskId),
+      } as Task;
+
+      console.log('[marvin]', 'initAgents', `agent ${agentId} task ${taskId} scheduled (${task.schedule}ms)`);
+    }
+
+    ctx.agents[agentId] = {
+      enabled: agent.enabled,
+      channels: agent.channels,
+      model: model,
+      tasks: tasks,
+    } as Agent;
+  }
+}
+
+async function execTask(ctx: Context, agentId: string, taskId: string) {
+  const agent = ctx.agents[agentId]!;
+  const task = agent.tasks[taskId];
+  if (!agent || !task) return;
+
+  if (!agent.enabled) return;
+  if (!task.enabled) return;
+
+  console.log('[marvin]', 'execTask', `${agentId}/${taskId}`);
+
+  try {
+    // TODO LLM loop (while true): send message, wait for response, run tools, check if done, repeat
+
+    // call the model api
+    const result = await agent.model.chat({
+      thinking: false,
+      messages: [{ role: 'user', content: task.input }]
+    });
+
+    // TODO: process result, call tools if needed (execTool)
+    console.log('[marvin]', 'execTask', 'result:', JSON.stringify(result));
+  } catch (err) {
+    console.error('[marvin]', 'execTask', 'error:', err);
+  }
+
+  // re-schedule next execution
+  task.timeout = setTimeout(execTask, task.schedule, ctx, agentId, taskId);
 }
 
 async function execReload(ctx: Context) {
