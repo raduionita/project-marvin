@@ -2,6 +2,7 @@ import { Chat, Model, Provider } from '../types.js';
 
 export class LmstudioModel extends Model {
   provider: Provider = 'lmstudio';
+  public baseUrl: string = 'http://localhost:1234';
 
   async chat(chat: Chat) : Promise<any> {
     console.log('[marvin]', 'LmstudioModel.chat', 'chat:', JSON.stringify(chat));
@@ -50,7 +51,6 @@ export class LmstudioModel extends Model {
         ],
       }),
     });
-
 
     const json = await response.json();
     return {

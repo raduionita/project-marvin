@@ -251,11 +251,29 @@ async function execTask(ctx: Context, agentId: string, taskId: string) {
   try {
     // TODO LLM loop (while true): send message, wait for response, run tools, check if done, repeat
 
+
+
+
+    
+    const chat: Chat = {} as Chat;
+
+    // TOOD: load agent IDENTITY.md into chat.messages[0].role = system
+
+    // TODO: load task.input into chat.messages[1].role = user
+
+    // TODO: while true start
+
     // call the model api
-    const result = await agent.model.chat({
-      thinking: false,
-      messages: [{ role: 'user', content: task.input }]
-    });
+    const result = await agent.model.chat(chat);
+
+    // TODO: call tool (if needed), update chat.messages with the tool result
+
+    // TODO: while true end
+
+
+
+
+
 
     // TODO: process result, call tools if needed (execTool)
     console.log('[marvin]', 'execTask', 'result:', JSON.stringify(result));

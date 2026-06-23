@@ -77,6 +77,13 @@ export abstract class Model {
   // apiKey is the API key for the model provider
   public apiKey: string = 'NO_API_KEY';
 
+  public temperature: number = 0.7;
+  public topP: number = 0.9;
+  public maxTokens: number = 8192;
+  public n: number = 1;
+  public userId: string = 'user-id';
+  public reasoning: string = 'high';
+
   constructor(config: Config['models'][string]) {
     Object.assign(this, config);
   }
