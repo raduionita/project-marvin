@@ -16,7 +16,7 @@ export default class WebBrowseTool extends Tool {
 
   async call(ctx: Context, args: { url: string }) {
     if (!ctx.browser) {
-      throw new Error('Browser is not initialized in the server context');
+      throw new Error('webBrowse: Browser is not initialized in the server context');
     }
 
     const url = args.url;
@@ -50,7 +50,7 @@ export default class WebBrowseTool extends Tool {
       const text = await body.innerText();
       return { title, body: text.split('\n').map((line: string) => line.trim()).filter((line: string) => line.length > 0).join('\n') };
     } catch (error) {
-      console.error('[Tool: webBrowse] Error:', error);
+      console.error('[marvin]', 'webBrowse', 'error:', error);
       throw error;
     } finally {
       await page.close();

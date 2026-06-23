@@ -11,30 +11,38 @@ import { tryJsonParse } from './helpers.js';
 import { Config } from './types.js';
 
 function initHandlers(ctx: Context) {
-  const handleSignal = async (signal: string) => {
-    console.log(`[marvin] Received ${signal}`);
-    await dropDaemon(ctx);
+  // SIGINT (Ctrl+C)
+  process.on('SIGINT', () => {
+    console.log('[marvin]', 'initHandlers', 'SIGINT');
     process.exit(0);
-  };
+  });
 
-  process.on('SIGINT', () => handleSignal('SIGINT'));
-  process.on('SIGTERM', () => handleSignal('SIGTERM'));
+  // SIGTERM (kill)
+  process.on('SIGTERM', () => {
+    console.log('[marvin]', 'initHandlers', 'SIGTERM');
+    process.exit(0);
+  });
 
+  // unhandled rejection from promise
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('[marvin] unhandledRejection at:', promise, 'reason:', reason);
+    console.error('[marvin]','initHandlers', 'unhandledRejection:', promise, 'reason:', reason);
+    // TODO: decide if the rejection should trigger a shutdown
   });
 
+  // uncaught exception
   process.on('uncaughtException', (err) => {
-    console.error('[marvin] uncaughtException:', err);
-    dropDaemon(ctx).then(() => process.exit(1));
+    console.error('[marvin]','initHandlers', 'uncaughtException:', err);
+    // TODO: decide if the exception should trigger a shutdown
   });
 
-  process.on('exit', (code) => {
-    console.log(`[marvin] process.exit(${code})`);
+  // process exit (graceful shutdown = stopDaemon)
+  process.on('exit', async (code) => {
+    console.log(`[marvin]','initHandlers', 'process.exit(${code})`);
+    await stopDaemon(ctx);
   });
 }
 
-async function initProject(ctx: Context) {
+function initProject(ctx: Context) {
   console.log('[marvin]', 'initProject');
 
   // create project/workspace folder
@@ -91,7 +99,6 @@ async function initServer(ctx: Context) {
   console.log('[marvin]', 'initServer');
 
   const port = ctx.config.settings.port || 19384;
-
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
     const command = url.pathname.split('/')[1];
@@ -102,15 +109,28 @@ async function initServer(ctx: Context) {
       return;
     }
 
-    console.log(`[marvin] Received request: ${command}`);
-
+    console.log('[marvin]', 'initServer', `command: ${command}`);
+    
     try {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, data: `Command ${command} executed` }));
+      switch (command) {
+        case 'reload':
+          await execReload(ctx);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, data: {} }));
+          break;
+        default:
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unknown command' }));
+          return;
+      }
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
     }
+  });
+
+  server.on('error', (err) => {
+    console.error('[marvin]', 'initServer', 'error:', err);
   });
 
   await new Promise<void>((resolve) => {
@@ -127,13 +147,37 @@ async function initBrowser(ctx: Context) {
   const browser = await chromium.launch({
     headless: true,
     args: [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox',
+      '--no-sandbox',
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding'
     ],
     // todo: proxies
   });
 
   ctx.browser = browser;
+}
+
+async function dropBrowser(ctx: Context) {
+  console.log('[marvin]', 'dropBrowser');
+  if (ctx.browser) {
+    try {
+      await ctx.browser.close();
+    } catch (err) {
+      console.error('[marvin]', 'dropBrowser', 'error:', err);
+    }
+    ctx.browser = null;
+  }
+}
+
+async function initTools(ctx: Context) {
+  console.log('[marvin]', 'initTools');
+
+  // for each file (except index.ts) in tools folder
+  // import dynamically and save it in context
 }
 
 async function initChannels(ctx: Context) {
@@ -147,46 +191,32 @@ async function initModels(ctx: Context) {
 }
 
 async function initAgents(ctx: Context) {
+  console.log('[marvin]', 'initAgents');
   // TODO: use config.agents to load each agent
   //   - agent.model = instance from initModels
   //   - for each agent.tasks: start setTimeout + execTask
-  console.log('[marvin] Agents initialization (TBD)');
 }
 
 async function execReload(ctx: Context) {
   console.log('[Context] Reloading systems...');
-  await dropDaemon(ctx);
+  await stopDaemon(ctx);
   // Re-initialization will be handled by the Daemon via initContext
 }
 
-async function dropDaemon(ctx: Context) {
-  console.log('[Context] Starting graceful shutdown...');
+async function stopDaemon(ctx: Context) {
+  console.log('[marvin]', 'killDaemon');
+  // guard against multiple calls
+  if (!ctx.running) return;
+  // mark as stopped
+  ctx.running = false;
 
-  // 1. Stop Agents & Tasks first to prevent new work
-  for (const agent of ctx.agents.values()) {
-    // In a real implementation, we'd call agent.cleanup()
-  }
-
-  // 2. Close Channels and Models
-  for (const channel of ctx.channels.values()) {
-    try {
-      await channel.detach();
-    } catch (err) {
-      console.error('[Context] Error detaching channel:', err);
-    }
-  }
-
-  // 3. Close Browser
-  if (ctx.browser) {
-    try {
-      await ctx.browser.close();
-    } catch (err) {
-      console.error('[Context] Error closing browser:', err);
-    }
-    ctx.browser = null;
-  }
-
-  console.log('[Context] Shutdown complete.');
+  // stop each system
+  
+  // stop server
+  // dropServer(ctx);
+  
+  // stop browser
+  dropBrowser(ctx);
 }
 
 export async function execDaemon() {
@@ -194,13 +224,12 @@ export async function execDaemon() {
 
   const ctx = loadContext();
 
-  initHandlers(ctx);
-
-  initProject(ctx);
-
+        initHandlers(ctx);
+        initProject(ctx);
   await initConfig(ctx);
   await initServer(ctx);
   await initBrowser(ctx);
+  await initTools(ctx);
   await initChannels(ctx);
   await initModels(ctx);
   await initAgents(ctx);

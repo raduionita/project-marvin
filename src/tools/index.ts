@@ -10,9 +10,11 @@ export const toolsRegistry = new Map<string, new (ctx: any) => Tool>();
 export { GetDateTool, WebBrowseTool, WebSearchTool };
 
 export async function execTool(ctx: Context, tool: string, args: any) {
+  console.log('[marvin]', 'execTool', tool);
+  
   const ToolClass = toolsRegistry.get(tool);
   if (!ToolClass) {
-    throw new Error(`Tool ${tool} not found`);
+    throw new Error(`execTool: Tool ${tool} not found`);
   }
   const toolInstance = new ToolClass(ctx);
   return await toolInstance.call(null, args);

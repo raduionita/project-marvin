@@ -4,12 +4,14 @@ import { Config, Model, Channel, Tool, Agent } from './types.js';
 let ctx: Context | null; 
 
 export class Context {
+  public running = true;
   public config: Config = {} as Config;
   public browser: Browser | null = null;
 
-  public channels = new Map<string, Channel>();
-  public models = new Map<string, Model>();
-  public agents = new Map<string, Agent>();
+  public tools   : Record<string, Tool> = {};
+  public channels: Record<string, Channel> = {};
+  public models  : Record<string, Model> = {};
+  public agents  : Record<string, Agent> = {};
 
   public wdir: string = '';
 }

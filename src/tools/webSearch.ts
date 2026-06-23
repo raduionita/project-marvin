@@ -20,7 +20,7 @@ export default class WebSearchTool extends Tool {
 
   async call(ctx: Context, args: { query: string }) {
     if (!ctx.browser) {
-      throw new Error('Browser is not initialized in the server context');
+      throw new Error('webSearch: Browser is not initialized in the server context');
     }
 
     const query = args.query;
@@ -64,7 +64,7 @@ export default class WebSearchTool extends Tool {
         link: o.c
       })) };
     } catch (error) {
-      console.error('[Tool: webSearch] Error:', error);
+      console.error('[marvin]', 'webSearch', 'error:', error);
     } finally {
       await page.close();
       await browserCtx.close();
