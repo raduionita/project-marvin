@@ -8,8 +8,9 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 
 import { Context, loadContext } from './context.js';
 import { tryJsonParse } from './helpers.js';
-import { Config, Model, Agent, Task, Chat, Tool } from './types.js';
+import { Config, Model, Agent, Task, Chat, Tool, Channel } from './types.js';
 import { listTools } from './tools/index.js';
+import { listChannels } from './channels/index.js';
 
 function initHandlers(ctx: Context) {
   // SIGINT (Ctrl+C)
@@ -218,8 +219,34 @@ async function initTools(ctx: Context) {
 }
 
 async function initChannels(ctx: Context) {
-  // TODO: load channels from config.channels using channelsRegistry
-  console.log('[marvin]', 'initChannels', 'Channels initialization (TBD)');
+  console.log('[marvin]', 'initChannels');
+
+  const files = listChannels();
+  for (const [id, config] of Object.entries(ctx.config.channels)) {
+    if (!config.enabled) continue;
+
+    const provider = config.provider;
+    const file = files.find(f => f.replace('.ts', '') === provider);
+    if (!file) {
+      console.warn('[marvin]', 'initChannels', `no file for provider "${provider}", skipping ${id}`);
+      continue;
+    }
+
+    try {
+      const Module = await import(`./channels/${provider}.js`);
+      const Class = Module.default || (Module as any)[provider.charAt(0).toUpperCase() + provider.slice(1)];
+      if (!Class || !(Class.prototype instanceof Channel)) {
+        console.warn('[marvin]', 'initChannels', `${file} does not export a Channel class, skipping ${id}`);
+        continue;
+      }
+      const instance = new Class();
+      await instance.attach(ctx);
+      ctx.channels[id] = instance;
+      console.log('[marvin]', 'initChannels', `loaded: ${id}`);
+    } catch (err) {
+      console.error('[marvin]', 'initChannels', `failed to load ${id}:`, err);
+    }
+  }
 }
 
 async function initModels(ctx: Context) {
@@ -357,6 +384,13 @@ function dropModels(ctx: Context) {
 
 function dropChannels(ctx: Context) {
   console.log('[marvin]', 'dropChannels');
+  for (const channel of Object.values(ctx.channels)) {
+    try {
+      channel.detach();
+    } catch (err) {
+      console.error('[marvin]', 'dropChannels', `error detaching channel:`, err);
+    }
+  }
   ctx.channels = {};
 }
 
