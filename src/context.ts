@@ -1,12 +1,15 @@
+import * as http from 'http';
 import { Browser } from 'playwright';
 import { Config, Model, Channel, Tool, Agent } from './types.js';
 
 let ctx: Context | null; 
 
 export class Context {
-  public running = true;
+  public state: 'running' | 'reloading' | 'stopped' = 'running';
+  
   public config: Config = {} as Config;
   public browser: Browser | null = null;
+  public server: http.Server | undefined;
 
   public tools   : Record<string, Tool> = {};
   public channels: Record<string, Channel> = {};

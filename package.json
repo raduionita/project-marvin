@@ -10,14 +10,16 @@
   "author": "Radu Ionita",
   "license": "ISC",
   "private": true,
-  "main": "app.ts",
+  "main": "marvin.ts",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -watch",
     "nuke": "rm -rf out node_modules",
-    "start:app": "node app.js",
-    "compile:linux": "bun build --compile --minify ./app.ts --outfile ./app"
+    "start": "bun run src/marvin.ts",
+    "start:daemon": "bun run src/marvin.ts --daemon",
+    "compile:linux": "bun build --compile --minify ./src/marvin.ts --outfile ./marvin",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",

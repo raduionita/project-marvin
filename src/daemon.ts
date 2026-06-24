@@ -1,15 +1,15 @@
 import * as http from 'http';
 import { homedir } from 'os';
 import { join } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'fs';
 
 import { chromium } from 'playwright-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
 
 import { Context, loadContext } from './context.js';
 import { tryJsonParse } from './helpers.js';
-import { Config, Model, Agent, Task, Chat } from './types.js';
-import { execTool } from './tools/index.js';
+import { Config, Model, Agent, Task, Chat, Tool } from './types.js';
+import { listTools } from './tools/index.js';
 
 function initHandlers(ctx: Context) {
   // SIGINT (Ctrl+C)
@@ -26,20 +26,20 @@ function initHandlers(ctx: Context) {
 
   // unhandled rejection from promise
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('[marvin]','initHandlers', 'unhandledRejection:', promise, 'reason:', reason);
+    console.error('[marvin]', 'initHandlers', 'unhandledRejection:', promise, 'reason:', reason);
     // TODO: decide if the rejection should trigger a shutdown
   });
 
   // uncaught exception
   process.on('uncaughtException', (err) => {
-    console.error('[marvin]','initHandlers', 'uncaughtException:', err);
+    console.error('[marvin]', 'initHandlers', 'uncaughtException:', err);
     // TODO: decide if the exception should trigger a shutdown
   });
 
   // process exit (graceful shutdown = stopDaemon)
   process.on('exit', async (code) => {
-    console.log(`[marvin]','initHandlers', 'process.exit(${code})`);
-    await stopDaemon(ctx);
+    console.log('[marvin]', 'initHandlers', `process.exit(${code})`);
+    await dropDaemon(ctx);
   });
 }
 
@@ -77,7 +77,7 @@ async function initConfig(ctx: Context) {
 
   if (!existsSync(path)) {
     // throw error
-    console.error('[marvin] Config file not found:', path);
+    console.error('[marvin]', 'initConfig', 'Config file not found:', path);
   }
 
   const data = readFileSync(path, 'utf8');
@@ -94,6 +94,20 @@ async function initConfig(ctx: Context) {
   }
 
   ctx.config = config;
+}
+
+function initWatch(ctx: Context) {
+  console.log('[marvin]', 'initWatch');
+
+  const mpath = join(ctx.wdir, 'marvin.json');
+  try {
+    watch(mpath, () => {
+      console.log('[marvin]', 'initWatch', 'config file changed, reloading...');
+      execReload(ctx);
+    });
+  } catch (err) {
+    console.warn('[marvin]', 'initWatch', 'config file watcher failed:', (err as Error).message);
+  }
 }
 
 async function initServer(ctx: Context) {
@@ -135,6 +149,7 @@ async function initServer(ctx: Context) {
   });
 
   await new Promise<void>((resolve) => {
+    ctx.server = server;
     server.listen(port, () => {
       console.log(`[marvin] HTTP Server listening on port ${port}`);
       resolve();
@@ -143,6 +158,8 @@ async function initServer(ctx: Context) {
 }
 
 async function initBrowser(ctx: Context) {
+  console.log('[marvin]', 'initBrowser');
+
   chromium.use(stealth());
 
   const browser = await chromium.launch({
@@ -176,14 +193,33 @@ async function dropBrowser(ctx: Context) {
 
 async function initTools(ctx: Context) {
   console.log('[marvin]', 'initTools');
-
-  // for each file (except index.ts) in tools folder
-  // import dynamically and save it in context
+  
+  const files = listTools();
+  for (const file of files) {
+    const moduleName = file.replace('.ts', '');
+    try {
+      const Module = await import(`./tools/${moduleName}.js`);
+      const Class = Module.default || (Module as any)[moduleName.charAt(0).toUpperCase() + moduleName.slice(1)];
+      if (!Class || !(Class.prototype instanceof Tool)) {
+        console.warn('[marvin]', 'initTools', `${file} does not export a Tool class, skipping`);
+        continue;
+      }
+      const instance = new (Class as new (ctx: Context) => Tool)(ctx);
+      if (moduleName !== instance.name()) {
+        console.warn('[marvin]', 'initTools', `${file}: module name "${moduleName}" does not match tool name "${instance.name()}", skipping`);
+        continue;
+      }
+      ctx.tools[instance.name()] = instance;
+      console.log('[marvin]', 'initTools', `loaded: ${instance.name()}`);
+    } catch (err) {
+      console.error('[marvin]', 'initTools', `failed to load ${file}:`, err);
+    }
+  }
 }
 
 async function initChannels(ctx: Context) {
   // TODO: load channels from config.channels using channelsRegistry
-  console.log('[marvin] Channels initialization (TBD)');
+  console.log('[marvin]', 'initChannels', 'Channels initialization (TBD)');
 }
 
 async function initModels(ctx: Context) {
@@ -254,7 +290,7 @@ async function execTask(ctx: Context, agentId: string, taskId: string) {
 
 
 
-    
+
     const chat: Chat = {} as Chat;
 
     // TOOD: load agent IDENTITY.md into chat.messages[0].role = system
@@ -286,24 +322,61 @@ async function execTask(ctx: Context, agentId: string, taskId: string) {
 }
 
 async function execReload(ctx: Context) {
-  console.log('[Context] Reloading systems...');
-  await stopDaemon(ctx);
-  // Re-initialization will be handled by the Daemon via initContext
+  console.log('[marvin]', 'execReload');
+  ctx.state = 'reloading';
+
+  // drop in reverse order
+  dropAgents(ctx);
+  dropModels(ctx);
+  dropChannels(ctx);
+  dropServer(ctx);
+
+  // re-init in dependency order
+  await initServer(ctx);
+  await initChannels(ctx);
+  await initModels(ctx);
+  await initAgents(ctx);
+
+  ctx.state = 'running';
 }
 
-async function stopDaemon(ctx: Context) {
-  console.log('[marvin]', 'killDaemon');
-  // guard against multiple calls
-  if (!ctx.running) return;
-  // mark as stopped
-  ctx.running = false;
+function dropAgents(ctx: Context) {
+  console.log('[marvin]', 'dropAgents');
+  for (const agent of Object.values(ctx.agents)) {
+    for (const task of Object.values(agent.tasks)) {
+      if (task.timeout) clearTimeout(task.timeout);
+    }
+  }
+  ctx.agents = {};
+}
 
-  // stop each system
-  
-  // stop server
-  // dropServer(ctx);
-  
-  // stop browser
+function dropModels(ctx: Context) {
+  console.log('[marvin]', 'dropModels');
+  ctx.models = {};
+}
+
+function dropChannels(ctx: Context) {
+  console.log('[marvin]', 'dropChannels');
+  ctx.channels = {};
+}
+
+function dropServer(ctx: Context) {
+  console.log('[marvin]', 'dropServer');
+  if (ctx.server) {
+    ctx.server.close();
+    ctx.server = undefined;
+  }
+}
+
+async function dropDaemon(ctx: Context) {
+  console.log('[marvin]', 'dropDaemon');
+  if (ctx.state !== 'running') return;
+  ctx.state = 'stopped';
+
+  dropAgents(ctx);
+  dropModels(ctx);
+  dropChannels(ctx);
+  dropServer(ctx);
   dropBrowser(ctx);
 }
 
@@ -312,12 +385,15 @@ export async function execDaemon() {
 
   const ctx = loadContext();
 
-        initHandlers(ctx);
-        initProject(ctx);
+  initHandlers(ctx);
+  initProject(ctx);
   await initConfig(ctx);
-  await initServer(ctx);
+  initWatch(ctx);
+
   await initBrowser(ctx);
   await initTools(ctx);
+
+  await initServer(ctx);
   await initChannels(ctx);
   await initModels(ctx);
   await initAgents(ctx);

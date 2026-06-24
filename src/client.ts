@@ -68,9 +68,9 @@ async function  initHandlers() {
 }
 
 // send reload command to daemon
-async function execReload() {
+async function execReload(ctx: Context) {
   console.log('[marvin]', 'execReload');
-  const url = new URL('http://localhost:19384/');
+  const url = new URL(`http://localhost:${ctx.config.settings.port}/`);
   url.pathname = '/reload';
   const res = await fetch(url.toString());
   if (!res.ok) {
@@ -89,7 +89,7 @@ export async function execClient() {
   await initConfig(ctx);
 
   if (args.includes('--reload')) {
-    await execReload();
+    await execReload(ctx);
   }
 
   // Placeholder for interaction logic

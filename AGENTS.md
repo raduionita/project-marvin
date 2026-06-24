@@ -32,6 +32,8 @@ Marvin source code is organized into the following folders:
   - `daemon.ts`             # daemon entry point
   - `context.ts`            # daemon context class
   - `marvin.ts`             # entry point, runs client or daemon
+  - `declare.d.ts`          # declares modules (i.e bun:test module)
+  - `**/*.test.ts`          # test files
 
 ## Project Structure
 After marvin is installed, marvin loads its config and data from:
@@ -70,7 +72,7 @@ After marvin is installed, marvin loads its config and data from:
 - Preserve existing style and conventions
 - Do not introduce new dependencies unless necessary
 - Explain any non-obvious tradeoff in the final response
-- After each major change, re-read the files, check for errors
+- After each major change, you MUST re-read the files, check for errors
 
 ## Workflow
 1. Inspect the relevant files

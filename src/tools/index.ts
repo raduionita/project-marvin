@@ -1,21 +1,21 @@
 import { Context } from '../context.js';
 import { Tool } from '../types.js';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { readdirSync } from 'fs';
 
-import GetDateTool from './getDate.js';
-import WebBrowseTool from './webBrowse.js';
-import WebSearchTool from './webSearch.js';
+const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
-export const toolsRegistry = new Map<string, new (ctx: any) => Tool>();
-
-export { GetDateTool, WebBrowseTool, WebSearchTool };
+export function listTools(): string[] {
+  return readdirSync(tdir).filter(f => !['index.ts'].includes(f) && !f.includes('.test') && f.endsWith('.ts'));
+}
 
 export async function execTool(ctx: Context, tool: string, args: any) {
   console.log('[marvin]', 'execTool', tool);
-  
-  const ToolClass = toolsRegistry.get(tool);
-  if (!ToolClass) {
+
+  const instance = ctx.tools[tool];
+  if (!instance) {
     throw new Error(`execTool: Tool ${tool} not found`);
   }
-  const toolInstance = new ToolClass(ctx);
-  return await toolInstance.call(null, args);
+  return await instance.call(ctx, args);
 }
