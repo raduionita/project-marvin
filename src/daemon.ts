@@ -382,6 +382,7 @@ function dropModels(ctx: Context) {
   ctx.models = {};
 }
 
+// will detach and delete ALL channels from the context
 function dropChannels(ctx: Context) {
   console.log('[marvin]', 'dropChannels');
   for (const channel of Object.values(ctx.channels)) {
@@ -394,6 +395,20 @@ function dropChannels(ctx: Context) {
   ctx.channels = {};
 }
 
+// will detach and delete the channel from the context
+function dropChannel(ctx: Context, id: string) {
+  console.log('[marvin]', 'dropChannel', id);
+  if (ctx.channels[id]) {
+    try {
+      ctx.channels[id].detach();
+    } catch (err) {
+      console.error('[marvin]', 'dropChannel', `error detaching channel:`, err);
+    }
+    delete ctx.channels[id];
+  }
+}
+
+// will close the server and set to undefined, you will need initServer() to re-open it
 function dropServer(ctx: Context) {
   console.log('[marvin]', 'dropServer');
   if (ctx.server) {
@@ -402,6 +417,7 @@ function dropServer(ctx: Context) {
   }
 }
 
+// will drop all the resources from the context
 async function dropDaemon(ctx: Context) {
   console.log('[marvin]', 'dropDaemon');
   if (ctx.state !== 'running') return;
@@ -414,6 +430,7 @@ async function dropDaemon(ctx: Context) {
   dropBrowser(ctx);
 }
 
+// main entry point for the daemon, only this is exported, needed by marvin.ts
 export async function execDaemon() {
   console.log('[marvin]', 'execDaemon');
 
