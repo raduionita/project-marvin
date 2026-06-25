@@ -11,6 +11,7 @@ import { tryJsonParse } from './helpers.js';
 import { Config, Model, Agent, Task, Chat, Tool, Channel } from './types.js';
 import { listTools } from './tools/index.js';
 import { listChannels } from './channels/index.js';
+import { listModels } from './models/index.js';
 
 function initHandlers(ctx: Context) {
   // SIGINT (Ctrl+C)
@@ -111,6 +112,15 @@ function initWatch(ctx: Context) {
   }
 }
 
+function initFlags(ctx: Context) {
+  console.log('[marvin]', 'initFlags');
+
+  const args = process.argv.slice(2);
+  if (args.includes('--reload')) {
+    ctx.state = 'reloading';
+  }
+}
+
 async function initServer(ctx: Context) {
   console.log('[marvin]', 'initServer');
 
@@ -195,19 +205,19 @@ async function dropBrowser(ctx: Context) {
 async function initTools(ctx: Context) {
   console.log('[marvin]', 'initTools');
   
-  const files = listTools();
+  const files = listTools(ctx).map(f => f.replace('.ts', ''));
   for (const file of files) {
-    const moduleName = file.replace('.ts', '');
+    const name = file;
     try {
-      const Module = await import(`./tools/${moduleName}.js`);
-      const Class = Module.default || (Module as any)[moduleName.charAt(0).toUpperCase() + moduleName.slice(1)];
+      const Module = await import(`./tools/${name}.js`);
+      const Class = Module.default || (Module as any)[name.charAt(0).toUpperCase() + name.slice(1)];
       if (!Class || !(Class.prototype instanceof Tool)) {
         console.warn('[marvin]', 'initTools', `${file} does not export a Tool class, skipping`);
         continue;
       }
       const instance = new (Class as new (ctx: Context) => Tool)(ctx);
-      if (moduleName !== instance.name()) {
-        console.warn('[marvin]', 'initTools', `${file}: module name "${moduleName}" does not match tool name "${instance.name()}", skipping`);
+      if (name !== instance.name()) {
+        console.warn('[marvin]', 'initTools', `${file}: module name "${name}" does not match tool name "${instance.name()}", skipping`);
         continue;
       }
       ctx.tools[instance.name()] = instance;
@@ -218,23 +228,22 @@ async function initTools(ctx: Context) {
   }
 }
 
-async function initChannels(ctx: Context) {
+export async function initChannels(ctx: Context) {
   console.log('[marvin]', 'initChannels');
 
-  const files = listChannels();
+  const files = listChannels(ctx).map(f => f.replace('.ts', ''));
   for (const [id, config] of Object.entries(ctx.config.channels)) {
     if (!config.enabled) continue;
 
-    const provider = config.provider;
-    const file = files.find(f => f.replace('.ts', '') === provider);
+    const file = files.find(f => f === id);
     if (!file) {
-      console.warn('[marvin]', 'initChannels', `no file for provider "${provider}", skipping ${id}`);
+      console.warn('[marvin]', 'initChannels', `no file for file "${file}", skipping ${id}`);
       continue;
     }
 
     try {
-      const Module = await import(`./channels/${provider}.js`);
-      const Class = Module.default || (Module as any)[provider.charAt(0).toUpperCase() + provider.slice(1)];
+      const Module = await import(`./channels/${file}.js`);
+      const Class = Module.default || (Module as any)[file.charAt(0).toUpperCase() + file.slice(1)];
       if (!Class || !(Class.prototype instanceof Channel)) {
         console.warn('[marvin]', 'initChannels', `${file} does not export a Channel class, skipping ${id}`);
         continue;
@@ -251,20 +260,29 @@ async function initChannels(ctx: Context) {
 
 async function initModels(ctx: Context) {
   console.log('[marvin]', 'initModels');
-  // dynamically load models from models/
+
+  const files = listModels(ctx).map(f => f.replace('.ts', ''))
   for (const [id, model] of Object.entries(ctx.config.models)) {
     if (!model.enabled) continue;
+
+    const provider = model.provider;
+    const file = files.find(f => f === provider);
+    if (!file) {
+      console.warn('[marvin]', 'initModels', `no file for provider "${provider}", skipping ${id}`);
+      continue;
+    }
+
     try {
-      const Module = await import(`./models/${model.provider}.js`);
-      const Class = (Module.default || (Module as any)[model.provider]) as new (config: any) => Model;
+      const Module = await import(`./models/${provider}.js`);
+      const Class = (Module.default || (Module as any)[provider.charAt(0).toUpperCase() + provider.slice(1)]) as new (config: any) => Model;
       const instance = new Class(model);
-      
+
       // save instance (needed by agents)
       ctx.models[id] = instance;
 
-      console.log('[marvin]', 'initModels', `loaded: ${id} (${model.provider} ${model.model})`);
+      console.log('[marvin]', 'initModels', `loaded: ${id} (${provider} ${model.model})`);
     } catch (err) {
-      console.error('[marvin]', 'initModels', `failed: ${id} (${model.provider}${model.model})`, err);
+      console.error('[marvin]', 'initModels', `failed to load ${id}:`, err);
     }
   }
 }
@@ -436,6 +454,7 @@ export async function execDaemon() {
 
   const ctx = loadContext();
 
+  initFlags(ctx);
   initHandlers(ctx);
   initProject(ctx);
   await initConfig(ctx);

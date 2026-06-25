@@ -1,6 +1,6 @@
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient } from '@slack/web-api';
-import { Channel } from '../types.js';
+import { Channel, Message } from '../types.js';
 import { Context } from '../context.js';
 
 export default class SlackChannel extends Channel {
@@ -8,7 +8,7 @@ export default class SlackChannel extends Channel {
   private web!: WebClient;
 
   async attach(ctx: Context) {
-    console.log('slack', 'attaching...', ctx.config.channels.slack);
+    console.log('[marvin]', 'slack', 'attaching...', ctx.config.channels.slack);
 
     const settings = ctx.config.channels.slack;
 
@@ -26,48 +26,60 @@ export default class SlackChannel extends Channel {
       retryConfig: { retries: 5 }
     });
 
-    this.sok.on('error', (error) => { console.error('slack', error); });
-    this.sok.on('connecting', () => { console.info('slack', 'connecting...'); });
-    this.sok.on('connected', () => { console.info('slack', 'connected!'); });
-    this.sok.on('reconnecting', (attemptNumber) => { console.warn('slack', `reconnecting... (${attemptNumber})`); });
-    this.sok.on('reconnected', () => { console.warn('slack', 'reconnected!'); });
-    this.sok.on('disconnected', (error) => { console.warn('slack', 'disconnected!', error); });
+    this.sok.on('error', (error) => { console.error('[marvin]', 'slack', error); });
+    this.sok.on('connecting', () => { console.info('[marvin]', 'slack', 'connecting...'); });
+    this.sok.on('connected', () => { console.info('[marvin]', 'slack', 'connected!'); });
+    this.sok.on('reconnecting', (attemptNumber) => { console.warn('[marvin]', 'slack', `reconnecting... (${attemptNumber})`); });
+    this.sok.on('reconnected', () => { console.warn('[marvin]', 'slack', 'reconnected!'); });
+    this.sok.on('disconnected', (error) => { console.warn('[marvin]', 'slack', 'disconnected!', error); });
 
     this.sok.on('app_mention', async (event, body, ack) => {
       try {
-        console.info('slack', 'app_mention', `channel=${event.channel}`);
+        console.info('[marvin]', 'slack', 'app_mention', `channel=${event.channel}`);
         await ack();
         await this.web.chat.postMessage({
           channel: event.channel,
           text: 'app_mention',
         });
       } catch (error) {
-        console.error('slack', 'app_mention', error);
+        console.error('[marvin]', 'slack', 'app_mention', error);
       }
     });
 
     this.sok.on('message.im', async (event, body, ack) => {
       try {
-        console.info('slack', 'message.im', `channel=${event.channel}`);
+        console.info('[marvin]', 'slack', 'message.im', `channel=${event.channel}`);
         await ack();
         await this.web.chat.postMessage({
           channel: event.channel,
           text: 'message.im',
         });
       } catch (error) {
-        console.error('slack', 'message.im', error);
+        console.error('[marvin]', 'slack', 'message.im', error);
       }
     });
 
     await this.sok.start();
-    console.log('slack', 'attached!');
+    console.log('[marvin]', 'slack', 'attached!');
+  }
+
+  async submit(message: Message) {
+    if (!this.web) {
+      console.warn('[marvin]', 'slack', 'not attached, skipping submit');
+      return;
+    }
+    console.log('[marvin]', 'slack', 'detaching...');
+    await this.web.chat.postMessage({
+      channel: message.channel || '',
+      text: message.content,
+    });
   }
 
   detach() {
     if (this.sok) {
-      console.log('slack', 'detaching...');
+      console.log('[marvin]', 'slack', 'detaching...');
       this.sok.disconnect();
-      console.log('slack', 'detached');
+      console.log('[marvin]', 'slack', 'detached');
     }
   }
 }

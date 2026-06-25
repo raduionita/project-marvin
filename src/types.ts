@@ -53,6 +53,7 @@ export abstract class Tool {
 export abstract class Channel {
   abstract attach(context: any): Promise<any>;
   abstract detach(): void;
+  abstract submit(message: Message): Promise<void>;
 }
 
 // task keeps track of the setTimeout id, schedule
@@ -106,6 +107,7 @@ export interface Message {
   role: Role;
   content: string;
   name?: string;
+  channel?: string;
   tool_call_id?: string;
 }
 

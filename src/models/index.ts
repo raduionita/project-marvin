@@ -1,18 +1,20 @@
-import { Context } from '../context.js';
+import { readdirSync } from 'node:fs';
 import { Model, Config } from '../types.js';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { Context } from '../context.js';
 
 type ModelConfig = Config['models'][string];
 
-export async function loadModel(config: ModelConfig) : Promise<Model> {
-  console.log('[marvin] model:', config.provider, config.model, 'loading...') ;
+const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
-  // import class dynamically
-  const ModelClass = await import(`./${config.provider}.js`);
-
-  // create instance
-  const instance = new ModelClass(config);
-
-  console.log('[marvin] model:', config.model, 'loaded!');
-
-  return instance;
+export function listModels(ctx: Context): string[] {
+  return readdirSync(tdir).filter(f => 
+    f !== 'index.ts' && 
+    !f.includes('.test.ts') && 
+    !f.includes('.d.ts') && 
+    (ctx.isTest || !f.includes('.mock.ts')) &&
+    f.endsWith('.ts')
+  );
 }

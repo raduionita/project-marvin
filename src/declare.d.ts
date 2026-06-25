@@ -13,6 +13,7 @@ declare module 'bun:test' {
     toBeInstanceOf(expected: Function): void;
     toBeUndefined(): void;
     toBeNull(): void;
+    toBeDefined(): void;
     toBeTruthy(): void;
     toBeFalsy(): void;
   }

@@ -1,24 +1,47 @@
 import { test, expect } from 'bun:test';
 import { listTools } from './index.js';
+import { Context } from '../context.js';
+import { Config } from '../types.js';
+
+function mockContext(config: Config = {} as Config): Context {
+  const ctx = new Context();
+  ctx.config = {
+    timestamp: Date.now(),
+    settings: { name: 'marvin', port: 19384, logLevel: 'info' },
+    channels: config.channels || {},
+    models: {},
+    agents: {},
+  } as Config;
+  ctx.channels = {};
+  ctx.models = {};
+  ctx.agents = {};
+  ctx.tools = {};
+  ctx.state = 'running';
+  return ctx;
+}
 
 test('listTools returns tool files', () => {
-  const tools = listTools();
+  const ctx = mockContext();
+  const tools = listTools(ctx);
   expect(Array.isArray(tools)).toBe(true);
   expect(tools.length).toBeGreaterThan(0);
 });
 
 test('listTools excludes index.ts', () => {
-  const tools = listTools();
+  const ctx = mockContext();
+  const tools = listTools(ctx);
   expect(tools).not.toContain('index.ts');
 });
 
 test('listTools excludes test files', () => {
-  const tools = listTools();
+  const ctx = mockContext();
+  const tools = listTools(ctx);
   expect(tools).not.toContain('getDate.test.ts');
 });
 
 test('listTools includes known tools', () => {
-  const tools = listTools();
+  const ctx = mockContext();
+  const tools = listTools(ctx);
   expect(tools).toContain('getDate.ts');
   expect(tools).toContain('webSearch.ts');
   expect(tools).toContain('webBrowse.ts');

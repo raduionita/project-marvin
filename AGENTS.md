@@ -13,16 +13,16 @@ Marvin is a multi-agent AI assistant system with a client-daemon architecture. T
 Marvin source code is organized into the following folders:
 - `src/`
   - `channels/`             # where all channels are being loaded from
-    - `index.ts`            # loads channels into registry, exports the registry
+    - `index.ts`            # lists channels
     - `slack.ts`            # channel implementation
   - `models/`               # where all models are being loaded from
-    - `index.ts`            # exposes loadModel(ModelConfig) that returns a Model instance
+    - `index.ts`            # lists models
     - `lmstudio.ts`         # local lmstudio model-provider implementation
     - `openai.ts`           # openai model-provider implementation
     - `anthropic.ts`        # anthripic model-provider implementation
     - `deepseek.ts`         # deepseek model-provider implementation
   - `tools/`                # internal tools folder
-    - `index.ts`            # loads tools into registry, exports the registry
+    - `index.ts`            # lists tools
     - `getDate.ts`          # tool implementation
     - `webBrowse.ts`        # tool implementation
     - `webSearch.ts`        # tool implementation
@@ -34,10 +34,11 @@ Marvin source code is organized into the following folders:
   - `marvin.ts`             # entry point, runs client or daemon
   - `declare.d.ts`          # declares modules (i.e bun:test module)
   - `**/*.test.ts`          # test files
+  - `**/*.mock.ts`          # mock files
 
-## Project Structure
+## Workspace Structure
 After marvin is installed, marvin loads its config and data from:
-- `~/.marvin/` # marving home folder
+- `~/.marvin/`          # marvin home folder
   - `marvin.json`       # config file
   - `MARVIN.md`         # assistant identity file
   - `agents/`           # agents folder
@@ -46,7 +47,7 @@ After marvin is installed, marvin loads its config and data from:
         - `task-1.md`   # agent-1 task-1 markdown file
       - `IDENTITY.md`   # agent-1 identity file
   - `tools/`            # custom tools folder
-    - `index.ts`        # simialr to `tools/index.ts` in the repo, loads all custom tools, marvin will import this file
+    - `index.ts`        # simialr to `src/tools/index.ts` in the repo, has custom tools 
     - `doSomething.ts`  # custom tool file
 
 
@@ -74,7 +75,7 @@ After marvin is installed, marvin loads its config and data from:
 - Explain any non-obvious tradeoff in the final response
 - After each major change, you MUST re-read the files, check for errors
 
-## Workflow
+## AI Agent Workflow
 1. Inspect the relevant files
 2. Identify the smallest correct change
 3. Apply the change

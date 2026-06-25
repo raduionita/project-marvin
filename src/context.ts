@@ -17,6 +17,8 @@ export class Context {
   public agents  : Record<string, Agent> = {};
 
   public wdir: string = '';
+
+  public readonly isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
 }
 
 export function loadContext() : Context {
