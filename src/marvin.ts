@@ -1,5 +1,5 @@
-import { execDaemon } from './daemon.js';
-import { execClient } from './client.js';
+import { Daemon } from './daemon.js';
+import { Client } from './client.js';
 
 (async () => {
   const args = process.argv.slice(2);
@@ -7,10 +7,12 @@ import { execClient } from './client.js';
 
   if (isDaemon) {
     console.log('[marvin] Starting Daemon mode...');
-    await execDaemon();
+    const daemon = new Daemon();
+    await daemon.start();
   } else {
     console.log('[marvin] Starting Client mode...');
-    await execClient();
+    const client = new Client();
+    await client.start();
   }
 })().catch(err => {
   console.error('[marvin] Fatal error during startup:', err);

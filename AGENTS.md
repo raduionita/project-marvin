@@ -66,6 +66,7 @@ After marvin is installed, marvin loads its config and data from:
 - tools are the way to execute actions (webSearch, webBrowse, getDate, etc.)
 - agents execute execute autonomous tasks, and communicate through their defined channels
 - tasks are ran periodically, on schedule, they contain a direct prompt or a markdown file that starts the AI loop
+- `execTask` is the engine of the assistant, runs the AI loop then reschedules itself
 
 ## Rules
 - Read this file before making changes

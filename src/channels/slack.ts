@@ -1,14 +1,15 @@
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient } from '@slack/web-api';
 import { Channel, Message } from '../types.js';
-import { Context } from '../context.js';
+import { Daemon } from '../daemon.js';
 
 export default class SlackChannel extends Channel {
   private sok!: SocketModeClient;
   private web!: WebClient;
 
-  async attach(ctx: Context) {
-    console.log('[marvin]', 'slack', 'attaching...', ctx.config.channels.slack);
+  async attach(daemon: Daemon) {
+    const ctx = daemon.context;
+    console.log('[marvin]', 'SlackChannel.attach', 'attaching...', ctx.config.channels.slack);
 
     const settings = ctx.config.channels.slack;
 

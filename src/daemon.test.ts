@@ -1,71 +1,75 @@
 import { test, expect } from 'bun:test';
 import { Context } from './context.js';
-import { Channel, Config } from './types.js';
+import { Channel, Config, App } from './types.js';
+import { Daemon } from './daemon.js';
 
 // helpers
 
-function mockContext(channelsConfig: Config['channels'] = {}): Context {
-  const ctx = new Context();
-  ctx.config = {
+function mockConfig(channels: Config['channels'] = {}): Config {
+  return {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 19384, logLevel: 'info' },
-    channels: channelsConfig,
+    channels: channels,
     models: {},
     agents: {},
   } as Config;
-  ctx.channels = {};
-  ctx.models = {};
-  ctx.agents = {};
-  ctx.tools = {};
-  ctx.state = 'running';
-  return ctx;
+}
+
+function mockDaemon(): Daemon {
+  return new Daemon();
 }
 
 // tests
 
-test('initChannels loads enabled channels with valid provider', async () => {
-  const ctx = mockContext({ 'channel.mock': { enabled: true } });
+test('execChannels loads enabled channels with valid provider', async () => {
+  const config = mockConfig({ 'channel.mock': { enabled: true } });
+  const daemon = mockDaemon();
 
-  const { initChannels } = await import('./daemon.js');
-  await initChannels(ctx);
+  await daemon.initConfig(config);
+  await daemon.initChannels();
 
-  expect(ctx.channels['channel.mock']).toBeDefined();
-  expect(ctx.channels['channel.mock'] instanceof Channel).toBe(true);
+  expect(daemon.ctx.channels['channel.mock']).toBeDefined();
+  expect(daemon.ctx.channels['channel.mock'] instanceof Channel).toBe(true);
 });
 
-test('initChannels skips disabled channels', async () => {
-  const ctx = mockContext({ disabledChannel: { enabled: false } });
+test('execChannels skips disabled channels', async () => {
+  const config = mockConfig({ disabledChannel: { enabled: false } });
+  const daemon = mockDaemon();
 
-  const { initChannels } = await import('./daemon.js');
-  await initChannels(ctx);
+  await daemon.initConfig(config);
+  await daemon.initChannels();
 
-  expect(ctx.channels['disabledChannel']).toBeUndefined();
+  expect(daemon.ctx.channels['disabledChannel']).toBeUndefined();
 });
 
-test('initChannels warns on missing provider', async () => {
-  const ctx = mockContext({ unknownProvider: { enabled: true } });
+test('execChannels warns on missing provider', async () => {
+  const config = mockConfig({ unknownProvider: { enabled: true } });
+  const daemon = mockDaemon();
 
-  const { initChannels } = await import('./daemon.js');
-  await initChannels(ctx);
+  await daemon.initConfig(config);
+  await daemon.initChannels();
 
-  expect(ctx.channels['unknownProvider']).toBeUndefined();
+
+  expect(daemon.ctx.channels['unknownProvider']).toBeUndefined();
 });
 
-test('initChannels skips non-Channel classes', async () => {
-  const ctx = mockContext({ badChannel: { enabled: true } });
+test('execChannels skips non-Channel classes', async () => {
+  const config = mockConfig({ badChannel: { enabled: true } });
+  const daemon = mockDaemon();
 
-  const { initChannels } = await import('./daemon.js');
-  await initChannels(ctx);
+  await daemon.initConfig(config);
+  await daemon.initChannels();
 
-  expect(ctx.channels['badChannel']).toBeUndefined();
+  expect(daemon.ctx.channels['badChannel']).toBeUndefined();
 });
 
-test('initChannels stores channels in ctx.channels', async () => {
-  const ctx = mockContext({ 'channel.mock': { enabled: true } });
+test('execChannels stores channels in ctx.channels', async () => {
+  const config = mockConfig({ 'channel.mock': { enabled: true } });
+  const daemon = mockDaemon();
 
-  const { initChannels } = await import('./daemon.js');
-  await initChannels(ctx);
+  await daemon.initConfig(config);
+  await daemon.initChannels();
 
-  expect(Object.keys(ctx.channels).length).toBeGreaterThan(0);
-  expect(Object.keys(ctx.channels)).toContain('channel.mock');
+  expect(Object.keys(daemon.ctx.channels).length).toBeGreaterThan(0);
+  expect(Object.keys(daemon.ctx.channels)).toContain('channel.mock');
 });

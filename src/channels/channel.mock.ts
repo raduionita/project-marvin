@@ -1,9 +1,9 @@
 import { Channel, Message } from '../types.js';
-import { Context } from '../context.js';
+import { Daemon } from '../daemon.js';
 
-// Intentionally does NOT extend Channel — used to test validation in initChannels
+// Intentionally does NOT extend Channel — used to test validation in execChannels
 export default class MockChannel extends Channel {
-  async attach(ctx: Context): Promise<void> {
+  async attach(daemon: Daemon): Promise<void> {
     console.log('[marvin]', 'MockChannel.attach', 'attached');
   }
 

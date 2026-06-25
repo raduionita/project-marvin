@@ -1,8 +1,9 @@
-import { Context } from '../context.js';
 import { Channel, Message } from '../types.js';
+import { Daemon } from '../daemon.js';
 
 export default class ExampleChannel extends Channel {
-  async attach(ctx: Context) : Promise<void> {
+  async attach(daemon: Daemon) : Promise<void> {
+    const ctx = daemon.context;
     console.log('[marvin]', 'ExampleChannel.attach', 'attaching...', ctx.config.settings);
     // done
     console.log('[marvin]', 'ExampleChannel.attach', 'attached!');

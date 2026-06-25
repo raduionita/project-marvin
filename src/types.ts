@@ -37,6 +37,10 @@ export interface Config {
   }>;
 }
 
+export abstract class App {
+  abstract start(): Promise<void>;
+}
+
 export abstract class Plugin {
   abstract attach(settings?: Record<string, any>): Promise<any>;
   abstract detach(): void;
@@ -51,7 +55,7 @@ export abstract class Tool {
 
 // channel interface
 export abstract class Channel {
-  abstract attach(context: any): Promise<any>;
+  abstract attach(daemon: App): Promise<void>;
   abstract detach(): void;
   abstract submit(message: Message): Promise<void>;
 }
