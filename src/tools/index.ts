@@ -3,11 +3,11 @@ import { fileURLToPath } from 'url';
 import { readdirSync } from 'fs';
 
 import { App } from '../types.js';
+import { Context } from '../context.js';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
-export function listTools(ctx: App): string[] {
-  const context = (ctx as any).context || {};
+export function listTools(context: Context): string[] {
   return readdirSync(tdir).filter(f =>
     f !== 'index.ts' &&
     !f.includes('.test.ts') &&

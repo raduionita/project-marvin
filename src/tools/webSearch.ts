@@ -7,7 +7,7 @@ const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
 
 export default class WebSearchTool extends Tool {
   name() { return 'webSearch'; }
-  description() { return 'Search the web'; }
+  info() { return 'Search the web'; }
   args() {
     return {
       query: {

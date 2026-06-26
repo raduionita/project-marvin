@@ -2,7 +2,7 @@ import { Tool } from '../types.js';
 
 export default class GetDateTool extends Tool {
   name() { return 'getDate'; }
-  description() { return 'Get the current date'; }
+  info() { return 'Get the current date'; }
   args() {
     return {
       timestamp: {

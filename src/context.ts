@@ -1,18 +1,25 @@
 import * as http from 'http';
-import { Browser } from 'playwright';
-import { Config, Model, Channel, Tool, Agent, App } from './types.js';
-
-export { App };
+import { type Browser } from 'playwright';
+import { type Config, type Model, type Channel, type Tool, type Agent } from './types.js';
+import { type Server } from './server.js';
+import { type Client } from './client.js';
 
 export class Context {
   public state: 'running' | 'reloading' | 'stopped' = 'running';
+  
+  public server?: Server;
+  public client?: Client;
 
   public config: Config = {} as Config;
   public browser: Browser | null = null;
-  public server: http.Server | undefined;
+  public http: http.Server | undefined;
 
-  public tools   : Record<string, Tool> = {};
+  // browser, http, watch (file watcher)
+  public systems: Record<string, any> = {};
+
+  // channels, models, agents
   public channels: Record<string, Channel> = {};
+  public tools   : Record<string, Tool> = {};
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
 

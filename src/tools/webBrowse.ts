@@ -3,7 +3,7 @@ import type { Context } from '../context.js';
 
 export default class WebBrowseTool extends Tool {
   name() { return 'webBrowse'; }
-  description() { return 'Browse the web'; }
+  info() { return 'Browse the web'; }
   args() {
     return {
       url: {

@@ -1,19 +1,19 @@
 import { Channel, Message } from '../types.js';
-import { Daemon } from '../daemon.js';
+import { Server } from '../server.js';
 
 export default class ExampleChannel extends Channel {
-  async attach(daemon: Daemon) : Promise<void> {
-    const ctx = daemon.context;
-    console.log('[marvin]', 'ExampleChannel.attach', 'attaching...', ctx.config.settings);
+  async init(server: Server) : Promise<void> {
+    const ctx = server.context;
+    console.log('[marvin]', 'ExampleChannel.init', 'attaching...', ctx.config.settings);
     // done
-    console.log('[marvin]', 'ExampleChannel.attach', 'attached!');
+    console.log('[marvin]', 'ExampleChannel.init', 'attached!');
   }
 
-  async submit(message: Message) {
+  async send(message: Message) {
     console.log('[marvin]', 'ExampleChannel.submit', JSON.stringify(message));
   }
 
-  async detach() {
+  async drop() {
     console.log('[marvin]', 'ExampleChannel.detach', 'detaching...');
     console.log('[marvin]', 'ExampleChannel.detach', 'detached');
   }

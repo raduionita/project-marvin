@@ -1,4 +1,6 @@
-export type Mode = 'client' | 'daemon';
+import { type Context } from './context.js';
+
+export type Mode = 'client' | 'server';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type Provider = 'deepseek' | 'lmstudio' | 'openai' | 'qwen' | 'anthropic' | 'google';
@@ -38,26 +40,26 @@ export interface Config {
 }
 
 export abstract class App {
-  abstract start(): Promise<void>;
-}
+  public context?: Context;
 
-export abstract class Plugin {
-  abstract attach(settings?: Record<string, any>): Promise<any>;
-  abstract detach(): void;
+  abstract init(): Promise<void>;
+  abstract drop(): Promise<void>;
+  
+  abstract initContext(): void;
 }
 
 export abstract class Tool {
   abstract name(): string;
-  abstract description(): string;
+  abstract info(): string;
   abstract args(): { [name: string]: { type: string; description: string; items?: { type: string }; required: boolean } };
   abstract call(ctx: any, args: any): Promise<any>;
 }
 
 // channel interface
 export abstract class Channel {
-  abstract attach(daemon: App): Promise<void>;
-  abstract detach(): void;
-  abstract submit(message: Message): Promise<void>;
+  abstract init(context: Context): Promise<void>;
+  abstract drop(): Promise<void>;
+  abstract send(message: Message): Promise<void>;
 }
 
 // task keeps track of the setTimeout id, schedule

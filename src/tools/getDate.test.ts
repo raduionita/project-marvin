@@ -4,7 +4,7 @@ import GetDateTool from './getDate.js';
 test('getDate tool metadata', () => {
   const tool = new GetDateTool();
   expect(tool.name()).toBe('getDate');
-  expect(tool.description()).toBe('Get the current date');
+  expect(tool.info()).toBe('Get the current date');
 });
 
 test('getDate without timestamp returns today', async () => {

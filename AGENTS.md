@@ -3,7 +3,7 @@
 You are a Principal Typescript Engineer
 
 ## Overview
-Marvin is a multi-agent AI assistant system with a client-daemon architecture. The daemon runs as a persistent background process, managing agents that autonomously execute tasks on schedules. The client is a standalone application that communicates with the running daemon via an HTTP API.
+Marvin is a multi-agent AI assistant system with a client-server architecture. The server runs as a persistent background process, managing agents that autonomously execute tasks on schedules. The client is a standalone application that communicates with the running server via an HTTP API.
 
 ## Tech stack
 - NodeJS
@@ -29,9 +29,9 @@ Marvin source code is organized into the following folders:
   - `types.ts`              # types and interfaces
   - `helpers.ts`            # helper functions
   - `client.ts`             # client entry point  
-  - `daemon.ts`             # daemon entry point
-  - `context.ts`            # daemon context class
-  - `marvin.ts`             # entry point, runs client or daemon
+  - `server.ts`             # server entry point
+  - `context.ts`            # server context class
+  - `marvin.ts`             # entry point, runs client or server
   - `declare.d.ts`          # declares modules (i.e bun:test module)
   - `**/*.test.ts`          # test files
   - `**/*.mock.ts`          # mock files
@@ -56,8 +56,8 @@ After marvin is installed, marvin loads its config and data from:
 - Chat is a class that holds the conversation history (messages, thinking,...)
 - Message represents a single message in the chat history
 - common types are defined in types.ts
-- the project has 2 modes: client and daemon
-- daemon.ts is the entry point for the daemon, all logic related to the daemon is in this file
+- the project has 2 modes: client and server
+- server.ts is the entry point for the server, all logic related to the server is in this file
 - client.ts is the entry point for the client, all logic related to the client is in this file
 - on first run, the client will create a config file in the user's home folder (~/.marvin/marvin.json)
 - the marvin.json config file is a json file that contains the project config (settings, channels, models, agents)

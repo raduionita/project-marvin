@@ -8,18 +8,17 @@ import { Config, App } from './types.js';
 import { Context } from './context.js';
 
 export class Client extends App {
-
-  async start(): Promise<void> {
+  async init(): Promise<void> {
     const args = process.argv.slice(2);
-    console.log('[marvin]', 'Client.execClient', args);
+    console.log('[marvin]', 'Client.init', args);
 
-    const ctx = new Context();
+    this.initContext();
     this.initHandlers();
-    await this.initProject(ctx);
-    await this.initConfig(ctx);
+    this.initProject();
+    this.initConfig();
 
     if (args.includes('--reload')) {
-      await this.execReload(ctx);
+      await this.execReload();
     }
 
     // Placeholder for interaction logic
@@ -33,7 +32,17 @@ export class Client extends App {
     });
   }
 
-  async initProject(ctx: Context) {
+  async drop() {
+    console.log('[marvin]', 'Client.drop');
+  }
+
+  initContext() {
+    console.log('[marvin]', 'Client.initContext');
+    this.context = new Context();
+    this.context!.client = this;
+  }
+
+  initProject() {
     console.log('[marvin]', 'Client.initProject');
 
     // create project/workspace folder
@@ -42,7 +51,7 @@ export class Client extends App {
       mkdirSync(wdir, { recursive: true });
     }
 
-    ctx.wdir = wdir;
+    this.context!.wdir = wdir;
 
     // create marvin.json if missing
     const path = join(wdir, 'config.json');
@@ -58,10 +67,10 @@ export class Client extends App {
     }
   }
 
-  async initConfig(ctx: Context) {
+  initConfig() {
     console.log('[marvin]', 'Client.initConfig');
 
-    const path = join(ctx.wdir, 'marvin.json');
+    const path = join(this.context!.wdir, 'marvin.json');
 
     let config = {} as Config;
 
@@ -83,20 +92,22 @@ export class Client extends App {
       } as Config;
     }
 
-    ctx.config = config;
+    this.context!.config = config;
   }
 
-  async initHandlers() {
+  initHandlers() {
+    console.log('[marvin]', 'Client.initHandlers');
     process.on('SIGINT', () => {
       console.log('[marvin]', 'Client.initHandlers', 'interrupted. Terminating...');
       process.exit(0);
     });
   }
 
-  // send reload command to daemon
-  async execReload(ctx: Context) {
+  // send reload command to server
+  async execReload() {
     console.log('[marvin]', 'Client.execReload');
-    const url = new URL(`http://localhost:${ctx.config.settings.port}/`);
+    
+    const url = new URL(`http://localhost:${this.context!.config.settings.port}/`);
     url.pathname = '/reload';
     const res = await fetch(url.toString());
     if (!res.ok) {
