@@ -9,7 +9,8 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 
 import { Context } from './context.js';
 import { tryJsonParse } from './helpers.js';
-import { App, Config, Model, Agent, Task, Chat, Tool, Channel } from './types.js';
+import { execTool } from './tools/index.js';
+import { App, Config, Model, Agent, Task, Chat, Tool, Channel, Message } from './types.js';
 import { listTools } from './tools/index.js';
 import { listChannels } from './channels/index.js';
 import { listModels } from './models/index.js';
@@ -26,7 +27,7 @@ export class Server extends App {
     this.initWatch();
     this.initFlags();
     await this.initBrowser();
-    await this.execTools();
+    await this.initTools();
     await this.initHttp();
     await this.initChannels();
     await this.initModels();
@@ -119,17 +120,17 @@ export class Server extends App {
       return;
     } else {
       const path = join(this.context!.wdir, 'marvin.json');
-  
+
       config = {} as Config;
-  
+
       if (!existsSync(path)) {
         // throw error
         console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
       }
-  
+
       const data = readFileSync(path, 'utf8');
       config = tryJsonParse(data);
-  
+
       if (!config) {
         config = {
           timestamp: Date.now(),
@@ -139,7 +140,7 @@ export class Server extends App {
           models: {}
         } as Config;
       }
-  
+
       this.context!.config = config;
     }
   }
@@ -250,8 +251,8 @@ export class Server extends App {
     }
   }
 
-  async execTools() {
-    console.log('[marvin]', 'Server.execTools');
+  async initTools() {
+    console.log('[marvin]', 'Server.initTools');
 
     const ctx = this.context!;
     const files = listTools(this.context!).map(f => f.replace('.ts', ''));
@@ -261,18 +262,18 @@ export class Server extends App {
         const Module = await import(`./tools/${name}.js`);
         const Class = Module.default || (Module as any)[name.charAt(0).toUpperCase() + name.slice(1)];
         if (!Class || !(Class.prototype instanceof Tool)) {
-          console.warn('[marvin]', 'Server.execTools', `${file} does not export a Tool class, skipping`);
+          console.warn('[marvin]', 'Server.initTools', `${file} does not export a Tool class, skipping`);
           continue;
         }
         const instance = new (Class as new (ctx: Context) => Tool)(ctx);
         if (name !== instance.name()) {
-          console.warn('[marvin]', 'Server.execTools', `${file}: module name "${name}" does not match tool name "${instance.name()}", skipping`);
+          console.warn('[marvin]', 'Server.initTools', `${file}: module name "${name}" does not match tool name "${instance.name()}", skipping`);
           continue;
         }
         ctx.tools[instance.name()] = instance;
-        console.log('[marvin]', 'Server.execTools', `loaded: ${instance.name()}`);
+        console.log('[marvin]', 'Server.initTools', `loaded: ${instance.name()}`);
       } catch (err) {
-        console.error('[marvin]', 'Server.execTools', `failed to load ${file}:`, err);
+        console.error('[marvin]', 'Server.initTools', `failed to load ${file}:`, err);
       }
     }
   }
@@ -370,42 +371,132 @@ export class Server extends App {
     }
   }
 
-  async execTask(ctx: Context, agentId: string, taskId: string) {
-    const agent = ctx.agents[agentId]!;
-    const task = agent.tasks[taskId];
-    if (!agent || !task) return;
+  // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
+  loadIdentity(ctx: Context, agentId: string): Message | null {
 
-    if (!agent.enabled) return;
-    if (!task.enabled) return;
+    // TODO: if config.agents[agentId].identity is not empty, use it, otherwise fallback to IDENTITY.md, MARVIN.md, constants.AGENT_SYSTEM_PROMPT
+
+    const config = ctx.config.agents[agentId];
+
+    // TODO: refactor: IDENTITY.md should be in memory on agent creation, this steps checks and parses it
+    
+    // TODO: fallback: IDENTITY.md -> MARVIN.md -> constants.AGENT_SYSTEM_PROMPT
+    
+    const path = join(ctx.wdir, 'agents', agentId, 'IDENTITY.md');
+    if (!existsSync(path)) return null;
+    const content = readFileSync(path, 'utf8').trim();
+
+    // TODO: refactor: content CANNOT be empty, should have a fallback
+    if (!content) return null;
+
+    // TODO: check content if it needs strings replacements (e.g. {userName})
+
+    return { role: 'system', content };
+  }
+
+  // load task input (user prompt for the AI loop)
+  loadInput(ctx: Context, agentId: string, taskId: string): Message | null {
+    // at this stage ctx.config.agents[agentId]! is NEVER undefined/null
+    const config = ctx.config.agents[agentId]!.tasks[taskId];
+
+    // ctx.config.agents[agentId]!.tasks[taskId].input can have 2 formats:
+    // - string: "user prompt" (used directly)
+    // - referece: @file:path/to/file.md (file is opened, parsed, replaced, and returned as a string)
+
+    // TODO: refactor: input should aready be in memory on task creation, this steps checks and parses it
+
+    const path = join(ctx.wdir, 'agents', agentId, 'tasks', taskId, 'input.md');
+    if (!existsSync(path)) return null;
+    const content = readFileSync(path, 'utf8').trim();
+    if (!content) return null;
+    return { role: 'user', content };
+  }
+
+  async execTask(ctx: Context, agentId: string, taskId: string) {
+    const agent = ctx.agents[agentId];
+    if (!agent) return;
+
+    const task = agent.tasks[taskId];
+    if (!task) return;
+    if (!agent.enabled || !task.enabled) return;
 
     console.log('[marvin]', 'Server.execTask', `${agentId}/${taskId}`);
 
+    // TODO: need to enforce a result type
+    let result: any;
+
     try {
-      // TODO LLM loop (while true): send message, wait for response, run tools, check if done, repeat
+      // TODO: decide if thinking is enabled or disabled
+      const chat: Chat = { thinking: false, messages: [] };
+      
+      // load agent IDENTITY.md as system message
+      chat.messages.push({ role: 'system', content: agent.identity });
 
+      // load task input as user message
+      chat.messages.push({ role: 'user', content: task.input });
+      
+      // AI loop: call model, execute tool calls, repeat until done
+      let steps = 0;
+      while (steps < task.maxSteps) {
+        steps++;
 
+        // TODO: Model.chat() NEEDS to return a proper (provider agnostic) result type, or a custom type that supports ALL providers
+        result = await agent.model.chat(chat);
 
-      const chat: Chat = {} as Chat;
+        // TODO: trim result, this can be really big
+        console.info('[marvin]', 'Server.execTask', `step ${steps}`, JSON.stringify(result));
 
-      // TOOD: load agent IDENTITY.md into chat.messages[0].role = system
+        // execute any tool calls
+        if (result.message.tools && result.message.tools.length > 0) {
+          const results: string[] = [];
 
-      // TODO: load task.input into chat.messages[1].role = user
+          for (const tool of result.message.tools) {
+            console.log('[marvin]', 'Server.execTask', `executing tool: ${tool.name}`, JSON.stringify(tool.args));
 
-      // TODO: while true start
+            // TODO: NEED stop tool = if stop exit while loop, reply/report to the user through the channel(s)
 
-      // call the model api
-      const result = await agent.model.chat(chat);
+            try {
+              const r = await execTool(ctx as any, tool.name, typeof tool.args === 'string' ? JSON.parse(tool.args) : tool.args);
+              results.push(JSON.stringify(r));
+            } catch (err) {
+              console.error('[marvin]', 'Server.execTask', `tool ${tool.name} failed:`, err);
+              results.push(`Error: ${(err as Error).message}`);
+            }
+          }
 
-      // TODO: call tool (if needed), update chat.messages with the tool result
+          // add tool call to chat history
+          chat.messages.push({ role: 'tool', content: results.join('\n'), tool_call_id: result.message.tools[0].id });
+        }
 
-      // TODO: while true end
+        // if model produced content without pending tool calls, we're done
+        if (result.message.content && (!result.message.tools || result.message.tools.length === 0)) {
+          break;
+        }
+      }
 
+      // warn if max steps reached
+      if (steps >= task.maxSteps) {
+        console.warn('[marvin]', 'Server.execTask', `max steps (${task.maxSteps}) reached for ${agentId}/${taskId}`);
+      }
 
+      // send final result through configured channels
+      const content = result?.message?.content || '';
+      for (const [channelId, groupId] of Object.entries(agent.channels)) {
+        const channel = ctx.channels[channelId];
 
+        // verify channel exists, warn if not, then skip
+        if (!channel) {
+          console.warn('[marvin]', 'Server.execTask', `channel ${channelId} not found, skipping`);
+          continue;
+        }
 
-
-      // TODO: process result, call tools if needed (execTool)
-      console.log('[marvin]', 'Server.execTask', 'result:', JSON.stringify(result));
+        // try to send, log error if failed, continue
+        try {
+          await channel.send({ role: 'assistant', content: content, group: groupId } as Message);
+        } catch (err) {
+          console.error('[marvin]', 'Server.execTask', `channel ${channelId} send failed:`, err);
+        }
+      }
     } catch (err) {
       console.error('[marvin]', 'Server.execTask', 'error:', err);
     }

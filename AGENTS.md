@@ -1,16 +1,13 @@
 # AGENTS.md — Marvin Project
 
-You are a Principal Typescript Engineer
+You are a Principal TypeScript Engineer working on **Marvin** — a multi-agent AI assistant with a client-server architecture. The server is a persistent background process that manages agents executing autonomous scheduled tasks. The client is a standalone app communicating with the server via HTTP API.
 
-## Overview
-Marvin is a multi-agent AI assistant system with a client-server architecture. The server runs as a persistent background process, managing agents that autonomously execute tasks on schedules. The client is a standalone application that communicates with the running server via an HTTP API.
+**Stack:** Node.js · TypeScript
 
-## Tech stack
-- NodeJS
-- Typescript
+---
 
 ## Repository Structure
-Marvin source code is organized into the following folders:
+
 - `src/`
   - `channels/`             # where all channels are being loaded from
     - `index.ts`            # lists channels
@@ -19,7 +16,7 @@ Marvin source code is organized into the following folders:
     - `index.ts`            # lists models
     - `lmstudio.ts`         # local lmstudio model-provider implementation
     - `openai.ts`           # openai model-provider implementation
-    - `anthropic.ts`        # anthripic model-provider implementation
+    - `anthropic.ts`        # anthropic model-provider implementation
     - `deepseek.ts`         # deepseek model-provider implementation
   - `tools/`                # internal tools folder
     - `index.ts`            # lists tools
@@ -28,66 +25,68 @@ Marvin source code is organized into the following folders:
     - `webSearch.ts`        # tool implementation
   - `types.ts`              # types and interfaces
   - `helpers.ts`            # helper functions
-  - `client.ts`             # client entry point  
+  - `client.ts`             # client entry point
   - `server.ts`             # server entry point
   - `context.ts`            # server context class
   - `marvin.ts`             # entry point, runs client or server
-  - `declare.d.ts`          # declares modules (i.e bun:test module)
+  - `declare.d.ts`          # declares modules (i.e. bun:test)
   - `**/*.test.ts`          # test files
   - `**/*.mock.ts`          # mock files
 
 ## Workspace Structure
-After marvin is installed, marvin loads its config and data from:
-- `~/.marvin/`          # marvin home folder
-  - `marvin.json`       # config file
+
+Loaded from `~/.marvin/` at runtime (created on first run):
+
+- `~/.marvin/`
+  - `marvin.json`       # config: settings, channels, models, agents
   - `MARVIN.md`         # assistant identity file
-  - `agents/`           # agents folder
-    - `agent-1/`        # agent folder
-      - `tasks/`        # agent-1 tasks folder
-        - `task-1.md`   # agent-1 task-1 markdown file
-      - `IDENTITY.md`   # agent-1 identity file
-  - `tools/`            # custom tools folder
-    - `index.ts`        # simialr to `src/tools/index.ts` in the repo, has custom tools 
-    - `doSomething.ts`  # custom tool file
+  - `agents/`
+    - `agent-1/`
+      - `tasks/`
+        - `task-1.md`   # task prompt — seeds the AI loop
+      - `IDENTITY.md`   # agent identity file
+  - `tools/`            # user-defined tools (mirrors src/tools/)
+    - `index.ts`
+    - `doSomething.ts`
 
+---
 
-## Knowledge Base (in the context of the project)
-- a model implementation class (MyModel extends Model) is ca combination of provider logic + llm info
-- Chat is a class that holds the conversation history (messages, thinking,...)
-- Message represents a single message in the chat history
-- common types are defined in types.ts
-- the project has 2 modes: client and server
-- server.ts is the entry point for the server, all logic related to the server is in this file
-- client.ts is the entry point for the client, all logic related to the client is in this file
-- on first run, the client will create a config file in the user's home folder (~/.marvin/marvin.json)
-- the marvin.json config file is a json file that contains the project config (settings, channels, models, agents)
-- channels are they way to communicate with the user (slack, discord, telegram, email, etc.)
-- models are way to communicate with the AI (openai, anthropic, deepseek, etc.)
-- tools are the way to execute actions (webSearch, webBrowse, getDate, etc.)
-- agents execute execute autonomous tasks, and communicate through their defined channels
-- tasks are ran periodically, on schedule, they contain a direct prompt or a markdown file that starts the AI loop
-- `execTask` is the engine of the assistant, runs the AI loop then reschedules itself
+## Core Concepts
+
+- `Model` — `MyModel extends Model`; provider logic + LLM config
+- `Chat` — conversation history (messages, thinking, …)
+- `Message` — single entry in the chat history
+- `Channel` — user-facing output: Slack, Discord, Telegram, email, …
+- `Tool` — executable action: `webSearch`, `webBrowse`, `getDate`, …
+- `Agent` — runs scheduled tasks; communicates via configured channels
+- `Task` — periodic prompt or `.md` file that starts the AI loop
+- `execTask` — engine: runs the AI loop, then reschedules itself
+
+Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-contained entry points for their respective modes.
+
+---
+
+## Workflow
+
+1. Read this file, then inspect the relevant source files
+2. Identify the **smallest correct change**
+3. Apply it; re-read changed files and check for errors
+4. Validate the result
+5. Summarize what changed and why
 
 ## Rules
-- Read this file before making changes
-- Prefer small, focused edits
-- Preserve existing style and conventions
-- Do not introduce new dependencies unless necessary
-- Explain any non-obvious tradeoff in the final response
-- After each major change, you MUST re-read the files, check for errors
 
-## AI Agent Workflow
-1. Inspect the relevant files
-2. Identify the smallest correct change
-3. Apply the change
-4. Reread the files, check for errors
-5. Validate the result
-6. Summarize what changed and why
+- Prefer small, focused edits — avoid unrelated cleanup
+- Preserve existing style, conventions, and formatting unless asked
+- No new dependencies unless necessary; explain any non-obvious tradeoffs
+- All changes must stay compatible with the current codebase
 
-## Constraints
-- Avoid unrelated cleanup
-- Do not modify formatting-only unless requested
-- Keep changes compatible with the current codebase
+## Task Backlog
+`TODO.md` file contains project's for pending taks, code that needs to be implemented, and other notes.
+Completed items in `TODO.md` should be removed.
 
-## GOALS
-- build an AI assistant similar to OpenClaw
+---
+
+## Goal
+
+Build an AI assistant similar to **OpenClaw**.

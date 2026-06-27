@@ -101,6 +101,8 @@ export abstract class Model {
 
 export interface Agent {
   enabled: boolean;
+  // agent system prompt
+  identity: string;
   // inside the task, the agent will send messages through these channels to the user/owner
   channels: Record<string, string>;
   // will use this model to communicate with the LLMs
@@ -113,7 +115,7 @@ export interface Message {
   role: Role;
   content: string;
   name?: string;
-  channel?: string;
+  group?: string;
   tool_call_id?: string;
 }
 

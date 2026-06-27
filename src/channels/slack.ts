@@ -61,7 +61,7 @@ export default class SlackChannel extends Channel {
     }
     console.log('[marvin]', 'SlackChannel.send', JSON.stringify(message));
     await this.web.chat.postMessage({
-      channel: message.channel || '',
+      channel: message.group || '',
       text: message.content,
     });
   }
