@@ -9,7 +9,7 @@ export default class ExampleChannel extends Channel {
     console.log('[marvin]', 'ExampleChannel.init', 'attached!');
   }
 
-  async send(message: Message) {
+  async sendMessage(message: Message) {
     console.log('[marvin]', 'ExampleChannel.submit', JSON.stringify(message));
   }
 

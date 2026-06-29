@@ -1,11 +1,11 @@
-import { Chat, Model, Provider } from '../types.js';
+import { Chat, Model, Provider, Reply, Message } from '../types.js';
 
 export default class DeepseekModel extends Model {
   provider: Provider = 'deepseek';
   public baseUrl: string = 'https://api.deepseek.com';
 
-  async chat(chat: Chat): Promise<any> {
-    console.log('[marvin]', 'DeepseekModel.chat', 'chat:', JSON.stringify(chat));
+  async sendChat(chat: Chat) : Promise<Reply> {
+    console.log('[marvin]', 'DeepseekModel.sendChat', 'chat:', JSON.stringify(chat));
     // call the model api
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',
@@ -18,21 +18,36 @@ export default class DeepseekModel extends Model {
         messages: chat.messages,
         stream: false,
         thinking: chat.thinking,
+        user_id: chat.userId,
       }),
     });
 
+    // extract json from response
     const json = await response.json();
+    // quick stop
+    const stop = json.choices.length === 0 || json.choices[0].finish_reason === 'stop';
+    // choice 0, for now only one choice is supported
+    const choice = json.choices[0];
+    // llm chat output as a reply object
     return {
-      id: json.id,
-      usage: json.usage,
+      id: json.id, // as string,
+      stop: stop,
+      finish: json.finish_reason,
       message: {
-        content: json.choices[0].message.content,
-        tools: json.choices[0].message.tool_calls?.map((tool: {[key: string]: any}) => ({
+        role: choice.message.role, // always "assistant" here
+        content: choice.message.content,
+        tools: choice.message.tool_calls?.map((tool: {[key: string]: any}) => ({
           id: tool.id,
           name: tool.function.name,
-          args: tool.function.arguments,
-        })) ?? [],
+          arguments: tool.function.arguments,
+        }))
+        // TODO: research of reasoning_content may be needed?
+      },
+      usage: {
+        completion: json.usage?.completion_tokens,
+        prompt: json.usage?.prompt_tokens,
       }
-    };
+    } as Reply;
   }
 }
+

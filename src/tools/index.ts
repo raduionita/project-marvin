@@ -17,13 +17,13 @@ export function listTools(context: Context): string[] {
   );
 }
 
-export async function execTool(ctx: App, tool: string, args: any) {
+// TODO: consider moving this server.ts?!
+export async function execTool(ctx: Context, tool: string, args: any) {
   console.log('[marvin]', 'execTool', tool);
 
-  const context = (ctx as any).context;
-  const instance = context.tools[tool];
+  const instance = ctx.tools[tool];
   if (!instance) {
     throw new Error(`execTool: Tool ${tool} not found`);
   }
-  return await instance.call(context, args);
+  return await instance.call(ctx, args);
 }

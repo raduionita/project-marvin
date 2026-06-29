@@ -10,7 +10,8 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 import { Context } from './context.js';
 import { tryJsonParse } from './helpers.js';
 import { execTool } from './tools/index.js';
-import { App, Config, Model, Agent, Task, Chat, Tool, Channel, Message } from './types.js';
+import { App, Config, Model, Agent, Task, Chat, Tool, Channel, Message, Reply } from './types.js';
+import * as constants from './constants.js';
 import { listTools } from './tools/index.js';
 import { listChannels } from './channels/index.js';
 import { listModels } from './models/index.js';
@@ -329,6 +330,7 @@ export class Server extends App {
         const instance = new Class(model);
 
         // save instance (needed by agents)
+        instance.id = id;
         ctx.models[id] = instance;
 
         console.log('[marvin]', 'Server.initModels', `loaded: ${id} (${provider} ${model.model})`);
@@ -352,6 +354,7 @@ export class Server extends App {
       const tasks: Record<string, Task> = {};
       for (const [taskId, task] of Object.entries(agent.tasks)) {
         tasks[taskId] = {
+          id: taskId,
           enabled: task.enabled,
           schedule: task.schedule,
           maxSteps: task.maxSteps,
@@ -362,8 +365,14 @@ export class Server extends App {
         console.log('[marvin]', 'Server.initAgents', `agent ${agentId} task ${taskId} scheduled (${task.schedule}ms)`);
       }
 
+      // load agent identity (IDENTITY.md or fallback)
+      const identityMsg = this.loadIdentity(ctx, agentId);
+      const identity = identityMsg ? identityMsg.content : constants.AGENT_SYSTEM_PROMPT;
+
       ctx.agents[agentId] = {
+        id: agentId,
         enabled: agent.enabled,
+        identity: identity,
         channels: agent.channels,
         model: model,
         tasks: tasks,
@@ -373,6 +382,7 @@ export class Server extends App {
 
   // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
   loadIdentity(ctx: Context, agentId: string): Message | null {
+    console.log('[marvin]', 'Server.loadIdentity', agentId);
 
     // TODO: if config.agents[agentId].identity is not empty, use it, otherwise fallback to IDENTITY.md, MARVIN.md, constants.AGENT_SYSTEM_PROMPT
 
@@ -396,6 +406,8 @@ export class Server extends App {
 
   // load task input (user prompt for the AI loop)
   loadInput(ctx: Context, agentId: string, taskId: string): Message | null {
+    console.log('[marvin]', 'Server.loadInput', agentId, taskId);
+
     // at this stage ctx.config.agents[agentId]! is NEVER undefined/null
     const config = ctx.config.agents[agentId]!.tasks[taskId];
 
@@ -412,6 +424,81 @@ export class Server extends App {
     return { role: 'user', content };
   }
 
+  async sendChat(ctx: Context, agentId: string, chatId: string, input: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
+    const agent = ctx.agents[agentId];
+    if (!agent) return null;
+
+    console.log('[marvin]', 'Server.sendMessage', `${agentId}: ${input.slice(0, 100)}`);
+
+    // TODO: get chat from cache/store using sessionId
+
+    const chat: Chat = {id: chatId, thinking: false, messages: [] } as  Chat;
+
+    // load agent IDENTITY.md as system message
+    chat.messages.push({ role: 'system', content: agent.identity });
+
+    // load task input as user message
+    chat.messages.push({ role: 'user', content: input });
+
+    // TODO this needs a type, Model.chat should return a proper Reply/Response/Result type
+    let reply: Reply;
+
+    // AI loop: call model, execute tool calls, repeat until done
+    let steps = -1;
+    do {
+      steps++;
+
+      // core of the AI loop: call model, execute tool calls, repeat until done
+      reply = await agent.model.sendChat(chat);
+
+      // trim result, this can be really big
+      console.info('[marvin]', 'Server.sendMessage', `step=${steps}`, JSON.stringify(reply));
+
+      if (reply.stop) {
+        console.warn('[marvin]', 'Server.sendMessage', `force stop at step ${steps}`);
+        break;
+      }
+
+      // execute any tool calls
+      if (reply.message.tools && reply.message.tools.length > 0) {
+        const results: string[] = [];
+
+        for (const tool of reply.message.tools) {
+          console.log('[marvin]', 'Server.sendMessage', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+
+          // TODO check for stop tool call, if found, stop the AI loop
+
+          try {
+            const args = JSON.parse(tool.arguments);
+            const result = await execTool(ctx as any, tool.name, args);
+            results.push(JSON.stringify(result));
+          } catch (err) {
+            console.error('[marvin]', 'Server.sendMessage', `tool ${tool.name} failed:`, err);
+            results.push(`Error: ${(err as Error).message}`);
+          }
+        }
+
+        // TODO: all this tool exec logic needs to be checked and tested (unit)
+
+        // add tool call to chat history
+        chat.messages.push({ role: 'tool', content: results.join('\n'), toolId: reply.message.tools[0]?.id });
+      }
+
+      // if model produced content without pending tool calls, we're done
+      if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
+        break;
+      }
+    } while (steps < maxSteps - 1);
+
+    // warn if max steps reached
+    if (steps >= maxSteps) {
+      console.warn('[marvin]', 'Server.sendMessage', `max steps (${maxSteps}) reached for ${agentId}`);
+    }
+
+    // TODO: more info here 
+    return { content: reply?.message?.content || '', steps };
+  }
+
   async execTask(ctx: Context, agentId: string, taskId: string) {
     const agent = ctx.agents[agentId];
     if (!agent) return;
@@ -422,83 +509,35 @@ export class Server extends App {
 
     console.log('[marvin]', 'Server.execTask', `${agentId}/${taskId}`);
 
-    // TODO: need to enforce a result type
-    let result: any;
+    const maxSteps = task.maxSteps || constants.DEFAULT_MAX_STEPS;
 
-    try {
-      // TODO: decide if thinking is enabled or disabled
-      const chat: Chat = { thinking: false, messages: [] };
-      
-      // load agent IDENTITY.md as system message
-      chat.messages.push({ role: 'system', content: agent.identity });
+    // TODO: create a new session
+    const sessionId = taskId + '-' + Date.now();
 
-      // load task input as user message
-      chat.messages.push({ role: 'user', content: task.input });
-      
-      // AI loop: call model, execute tool calls, repeat until done
-      let steps = 0;
-      while (steps < task.maxSteps) {
-        steps++;
+    const result = await this.sendChat(ctx, agentId, sessionId, task.input, maxSteps);
+    if (!result) {
+      console.error('[marvin]', 'Server.execTask', `agent ${agentId} not found`);
+      return;
+    }
 
-        // TODO: Model.chat() NEEDS to return a proper (provider agnostic) result type, or a custom type that supports ALL providers
-        result = await agent.model.chat(chat);
+    const { content, steps } = result;
 
-        // TODO: trim result, this can be really big
-        console.info('[marvin]', 'Server.execTask', `step ${steps}`, JSON.stringify(result));
+    // send final result through configured channels
+    for (const [channelId, groupId] of Object.entries(agent.channels)) {
+      const channel = ctx.channels[channelId];
 
-        // execute any tool calls
-        if (result.message.tools && result.message.tools.length > 0) {
-          const results: string[] = [];
-
-          for (const tool of result.message.tools) {
-            console.log('[marvin]', 'Server.execTask', `executing tool: ${tool.name}`, JSON.stringify(tool.args));
-
-            // TODO: NEED stop tool = if stop exit while loop, reply/report to the user through the channel(s)
-
-            try {
-              const r = await execTool(ctx as any, tool.name, typeof tool.args === 'string' ? JSON.parse(tool.args) : tool.args);
-              results.push(JSON.stringify(r));
-            } catch (err) {
-              console.error('[marvin]', 'Server.execTask', `tool ${tool.name} failed:`, err);
-              results.push(`Error: ${(err as Error).message}`);
-            }
-          }
-
-          // add tool call to chat history
-          chat.messages.push({ role: 'tool', content: results.join('\n'), tool_call_id: result.message.tools[0].id });
-        }
-
-        // if model produced content without pending tool calls, we're done
-        if (result.message.content && (!result.message.tools || result.message.tools.length === 0)) {
-          break;
-        }
+      // verify channel exists, warn if not, then skip
+      if (!channel) {
+        console.warn('[marvin]', 'Server.execTask', `channel ${channelId} not found, skipping`);
+        continue;
       }
 
-      // warn if max steps reached
-      if (steps >= task.maxSteps) {
-        console.warn('[marvin]', 'Server.execTask', `max steps (${task.maxSteps}) reached for ${agentId}/${taskId}`);
+      // try to send, log error if failed, continue
+      try {
+        await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
+      } catch (err) {
+        console.error('[marvin]', 'Server.execTask', `channel ${channelId} send failed:`, err);
       }
-
-      // send final result through configured channels
-      const content = result?.message?.content || '';
-      for (const [channelId, groupId] of Object.entries(agent.channels)) {
-        const channel = ctx.channels[channelId];
-
-        // verify channel exists, warn if not, then skip
-        if (!channel) {
-          console.warn('[marvin]', 'Server.execTask', `channel ${channelId} not found, skipping`);
-          continue;
-        }
-
-        // try to send, log error if failed, continue
-        try {
-          await channel.send({ role: 'assistant', content: content, group: groupId } as Message);
-        } catch (err) {
-          console.error('[marvin]', 'Server.execTask', `channel ${channelId} send failed:`, err);
-        }
-      }
-    } catch (err) {
-      console.error('[marvin]', 'Server.execTask', 'error:', err);
     }
 
     // re-schedule next execution

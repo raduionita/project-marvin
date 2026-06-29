@@ -23,6 +23,7 @@ You are a Principal TypeScript Engineer working on **Marvin** — a multi-agent 
     - `getDate.ts`          # tool implementation
     - `webBrowse.ts`        # tool implementation
     - `webSearch.ts`        # tool implementation
+  - `constants.ts`          # project wide constants
   - `types.ts`              # types and interfaces
   - `helpers.ts`            # helper functions
   - `client.ts`             # client entry point
@@ -42,9 +43,9 @@ Loaded from `~/.marvin/` at runtime (created on first run):
   - `MARVIN.md`         # assistant identity file
   - `agents/`
     - `agent-1/`
-      - `tasks/`
-        - `task-1.md`   # task prompt — seeds the AI loop
       - `IDENTITY.md`   # agent identity file
+      - `tasks/`
+        - `TASK-1.md`   # task prompt — seeds the AI loop
   - `tools/`            # user-defined tools (mirrors src/tools/)
     - `index.ts`
     - `doSomething.ts`
@@ -83,7 +84,7 @@ Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-conta
 
 ## Task Backlog
 `TODO.md` file contains project's for pending taks, code that needs to be implemented, and other notes.
-Completed items in `TODO.md` should be removed.
+Completed items in `TODO.md` should be removed, ask before removing it.
 
 ---
 

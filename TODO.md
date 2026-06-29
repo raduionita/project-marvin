@@ -10,7 +10,10 @@
 - DRY (Don't Repeat Yourself) feature (client and server) with flag (--dry), only console.log calls get executed
 - Tools: NEED internal stop tool for the AI loop (e.g. `endChat` or `stopChat`)
 
+- Agents: add ochestrator/default agent "marvin", that also acts like a fallback, if no agent is found
+
 ## Major tasks
+- Session: a Session object should wrap around Chat
 - server.ts: execTask: wrap the whole loop in a Conversation (or something similar), to monitor all api calls and tokens used
 - Agents: finish add support for multiple channels, e.g. Slack, Telegram, Discord, etc.
 - Client: interactive mode (i.e. `marvin add agent`) and non-interactive mode (i.e. `marvin add agent agent-1 ...`)
@@ -28,3 +31,7 @@
 - Slack: threads, when messageing @marvin, Marvin should reply in a thread (not a new message), the thread will becode chat history
 
 ## Minor tasks
+
+
+## Backlog
+- LMM response streaming

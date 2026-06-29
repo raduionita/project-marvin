@@ -8,7 +8,7 @@ export default class TelegramChannel extends Channel {
     console.log('[marvin]', 'TelegramChannel.init', 'attached!');
   }
 
-  async send(message: Message) {
+  async sendMessage(message: Message) {
     console.log('telegram', 'submit:', JSON.stringify(message));
   }
 

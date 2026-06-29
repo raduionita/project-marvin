@@ -8,7 +8,7 @@ export default class WhatsAppChannel extends Channel {
     console.log('[marvin]', 'WhatsAppChannel.init', 'attached!');
   }
 
-  async send(message: Message) {
+  async sendMessage(message: Message) {
     console.log('whatsapp', 'submit:', JSON.stringify(message));
   }
 

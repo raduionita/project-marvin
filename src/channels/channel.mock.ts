@@ -10,7 +10,7 @@ export default class MockChannel extends Channel {
     console.log('[marvin]', 'MockChannel.init', 'initialized');
   }
 
-  async send(message: Message): Promise<void> {
+  async sendMessage(message: Message): Promise<void> {
     console.log('[marvin]', 'MockChannel.send', JSON.stringify(message));
   }
 
