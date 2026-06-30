@@ -51,7 +51,7 @@ export class Client extends App {
       mkdirSync(wdir, { recursive: true });
     }
 
-    this.context!.wdir = wdir;
+    this.context!.home = wdir;
 
     // create marvin.json if missing
     const path = join(wdir, 'config.json');
@@ -70,7 +70,7 @@ export class Client extends App {
   initConfig() {
     console.log('[marvin]', 'Client.initConfig');
 
-    const path = join(this.context!.wdir, 'marvin.json');
+    const path = join(this.context!.home, 'marvin.json');
 
     let config = {} as Config;
 
@@ -106,7 +106,7 @@ export class Client extends App {
   // send reload command to server
   async execReload() {
     console.log('[marvin]', 'Client.execReload');
-    
+
     const url = new URL(`http://localhost:${this.context!.config.settings.port}/`);
     url.pathname = '/reload';
     const res = await fetch(url.toString());

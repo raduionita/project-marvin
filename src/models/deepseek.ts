@@ -19,6 +19,12 @@ export default class DeepseekModel extends Model {
         stream: false,
         thinking: chat.thinking,
         user_id: chat.userId,
+        tool_choice: chat.tools ? 'auto' : 'none',
+        reasoning_effort: this.reasoning, // TODO: this should be configurable depending on the task
+        response_format: { type: this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
+        temperature: this.temperature,
+        top_p: this.topP,
+        max_tokens: this.maxTokens,
       }),
     });
 

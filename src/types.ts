@@ -92,6 +92,7 @@ export abstract class Model {
   public n: number = 1;
   public userId: string = 'user-id';
   public reasoning: string = 'high';
+  public format: 'text' | 'json' = 'text';
 
   constructor(config: Config['models'][string]) {
     Object.assign(this, config);
@@ -116,8 +117,11 @@ export interface Agent {
 }
 
 export interface Chat {
+  // used for cache retrieval, restore chat state and continue
   id: string;
+  // thinking is enabled or disabled
   thinking: boolean;
+  // messages is the chat history
   messages: Message[];
   userId?: string;
   tools?: { 
@@ -137,6 +141,11 @@ export interface Chat {
       }
     } 
   }[];
+  // sum/total of all usages (Reply.usage)
+  usage?: {
+    completion: number;
+    prompt: number;
+  }
 }
 
 export interface Message {

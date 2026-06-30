@@ -14,7 +14,7 @@ export class Context {
   public browser: Browser | null = null;
   public http: http.Server | undefined;
 
-  // browser, http, watch (file watcher)
+  // TODO: later consider moving browser, http, watch (file watcher) to a separate group "systems"
   public systems: Record<string, any> = {};
 
   // channels, models, agents
@@ -23,7 +23,11 @@ export class Context {
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
 
-  public wdir: string = '';
+  // home (~/.marvin) data folder
+  public home: string = '';
+  // root (~/) app folder 
+  public root: string = '';
 
-  public readonly isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
+  public isDry: boolean = false;
+  public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
 }

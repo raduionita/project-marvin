@@ -1,11 +1,11 @@
 import { readdirSync } from 'fs';
 
-export function tryJsonParse(str: string): any {
+export function tryJsonParse<T>(str: string): T {
   try {
-    return JSON.parse(str);
+    return JSON.parse(str) as T;
   } catch (error) {
     console.warn('[marvin]', 'tryJsonParse', error);
-    return {};
+    return {} as T;
   }
 }
 

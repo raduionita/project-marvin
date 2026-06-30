@@ -56,8 +56,6 @@ export class Server extends App {
   }
 
   initHandlers() {
-    const ctx = this.context!;
-
     // SIGINT (Ctrl+C)
     process.on('SIGINT', () => {
       console.log('[marvin]', 'Server.initHandlers', 'SIGINT');
@@ -92,24 +90,23 @@ export class Server extends App {
   initProject() {
     console.log('[marvin]', 'Server.initProject');
 
-    // create project/workspace folder
+    // create project/workspace folder (~/.marvin)
     const wdir = join(homedir(), '.marvin');
     if (!existsSync(wdir)) {
       mkdirSync(wdir, { recursive: true });
     }
 
-    this.context!.wdir = wdir;
+    this.context!.home = wdir;
 
-    // create marvin.json if missing
-    const path = join(wdir, 'config.json');
+    // create marvin.json if missing (~/.marvin/marvin.json)
+    const path = join(wdir, 'marvin.json');
     if (!existsSync(path)) {
       const config = {
-        timestamp: Date.now(),
-        settings: { name: 'marvin', port: 19384, logLevel: 'info' },
+        settings: { name: 'mArvIn', port: 19384, logLevel: 'info' },
         channels: {},
+        models: {},
         agents: {},
-        models: {}
-      } as Config;
+      };
       writeFileSync(path, JSON.stringify(config, null, 2));
     }
   }
@@ -120,36 +117,33 @@ export class Server extends App {
       this.context!.config = config;
       return;
     } else {
-      const path = join(this.context!.wdir, 'marvin.json');
+      const path = join(this.context!.home, 'marvin.json');
 
       config = {} as Config;
 
+      // at this stage marvin.json MUST exist, but just in case
       if (!existsSync(path)) {
-        // throw error
         console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
+        this.context!.config = {
+          settings: { name: 'mArvIn', port: 19384, logLevel: 'info' },
+          channels: {},
+          models: {},
+          agents: {},
+        } as Config;
+        return;
       }
 
       const data = readFileSync(path, 'utf8');
       config = tryJsonParse(data);
 
-      if (!config) {
-        config = {
-          timestamp: Date.now(),
-          settings: { name: 'marvin', port: 19384, logLevel: 'info' },
-          channels: {},
-          agents: {},
-          models: {}
-        } as Config;
-      }
-
-      this.context!.config = config;
+      this.context!.config = config!;
     }
   }
 
   initWatch() {
     console.log('[marvin]', 'Server.initWatch');
 
-    const mpath = join(this.context!.wdir, 'marvin.json');
+    const mpath = join(this.context!.home, 'marvin.json');
     try {
       let w = watch(mpath, () => {
         console.log('[marvin]', 'Server.initWatch', 'config file changed, reloading...');
@@ -165,9 +159,8 @@ export class Server extends App {
     console.log('[marvin]', 'Server.initFlags');
 
     const args = process.argv.slice(2);
-    if (args.includes('--reload')) {
-      this.context!.state = 'reloading';
-    }
+
+    this.context!.isDry = args.includes('--dry');
   }
 
   async initHttp() {
@@ -392,7 +385,7 @@ export class Server extends App {
     
     // TODO: fallback: IDENTITY.md -> MARVIN.md -> constants.AGENT_SYSTEM_PROMPT
     
-    const path = join(ctx.wdir, 'agents', agentId, 'IDENTITY.md');
+    const path = join(ctx.home, 'agents', agentId, 'IDENTITY.md');
     if (!existsSync(path)) return null;
     const content = readFileSync(path, 'utf8').trim();
 
@@ -417,7 +410,7 @@ export class Server extends App {
 
     // TODO: refactor: input should aready be in memory on task creation, this steps checks and parses it
 
-    const path = join(ctx.wdir, 'agents', agentId, 'tasks', taskId, 'input.md');
+    const path = join(ctx.home, 'agents', agentId, 'tasks', taskId, 'input.md');
     if (!existsSync(path)) return null;
     const content = readFileSync(path, 'utf8').trim();
     if (!content) return null;
