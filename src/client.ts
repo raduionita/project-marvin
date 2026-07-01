@@ -58,7 +58,7 @@ export class Client extends App {
     if (!existsSync(path)) {
       const config = {
         timestamp: Date.now(),
-        settings: { name: 'marvin', port: 19384, logLevel: 'info' },
+        settings: { name: 'marvin', port: 7331, logLevel: 'info' },
         channels: {},
         agents: {},
         models: {}
@@ -85,7 +85,7 @@ export class Client extends App {
     if (!config) {
       config = {
         timestamp: Date.now(),
-        settings: { name: 'marvin', port: 19384, logLevel: 'info' },
+        settings: { name: 'marvin', port: 7331, logLevel: 'info' },
         channels: {},
         agents: {},
         models: {}

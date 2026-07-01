@@ -69,8 +69,10 @@ export default class SlackChannel extends Channel {
 
     // send the message
     const response = await this.web.chat.postMessage({
-      channel: message.channel || '',
       text: message.content,
+      // OR .markdown_text
+      // +  .mrkdwn
+      channel: message.channel || '',
       thread_ts: message.thread || '',
     });
 
@@ -93,45 +95,46 @@ export default class SlackChannel extends Channel {
       console.info('[marvin]', 'SlackChannel.onMention', `channel=${event.channel} thread=${event.thread_ts}|${event.ts}`);
       console.debug('[marvin]', 'SlackChannel.onMention', 'body=', JSON.stringify(body));
       console.debug('[marvin]', 'SlackChannel.onMention', 'event=', JSON.stringify(event));
+      
+      // acknowledge the event
       await ack();
-
-      // TODO: on any error, try to message slack back with what happened
 
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
-
-      // find an agent that has slack configured
-      const agent = this.findAgent(event);
-
-      console.log('[marvin]', 'SlackChannel.onMention', `processing via agent ${agent.id}: ${text.slice(0, 100)}`);
+      if (!text) {
+        console.warn('[marvin]', 'SlackChannel.onMention', 'no text content');
+        await this.sendMessage({ role: 'assistant', content: '(no text content)' });
+        return; 
+      }
 
       // get the server reference from context
       const server = this.ctx.server;
       // this should never happen, but just in case throw an error
       if (!server) {
-        throw new Error('SlackChannel.onMention: server not available');
-      }
-
-      // TOOD: if thread_ts is empty, create a new session/thread, maybe this is not needed, just use event.ts/event.thread_ts
-
-      const chatId: string = event.thread_ts;
-
-      // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await server.sendChat(this.ctx, agent.id, chatId, text);
-
-      if (!result) {
-        console.error('[marvin]', 'SlackChannel.onMention', `no result from sendChat for agent ${agent.id}`);
+        console.error('[marvin]', 'SlackChannel.onMention', 'server not available');
+        await this.sendMessage({ role: 'assistant', content: '(server not available)' });
         return;
       }
 
-      // send response back to Slack, preserving thread if present
-      const output: Message = { role: 'assistant', content: result.content, channel: event.channel, thread: event.thread_ts || event.ts };
+      // find an agent that has slack configured
+      const agent = this.findAgent(event.channel);
+      const thread = event.thread_ts || event.ts || event.event_ts;
+      const agentId = agent.id;
+      const chatId: string = `slack-${event.channel}-${thread}`;
 
-      // TODO: if NOT a thread reply, create a new thread, replies from agents will be in a thread
+      console.log('[marvin]', 'SlackChannel.onMention', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
-      await this.sendMessage(output);
+      // process through Marvin's AI loop (executes model calls + tool execution)
+      const result = await server.sendChat(this.ctx, chatId, agentId, text);
+      if (!result) {
+        console.error('[marvin]', 'SlackChannel.onMention', `no result from sendChat for agent ${agentId}`);
+        await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
+        return;
+      }
+
+      await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel, thread: thread });
     } catch (error) {
-      console.error('[marvin]', 'slack', 'app_mention', error);
+      console.error('[marvin]', 'SlackChannel.onMention', error);
     }
   }
 
@@ -145,31 +148,32 @@ export default class SlackChannel extends Channel {
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
 
-      // find an agent that has slack configured
-      const agent = this.findAgent();
-
-      console.log('[marvin]', 'SlackChannel.onDirectMessage', `processing via agent ${agent.id}: ${text.slice(0, 100)}`);
-
       // get the server reference from context
       const server = this.ctx.server;
       if (!server) {
         throw new Error('SlackChannel.onMention: server not available');
       }
 
-      const sessionId = event.thread_ts;
+      // find an agent that has slack configured
+      const agent = this.findAgent();
+      const thread = event.thread_ts || event.ts || event.event_ts;
+      const agentId = agent.id;
+      const chatId = `slack-${event.channel}-${thread}`;
+
+      console.log('[marvin]', 'SlackChannel.onDirectMessage', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await server.sendChat(this.ctx, agent.id, sessionId, text);
+      const result = await server.sendChat(this.ctx, chatId, agentId, text);
 
       if (!result) {
-        console.error('[marvin]', 'SlackChannel.onDirectMessage', `no result from processMessage for agent ${agent.id}`);
+        console.error('[marvin]', 'SlackChannel.onDirectMessage', `no result from processMessage for agent ${agentId}`);
         return;
       }
 
       // DMs don't have threads, just send a new message
-      await this.sendMessage({ role: 'assistant', content: result.content });
+      await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel });
     } catch (error) {
-      console.error('[marvin]', 'slack', 'message.im', error);
+      console.error('[marvin]', 'SlackChannel.onDirectMessage', error);
     }
   }
 
@@ -206,9 +210,12 @@ export default class SlackChannel extends Channel {
 
   // extract the actual text from a Slack event, stripping @marvin mention
   private extractText(event: { [key: string]: any }): string {
-    let text = event.text || '';
+    let text: string = (event.text || '');
 
     // TOOD: should remove @bot-name with "" NOT other user's @mentions
+    // TODO: other user metions should be replaced with their names?
+
+    // const marvin = `@${this.ctx.config.settings.name}`;
 
     // strip @marvin mention (Slack format: <@U12345>)
     text = text.replace(/<@[\w]+>/g, '').trim();
@@ -216,40 +223,29 @@ export default class SlackChannel extends Channel {
     // clean up extra whitespace
     text = text.replace(/\s+/g, ' ').trim();
 
-    return text || '(no text content)';
+    return text;
   }
 
   // find agent using event.channel or fallback to default "marvin"
-  private findAgent(event?: { [key: string]: any }): Agent {
-    console.log('[marvin]', 'SlackChannel.findAgent', event?.channel);
+  private findAgent(channel?: string): Agent {
+    console.log('[marvin]', 'SlackChannel.findAgent', channel ? `channel=${channel}` : 'marvin');
 
-    const ctx = this.ctx;
-
-    // TODO: decide what agent to use, if multiple agents are enabled w/ slack...
-    // - check agains the slack channel the message was sent to
-    // - if the message was NOT on a bound channel, use the default/orchestrator agent "marvin"
+    // diretly use marvin/orchestrator agent
+    if (!channel) {
+      return this.ctx.agents[this.ctx.config.settings.name]!;
+    }
 
     // find ir first enabled agent that has slack configured
-    for (const agent of Object.values(ctx.agents)) {
+    for (const agent of Object.values(this.ctx.agents)) {
       if (!agent.enabled) continue;
 
-      // check if this agent has slack configured
-      const channels = ctx.config.agents?.[agent.id]?.channels || {};
-      if (channels.slack) {
+      // find the agent that has the slack+group configured
+      if (agent.channels['slack'] === channel) {
         return agent;
       }
     }
-
-    // TODO: fallback should be the orchestrator agent "marvin"
 
     // fallback: first enabled agent
-    for (const agent of Object.values(ctx.agents)) {
-      if (agent.enabled) {
-        return agent;
-      }
-    }
-
-    // TODO: never null, throw error just in case
-    throw new Error('SlackChannel.findAgent: no agent found');
+    return this.ctx.agents[this.ctx.config.settings.name]!;
   }
 }

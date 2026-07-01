@@ -3,7 +3,7 @@ import { type Context } from './context.js';
 export type Mode = 'client' | 'server';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type Provider = 'deepseek' | 'lmstudio' | 'openai' | 'qwen' | 'anthropic' | 'google';
+export type Provider = 'fallback' | 'deepseek' | 'lmstudio' | 'openai' | 'qwen' | 'anthropic' | 'google';
 export type Thinking = 'enabled' | 'disabled';
 export type Role = 'system' | 'user' | 'assistant' | 'tool';
 
@@ -27,6 +27,7 @@ export interface Config {
   }>;
   agents: Record<string, {
     enabled: boolean;
+    default: boolean;
     model: string;
     channels: Record<string, string>;
     tools: string[];
@@ -74,9 +75,10 @@ export interface Task {
 
 // model interface class
 export abstract class Model {
-  public id: string = 'model-id';
   // model is enabled or disabled
   public enabled: boolean = true;
+  // model is the default model for the agent
+  public default: boolean = false;
   // model provider (e.g. lmstudio, openai, anthropic, deepseek, etc.)
   public provider: Provider = 'lmstudio';
   // model field refers to the LLM identifier.
@@ -94,7 +96,7 @@ export abstract class Model {
   public reasoning: string = 'high';
   public format: 'text' | 'json' = 'text';
 
-  constructor(config: Config['models'][string]) {
+  constructor(config: { [key: string]: any }) {
     Object.assign(this, config);
   }
 

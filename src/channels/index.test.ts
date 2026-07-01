@@ -7,7 +7,7 @@ function mockContext(config: Config = {} as Config): Context {
   const ctx = new Context();
   ctx.config = {
     timestamp: Date.now(),
-    settings: { name: 'marvin', port: 19384, logLevel: 'info' },
+    settings: { name: 'marvin', port: 7331, logLevel: 'info' },
     channels: config.channels || {},
     models: {},
     agents: {},

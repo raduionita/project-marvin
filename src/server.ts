@@ -91,22 +91,30 @@ export class Server extends App {
     console.log('[marvin]', 'Server.initProject');
 
     // create project/workspace folder (~/.marvin)
-    const wdir = join(homedir(), '.marvin');
-    if (!existsSync(wdir)) {
-      mkdirSync(wdir, { recursive: true });
+    const home = join(homedir(), '.marvin');
+    if (!existsSync(home)) {
+      mkdirSync(home, { recursive: true });
     }
 
-    this.context!.home = wdir;
+    // set home (~/.marvin)
+    this.context!.home = home;
+
+    // agents folder (~/.marvin/agents)
+    const apath = join(home, 'agents');
+    if (!existsSync(apath)) {
+      mkdirSync(apath, { recursive: true });
+    }
+
+    // create ~/.marvin/MARVIN.md from constants (orchestrator identity)
+    const mpath = join(home, 'MARVIN.md');
+    if (!existsSync(mpath)) {
+      writeFileSync(mpath, constants.MARVIN_MD.trim());
+    }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
-    const path = join(wdir, 'marvin.json');
+    const path = join(home, 'marvin.json');
     if (!existsSync(path)) {
-      const config = {
-        settings: { name: 'mArvIn', port: 19384, logLevel: 'info' },
-        channels: {},
-        models: {},
-        agents: {},
-      };
+      const config = constants.DEFAULT_CONFIG;
       writeFileSync(path, JSON.stringify(config, null, 2));
     }
   }
@@ -124,12 +132,7 @@ export class Server extends App {
       // at this stage marvin.json MUST exist, but just in case
       if (!existsSync(path)) {
         console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
-        this.context!.config = {
-          settings: { name: 'mArvIn', port: 19384, logLevel: 'info' },
-          channels: {},
-          models: {},
-          agents: {},
-        } as Config;
+        this.context!.config = constants.DEFAULT_CONFIG as Config;
         return;
       }
 
@@ -167,7 +170,7 @@ export class Server extends App {
     console.log('[marvin]', 'Server.initHttp');
 
     const ctx = this.context!;
-    const port = ctx.config.settings.port || 19384;
+    const port = ctx.config.settings.port || 7331;
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url || '/', `http://localhost:${port}`);
       const command = url.pathname.split('/')[1];
@@ -306,29 +309,63 @@ export class Server extends App {
     console.log('[marvin]', 'Server.initModels');
 
     const ctx = this.context!;
+
+    // config models
     const files = listModels(this).map(f => f.replace('.ts', ''))
-    for (const [id, model] of Object.entries(ctx.config.models)) {
+    for (const [modelId, model] of Object.entries(ctx.config.models)) {
       if (!model.enabled) continue;
 
       const provider = model.provider;
+
       const file = files.find(f => f === provider);
       if (!file) {
-        console.warn('[marvin]', 'Server.initModels', `no file for provider "${provider}", skipping ${id}`);
+        console.warn('[marvin]', 'Server.initModels', `no file for provider "${provider}", skipping ${modelId}`);
         continue;
       }
 
       try {
+        // import the model provider
         const Module = await import(`./models/${provider}.js`);
-        const Class = (Module.default || (Module as any)[provider.charAt(0).toUpperCase() + provider.slice(1)]) as new (config: any) => Model;
-        const instance = new Class(model);
+        const Class = Module.default;
 
+        // must be a Model class
+        if (!Class || !(Class.prototype instanceof Model)) {
+          console.error('[marvin]', 'Server.initModels', `${modelId} does not export a Model class, skipping`);
+          continue;
+        }
+        
         // save instance (needed by agents)
-        instance.id = id;
-        ctx.models[id] = instance;
+        const instance = new Class(model);
+        ctx.models[modelId] = instance;
 
-        console.log('[marvin]', 'Server.initModels', `loaded: ${id} (${provider} ${model.model})`);
+        console.log('[marvin]', 'Server.initModels', `loaded: ${modelId} (${provider} ${model.model})`);
       } catch (err) {
-        console.error('[marvin]', 'Server.initModels', `failed to load ${id}:`, err);
+        console.error('[marvin]', 'Server.initModels', `failed to load ${modelId}:`, err);
+      }
+    }
+
+    // fallback model (if no other model is found)
+    if (Object.keys(ctx.models).length === 0) {
+      const modelId = 'fallback';
+
+      try {
+        // import the model provider
+        const Module = await import(`./models/fallback.js`);
+        const Class = Module.default;
+
+        // must be a Model class
+        if (!Class || !(Class.prototype instanceof Model)) {
+          console.error('[marvin]', 'Server.initModels', `${modelId} does not export a Model class!`);
+          process.exit(1);
+        }
+
+        const instance = new Class({provider: 'fallback', model: 'fallback'});
+        ctx.models[modelId] = instance;
+
+        // warn because fallback model is not a good idea, and does NOTHING
+        console.warn('[marvin]', 'Server.initModels', `loaded: ${modelId}`);
+      } catch (err) {
+        console.error('[marvin]', 'Server.initModels', `failed to load ${modelId}:`, err);
       }
     }
   }
@@ -337,6 +374,31 @@ export class Server extends App {
     console.log('[marvin]', 'Server.initAgents');
 
     const ctx = this.context!;
+
+    // type: orchestrator/supervisor
+    const agentId = ctx.config.settings.name;
+    
+    // model: default or first
+    const model = Object.values(ctx.models).find(m => m.enabled && m.default) || ctx.models[Object.keys(ctx.models)[0] as string]!;
+
+    // load agent system prompt (~/.marvin/IDENTITY.md)
+    let identity = readFileSync(join(ctx.home, 'MARVIN.md'), 'utf8').trim();
+    if (!identity) {
+      console.warn('[marvin]', 'Server.initAgents', `no MARVIN.md found for agent ${agentId}, using default`);
+      identity = constants.MARVIN_MD;
+    }
+    
+    // add ochestrator agent
+    ctx.agents[agentId] = {
+      id: agentId,
+      enabled: true,
+      identity: identity,
+      channels: {},
+      model: model,
+      tasks: {},
+    } as Agent;
+
+    // type: agent
     for (const [agentId, agent] of Object.entries(ctx.config.agents)) {
       const model = ctx.models[agent.model];
       if (!model) {
@@ -346,21 +408,41 @@ export class Server extends App {
 
       const tasks: Record<string, Task> = {};
       for (const [taskId, task] of Object.entries(agent.tasks)) {
+        let enabled = task.enabled;
+
+        // default input to task.input as string/prompt
+        let input = task.input;
+
+        // first try to load task input from file
+        if (existsSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId.toUpperCase()}.md`))) {
+          input = readFileSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId.toUpperCase()}.md`), 'utf8').trim();
+        } else if (existsSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId}.md`))) {
+          input = readFileSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId}.md`), 'utf8').trim();
+        }
+
+        if (!input) {
+          console.warn('[marvin]', 'Server.initAgents', `no input found for task ${taskId}, disabling`);
+          enabled = false;
+        }
+
         tasks[taskId] = {
           id: taskId,
-          enabled: task.enabled,
+          enabled: enabled,
           schedule: task.schedule,
           maxSteps: task.maxSteps,
-          input: task.input,
+          input: input,
           timeout: setTimeout(this.execTask.bind(this), task.schedule, ctx, agentId, taskId),
         } as Task;
 
         console.log('[marvin]', 'Server.initAgents', `agent ${agentId} task ${taskId} scheduled (${task.schedule}ms)`);
       }
 
-      // load agent identity (IDENTITY.md or fallback)
-      const identityMsg = this.loadIdentity(ctx, agentId);
-      const identity = identityMsg ? identityMsg.content : constants.AGENT_SYSTEM_PROMPT;
+      // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
+      let identity = readFileSync(join(ctx.home, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
+      if (!identity) {
+        console.warn('[marvin]', 'Server.initAgents', `no IDENTITY.md found for agent ${agentId}, using default`);
+        identity = constants.IDENTITY_MD;
+      }
 
       ctx.agents[agentId] = {
         id: agentId,
@@ -373,59 +455,14 @@ export class Server extends App {
     }
   }
 
-  // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
-  loadIdentity(ctx: Context, agentId: string): Message | null {
-    console.log('[marvin]', 'Server.loadIdentity', agentId);
+  async sendChat(ctx: Context, chatId: string, agentId: string, input: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
+    const agent = ctx.agents[agentId]!;
 
-    // TODO: if config.agents[agentId].identity is not empty, use it, otherwise fallback to IDENTITY.md, MARVIN.md, constants.AGENT_SYSTEM_PROMPT
-
-    const config = ctx.config.agents[agentId];
-
-    // TODO: refactor: IDENTITY.md should be in memory on agent creation, this steps checks and parses it
-    
-    // TODO: fallback: IDENTITY.md -> MARVIN.md -> constants.AGENT_SYSTEM_PROMPT
-    
-    const path = join(ctx.home, 'agents', agentId, 'IDENTITY.md');
-    if (!existsSync(path)) return null;
-    const content = readFileSync(path, 'utf8').trim();
-
-    // TODO: refactor: content CANNOT be empty, should have a fallback
-    if (!content) return null;
-
-    // TODO: check content if it needs strings replacements (e.g. {userName})
-
-    return { role: 'system', content };
-  }
-
-  // load task input (user prompt for the AI loop)
-  loadInput(ctx: Context, agentId: string, taskId: string): Message | null {
-    console.log('[marvin]', 'Server.loadInput', agentId, taskId);
-
-    // at this stage ctx.config.agents[agentId]! is NEVER undefined/null
-    const config = ctx.config.agents[agentId]!.tasks[taskId];
-
-    // ctx.config.agents[agentId]!.tasks[taskId].input can have 2 formats:
-    // - string: "user prompt" (used directly)
-    // - referece: @file:path/to/file.md (file is opened, parsed, replaced, and returned as a string)
-
-    // TODO: refactor: input should aready be in memory on task creation, this steps checks and parses it
-
-    const path = join(ctx.home, 'agents', agentId, 'tasks', taskId, 'input.md');
-    if (!existsSync(path)) return null;
-    const content = readFileSync(path, 'utf8').trim();
-    if (!content) return null;
-    return { role: 'user', content };
-  }
-
-  async sendChat(ctx: Context, agentId: string, chatId: string, input: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
-    const agent = ctx.agents[agentId];
-    if (!agent) return null;
-
-    console.log('[marvin]', 'Server.sendMessage', `${agentId}: ${input.slice(0, 100)}`);
+    console.log('[marvin]', 'Server.sendChat', `${agentId}: ${input.slice(0, 100)}`);
 
     // TODO: get chat from cache/store using sessionId
 
-    const chat: Chat = {id: chatId, thinking: false, messages: [] } as  Chat;
+    const chat = { id: chatId, thinking: false, messages: [] } as Chat;
 
     // load agent IDENTITY.md as system message
     chat.messages.push({ role: 'system', content: agent.identity });
@@ -445,10 +482,10 @@ export class Server extends App {
       reply = await agent.model.sendChat(chat);
 
       // trim result, this can be really big
-      console.info('[marvin]', 'Server.sendMessage', `step=${steps}`, JSON.stringify(reply));
+      console.info('[marvin]', 'Server.sendChat', `step=${steps}`, JSON.stringify(reply));
 
       if (reply.stop) {
-        console.warn('[marvin]', 'Server.sendMessage', `force stop at step ${steps}`);
+        console.warn('[marvin]', 'Server.sendChat', `force stop at step ${steps}`);
         break;
       }
 
@@ -457,7 +494,7 @@ export class Server extends App {
         const results: string[] = [];
 
         for (const tool of reply.message.tools) {
-          console.log('[marvin]', 'Server.sendMessage', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+          console.log('[marvin]', 'Server.sendChat', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
           // TODO check for stop tool call, if found, stop the AI loop
 
@@ -466,7 +503,7 @@ export class Server extends App {
             const result = await execTool(ctx as any, tool.name, args);
             results.push(JSON.stringify(result));
           } catch (err) {
-            console.error('[marvin]', 'Server.sendMessage', `tool ${tool.name} failed:`, err);
+            console.error('[marvin]', 'Server.sendChat', `tool ${tool.name} failed:`, err);
             results.push(`Error: ${(err as Error).message}`);
           }
         }
@@ -485,7 +522,7 @@ export class Server extends App {
 
     // warn if max steps reached
     if (steps >= maxSteps) {
-      console.warn('[marvin]', 'Server.sendMessage', `max steps (${maxSteps}) reached for ${agentId}`);
+      console.warn('[marvin]', 'Server.sendChat', `max steps (${maxSteps}) reached for ${agentId}`);
     }
 
     // TODO: more info here 
@@ -493,23 +530,21 @@ export class Server extends App {
   }
 
   async execTask(ctx: Context, agentId: string, taskId: string) {
-    const agent = ctx.agents[agentId];
-    if (!agent) return;
+    const agent = ctx.agents[agentId]!;
+    const task = agent.tasks[taskId]!;
 
-    const task = agent.tasks[taskId];
-    if (!task) return;
     if (!agent.enabled || !task.enabled) return;
 
     console.log('[marvin]', 'Server.execTask', `${agentId}/${taskId}`);
 
     const maxSteps = task.maxSteps || constants.DEFAULT_MAX_STEPS;
 
-    // TODO: create a new session
-    const sessionId = taskId + '-' + Date.now();
+    // TODO: create a new chat or use it to retrieve the chat from cache
+    const chatId = `task-${taskId}-${Date.now()}`;
 
-    const result = await this.sendChat(ctx, agentId, sessionId, task.input, maxSteps);
+    const result = await this.sendChat(ctx, agentId, chatId, task.input, maxSteps);
     if (!result) {
-      console.error('[marvin]', 'Server.execTask', `agent ${agentId} not found`);
+      console.error('[marvin]', 'Server.execTask', `no result from sendChat for agent ${agentId}`);
       return;
     }
 

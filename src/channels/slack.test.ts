@@ -11,7 +11,7 @@ function mockConfig(options: {
 } = {}): Config {
   return {
     timestamp: Date.now(),
-    settings: { name: 'marvin', port: 19384, logLevel: 'info' },
+    settings: { name: 'marvin', port: 7331, logLevel: 'info' },
     channels: options.channels || {},
     models: options.models || {},
     agents: options.agents || {},

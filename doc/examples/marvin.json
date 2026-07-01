@@ -1,6 +1,6 @@
 {
   "settings": {
-    "name": "mArvIn",
+    "name": "marvin",
     "port": 13337,
     "logLevel": "debug"
   },
