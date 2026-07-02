@@ -25,5 +25,5 @@ export async function execTool(ctx: Context, tool: string, args: any) {
   if (!instance) {
     throw new Error(`execTool: Tool ${tool} not found`);
   }
-  return await instance.call(ctx, args);
+  return await instance.call(args);
 }

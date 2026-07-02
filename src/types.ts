@@ -41,24 +41,41 @@ export interface Config {
 }
 
 export abstract class App {
-  public context?: Context;
+  public ctx: Context;
+
+  constructor(ctx: Context) {
+    console.log('[marvin]', 'App.constructor', this.constructor.name);
+    this.ctx = ctx;
+  }
 
   abstract init(): Promise<void>;
   abstract drop(): Promise<void>;
-  
-  abstract initContext(): void;
 }
 
 export abstract class Tool {
+  public ctx: Context;
+
+  constructor(ctx: Context) {
+    console.log('[marvin]', 'Tool.constructor', this.constructor.name);
+    this.ctx = ctx;
+  }
+
   abstract name(): string;
   abstract info(): string;
   abstract args(): { [name: string]: { type: string; description: string; items?: { type: string }; required: boolean } };
-  abstract call(ctx: any, args: any): Promise<any>;
+  abstract call(args: any): Promise<any>;
 }
 
 // channel interface
 export abstract class Channel {
-  abstract init(context: Context): Promise<void>;
+  public ctx: Context;
+
+  constructor(ctx: Context) {
+    console.log('[marvin]', 'Channel.constructor', this.constructor.name);
+    this.ctx = ctx;
+  }
+
+  abstract init(): Promise<void>;
   abstract drop(): Promise<void>;
   abstract sendMessage(message: Message): Promise<any | null>;
 }

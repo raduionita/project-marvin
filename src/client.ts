@@ -12,7 +12,6 @@ export class Client extends App {
     const args = process.argv.slice(2);
     console.log('[marvin]', 'Client.init', args);
 
-    this.initContext();
     this.initHandlers();
     this.initProject();
     this.initConfig();
@@ -36,12 +35,6 @@ export class Client extends App {
     console.log('[marvin]', 'Client.drop');
   }
 
-  initContext() {
-    console.log('[marvin]', 'Client.initContext');
-    this.context = new Context();
-    this.context!.client = this;
-  }
-
   initProject() {
     console.log('[marvin]', 'Client.initProject');
 
@@ -51,7 +44,7 @@ export class Client extends App {
       mkdirSync(wdir, { recursive: true });
     }
 
-    this.context!.home = wdir;
+    this.ctx!.home = wdir;
 
     // create marvin.json if missing
     const path = join(wdir, 'config.json');
@@ -70,7 +63,7 @@ export class Client extends App {
   initConfig() {
     console.log('[marvin]', 'Client.initConfig');
 
-    const path = join(this.context!.home, 'marvin.json');
+    const path = join(this.ctx!.home, 'marvin.json');
 
     let config = {} as Config;
 
@@ -92,7 +85,7 @@ export class Client extends App {
       } as Config;
     }
 
-    this.context!.config = config;
+    this.ctx!.config = config;
   }
 
   initHandlers() {
@@ -107,7 +100,7 @@ export class Client extends App {
   async execReload() {
     console.log('[marvin]', 'Client.execReload');
 
-    const url = new URL(`http://localhost:${this.context!.config.settings.port}/`);
+    const url = new URL(`http://localhost:${this.ctx!.config.settings.port}/`);
     url.pathname = '/reload';
     const res = await fetch(url.toString());
     if (!res.ok) {

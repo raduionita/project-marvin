@@ -2,6 +2,7 @@ import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient } from '@slack/web-api';
 import { Channel, Message, Agent } from '../types.js';
 import { Context } from '../context.js';
+import * as constants from '../constants.js';
 
 type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>, ack: (response?: Record<string, unknown>) => Promise<void> };
 
@@ -10,11 +11,8 @@ type SlackResponse = { ts: string; ok: boolean; error: string | undefined; messa
 export default class SlackChannel extends Channel {
   protected sok!: SocketModeClient;
   protected web!: WebClient;
-  protected ctx!: Context;
 
-  async init(ctx: Context) {
-    this.ctx = ctx;
-
+  async init() {
     console.log('[marvin]', 'SlackChannel.init', this.ctx.config.channels.slack);
 
     const settings = this.ctx.config.channels.slack;
@@ -97,7 +95,7 @@ export default class SlackChannel extends Channel {
       console.debug('[marvin]', 'SlackChannel.onMention', 'event=', JSON.stringify(event));
       
       // acknowledge the event
-      await ack();
+      await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
 
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
@@ -143,7 +141,8 @@ export default class SlackChannel extends Channel {
       console.info('[marvin]', 'SlackChannel.onDirectMessage', `channel=${event.channel}`);
       console.debug('[marvin]', 'SlackChannel.onDirectMessage', 'body=', JSON.stringify(body));
       console.debug('[marvin]', 'SlackChannel.onDirectMessage', 'event=', JSON.stringify(event));
-      await ack();
+      
+      await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
 
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);

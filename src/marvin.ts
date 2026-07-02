@@ -1,17 +1,20 @@
 import { Server } from './server.js';
 import { Client } from './client.js';
+import { Context } from './context.js';
 
 (async () => {
   const args = process.argv.slice(2);
   const isServer = args.includes('--server');
 
+  const ctx = new Context();
+
   if (isServer) {
     console.log('[marvin] Starting Daemon mode...');
-    const server = new Server();
+    const server = new Server(ctx);
     await server.init();
   } else {
     console.log('[marvin] Starting Client mode...');
-    const client = new Client();
+    const client = new Client(ctx);
     await client.init();
   }
 })().catch(err => {

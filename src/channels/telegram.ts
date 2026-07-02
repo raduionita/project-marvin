@@ -3,7 +3,7 @@ import { Server } from '../server.js';
 
 export default class TelegramChannel extends Channel {
   async init(server: Server) : Promise<void> {
-    const ctx = server.context;
+    const ctx = server.ctx;
     console.log('[marvin]', 'TelegramChannel.init', 'attaching...', ctx.config.settings);
     console.log('[marvin]', 'TelegramChannel.init', 'attached!');
   }

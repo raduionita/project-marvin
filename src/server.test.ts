@@ -29,8 +29,8 @@ test('execChannels loads enabled channels with valid provider', async () => {
   await server.initConfig(config);
   await server.initChannels();
 
-  expect(server.context!.channels['channel.mock']).toBeDefined();
-  expect(server.context!.channels['channel.mock'] instanceof Channel).toBe(true);
+  expect(server.ctx!.channels['channel.mock']).toBeDefined();
+  expect(server.ctx!.channels['channel.mock'] instanceof Channel).toBe(true);
 });
 
 test('execChannels skips disabled channels', async () => {
@@ -41,7 +41,7 @@ test('execChannels skips disabled channels', async () => {
   await server.initConfig(config);
   await server.initChannels();
 
-  expect(server.context!.channels['disabledChannel']).toBeUndefined();
+  expect(server.ctx!.channels['disabledChannel']).toBeUndefined();
 });
 
 test('execChannels warns on missing provider', async () => {
@@ -53,7 +53,7 @@ test('execChannels warns on missing provider', async () => {
   await server.initChannels();
 
 
-  expect(server.context!.channels['unknownProvider']).toBeUndefined();
+  expect(server.ctx!.channels['unknownProvider']).toBeUndefined();
 });
 
 test('execChannels skips non-Channel classes', async () => {
@@ -64,7 +64,7 @@ test('execChannels skips non-Channel classes', async () => {
   await server.initConfig(config);
   await server.initChannels();
 
-  expect(server.context!.channels['badChannel']).toBeUndefined();
+  expect(server.ctx!.channels['badChannel']).toBeUndefined();
 });
 
 test('execChannels stores channels in ctx.channels', async () => {
@@ -75,6 +75,6 @@ test('execChannels stores channels in ctx.channels', async () => {
   await server.initConfig(config);
   await server.initChannels();
 
-  expect(Object.keys(server.context!.channels).length).toBeGreaterThan(0);
-  expect(Object.keys(server.context!.channels)).toContain('channel.mock');
+  expect(Object.keys(server.ctx!.channels).length).toBeGreaterThan(0);
+  expect(Object.keys(server.ctx!.channels)).toContain('channel.mock');
 });

@@ -13,7 +13,7 @@ export default class GetDateTool extends Tool {
     };
   }
 
-  async call(ctx: any, args: any) {
+  async call(args: any) {
     return new Date(args.timestamp || Date.now()).toLocaleDateString();
   }
 }

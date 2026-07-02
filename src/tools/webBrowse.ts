@@ -14,13 +14,13 @@ export default class WebBrowseTool extends Tool {
     };
   }
 
-  async call(ctx: Context, args: { url: string }) {
-    if (!ctx.browser) {
+  async call(args: { url: string }) {
+    if (!this.ctx.browser) {
       throw new Error('webBrowse: Browser is not initialized in the server context');
     }
 
     const url = args.url;
-    const browserCtx = await ctx.browser.newContext({
+    const browserCtx = await this.ctx.browser.newContext({
       viewport: { width: 1200, height: 800 },
       javaScriptEnabled: true,
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36',

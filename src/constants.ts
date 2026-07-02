@@ -22,3 +22,6 @@ export const EXIT_CODES = {
   OK: 0,
   ERROR: 1,
 };
+
+
+export const ACKS = ['Here...', 'On it...', 'One sec...', 'Hold on...', 'I got this...', 'Got it...', 'Lemme see...'];

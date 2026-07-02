@@ -18,14 +18,14 @@ export default class WebSearchTool extends Tool {
     };
   }
 
-  async call(ctx: Context, args: { query: string }) {
-    if (!ctx.browser) {
+  async call(args: { query: string }) {
+    if (!this.ctx.browser) {
       throw new Error('webSearch: Browser is not initialized in the server context');
     }
 
     const query = args.query;
     const url = `https://duckduckgo.com?q=${query}&df=d`;
-    const browserCtx = await ctx.browser.newContext({
+    const browserCtx = await this.ctx.browser.newContext({
       viewport: { width: 1200, height: 800 },
       javaScriptEnabled: true,
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36',

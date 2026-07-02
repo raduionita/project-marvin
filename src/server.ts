@@ -21,7 +21,6 @@ export class Server extends App {
   async init(): Promise<void> {
     console.log('[marvin]', 'Server.init');
 
-    this.initContext();
     this.initHandlers();
     this.initProject();
     this.initConfig();
@@ -39,20 +38,14 @@ export class Server extends App {
   async drop() {
     console.log('[marvin]', 'Server.drop');
 
-    if (this.context!.state !== 'running') return;
-    this.context!.state = 'stopped';
+    if (this.ctx!.state !== 'running') return;
+    this.ctx!.state = 'stopped';
 
     this.dropAgents();
     this.dropModels();
     await this.dropChannels();
     this.dropHttp();
     await this.dropBrowser();
-  }
-
-  initContext() {
-    console.log('[marvin]', 'Server.initContext');
-    this.context = new Context();
-    this.context!.server = this;
   }
 
   initHandlers() {
@@ -97,7 +90,7 @@ export class Server extends App {
     }
 
     // set home (~/.marvin)
-    this.context!.home = home;
+    this.ctx!.home = home;
 
     // agents folder (~/.marvin/agents)
     const apath = join(home, 'agents');
@@ -122,31 +115,31 @@ export class Server extends App {
   initConfig(config?: Config | undefined) {
     console.log('[marvin]', 'Server.initConfig', config !== undefined);
     if (config) {
-      this.context!.config = config;
+      this.ctx!.config = config;
       return;
     } else {
-      const path = join(this.context!.home, 'marvin.json');
+      const path = join(this.ctx!.home, 'marvin.json');
 
       config = {} as Config;
 
       // at this stage marvin.json MUST exist, but just in case
       if (!existsSync(path)) {
         console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
-        this.context!.config = constants.DEFAULT_CONFIG as Config;
+        this.ctx!.config = constants.DEFAULT_CONFIG as Config;
         return;
       }
 
       const data = readFileSync(path, 'utf8');
       config = tryJsonParse(data);
 
-      this.context!.config = config!;
+      this.ctx!.config = config!;
     }
   }
 
   initWatch() {
     console.log('[marvin]', 'Server.initWatch');
 
-    const mpath = join(this.context!.home, 'marvin.json');
+    const mpath = join(this.ctx!.home, 'marvin.json');
     try {
       let w = watch(mpath, () => {
         console.log('[marvin]', 'Server.initWatch', 'config file changed, reloading...');
@@ -163,13 +156,13 @@ export class Server extends App {
 
     const args = process.argv.slice(2);
 
-    this.context!.isDry = args.includes('--dry');
+    this.ctx!.isDry = args.includes('--dry');
   }
 
   async initHttp() {
     console.log('[marvin]', 'Server.initHttp');
 
-    const ctx = this.context!;
+    const ctx = this.ctx!;
     const port = ctx.config.settings.port || 7331;
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url || '/', `http://localhost:${port}`);
@@ -233,41 +226,25 @@ export class Server extends App {
       // todo: proxies
     });
 
-    this.context!.browser = browser;
-  }
-
-  async dropBrowser() {
-    console.log('[marvin]', 'Server.dropBrowser');
-    if (this.context!.browser) {
-      try {
-        await this.context!.browser.close();
-      } catch (err) {
-        console.error('[marvin]', 'Server.dropBrowser', 'error:', err);
-      }
-      this.context!.browser = null;
-    }
+    this.ctx!.browser = browser;
   }
 
   async initTools() {
     console.log('[marvin]', 'Server.initTools');
 
-    const ctx = this.context!;
-    const files = listTools(this.context!).map(f => f.replace('.ts', ''));
+    const files = listTools(this.ctx).map(f => f.replace('.ts', ''));
     for (const file of files) {
       const name = file;
       try {
         const Module = await import(`./tools/${name}.js`);
-        const Class = Module.default || (Module as any)[name.charAt(0).toUpperCase() + name.slice(1)];
+        const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
           console.warn('[marvin]', 'Server.initTools', `${file} does not export a Tool class, skipping`);
           continue;
         }
-        const instance = new (Class as new (ctx: Context) => Tool)(ctx);
-        if (name !== instance.name()) {
-          console.warn('[marvin]', 'Server.initTools', `${file}: module name "${name}" does not match tool name "${instance.name()}", skipping`);
-          continue;
-        }
-        ctx.tools[instance.name()] = instance;
+        // register instance of Tool
+        const instance = new Class(this.ctx);
+        this.ctx.tools[instance.name()] = instance;
         console.log('[marvin]', 'Server.initTools', `loaded: ${instance.name()}`);
       } catch (err) {
         console.error('[marvin]', 'Server.initTools', `failed to load ${file}:`, err);
@@ -278,8 +255,8 @@ export class Server extends App {
   async initChannels() {
     console.log('[marvin]', 'Server.initChannels');
 
-    const files = listChannels(this.context!).map(f => f.replace('.ts', ''));
-    for (const [id, config] of Object.entries(this.context!.config.channels) as [string, Config['channels'][string]][]) {
+    const files = listChannels(this.ctx!).map(f => f.replace('.ts', ''));
+    for (const [id, config] of Object.entries(this.ctx!.config.channels) as [string, Config['channels'][string]][]) {
       if (!config.enabled) continue;
 
       const file = files.find(f => f === id);
@@ -290,14 +267,15 @@ export class Server extends App {
 
       try {
         const Module = await import(`./channels/${file}.js`);
-        const Class = Module.default || (Module as any)[file.charAt(0).toUpperCase() + file.slice(1)];
+        const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Channel)) {
           console.warn('[marvin]', 'Server.initChannels', `${file} does not export a Channel class, skipping ${id}`);
           continue;
         }
-        const instance = new Class();
-        await instance.init(this);
-        this.context!.channels[id] = instance;
+        // register instance of Channel 
+        const instance = new Class(this.ctx);
+        await instance.init();
+        this.ctx.channels[id] = instance;
         console.log('[marvin]', 'Server.initChannels', `loaded: ${id}`);
       } catch (err) {
         console.error('[marvin]', 'Server.initChannels', `failed to load ${id}:`, err);
@@ -308,7 +286,7 @@ export class Server extends App {
   async initModels() {
     console.log('[marvin]', 'Server.initModels');
 
-    const ctx = this.context!;
+    const ctx = this.ctx!;
 
     // config models
     const files = listModels(this).map(f => f.replace('.ts', ''))
@@ -373,7 +351,7 @@ export class Server extends App {
   async initAgents() {
     console.log('[marvin]', 'Server.initAgents');
 
-    const ctx = this.context!;
+    const ctx = this.ctx!;
 
     // type: orchestrator/supervisor
     const agentId = ctx.config.settings.name;
@@ -574,7 +552,7 @@ export class Server extends App {
 
   async execReload() {
     console.log('[marvin]', 'Server.execReload');
-    this.context!.state = 'reloading';
+    this.ctx!.state = 'reloading';
 
     // drop in reverse order
     this.dropAgents();
@@ -588,12 +566,12 @@ export class Server extends App {
     await this.initModels();
     await this.initAgents();
 
-    this.context!.state = 'running';
+    this.ctx!.state = 'running';
   }
 
   dropAgents() {
     console.log('[marvin]', 'Server.dropAgents');
-    const ctx = this.context!;
+    const ctx = this.ctx!;
     for (const agent of Object.values(ctx.agents)) {
       for (const task of Object.values(agent.tasks)) {
         if (task.timeout) clearTimeout(task.timeout);
@@ -604,13 +582,13 @@ export class Server extends App {
 
   dropModels() {
     console.log('[marvin]', 'Server.dropModels');
-    this.context!.models = {};
+    this.ctx!.models = {};
   }
 
   // will detach and delete ALL channels from the context
   async dropChannels() {
     console.log('[marvin]', 'Server.dropChannels');
-    const ctx = this.context!;
+    const ctx = this.ctx!;
     for (const channel of Object.values(ctx.channels)) {
       try {
         await channel.drop();
@@ -624,7 +602,7 @@ export class Server extends App {
   // will detach and delete the channel from the context
   dropChannel(id: string) {
     console.log('[marvin]', 'Server.dropChannel', id);
-    const ctx = this.context!;
+    const ctx = this.ctx!;
     if (ctx.channels[id]) {
       try {
         ctx.channels[id].drop();
@@ -635,12 +613,24 @@ export class Server extends App {
     }
   }
 
+  async dropBrowser() {
+    console.log('[marvin]', 'Server.dropBrowser');
+    if (this.ctx!.browser) {
+      try {
+        await this.ctx!.browser.close();
+      } catch (err) {
+        console.error('[marvin]', 'Server.dropBrowser', 'error:', err);
+      }
+      this.ctx!.browser = null;
+    }
+  }
+
   // will close the server and set to undefined, you will need initHttp() to re-open it
   dropHttp() {
     console.log('[marvin]', 'Server.dropHttp');
-    if (this.context!.http) {
-      this.context!.http.close();
-      this.context!.http = undefined;
+    if (this.ctx!.http) {
+      this.ctx!.http.close();
+      this.ctx!.http = undefined;
     }
   }
 }
