@@ -8,9 +8,9 @@ type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>,
 type SlackResponse = { ts: string; ok: boolean; error: string | undefined; message?: string, channel?: string };
 
 export default class SlackChannel extends Channel {
-  private sok!: SocketModeClient;
-  private web!: WebClient;
-  private ctx!: Context;
+  protected sok!: SocketModeClient;
+  protected web!: WebClient;
+  protected ctx!: Context;
 
   async init(ctx: Context) {
     this.ctx = ctx;
@@ -90,7 +90,7 @@ export default class SlackChannel extends Channel {
     }
   }
 
-  private async onMention({ event, body, ack }: HandlerParams) {
+  protected async onMention({ event, body, ack }: HandlerParams) {
     try {
       console.info('[marvin]', 'SlackChannel.onMention', `channel=${event.channel} thread=${event.thread_ts}|${event.ts}`);
       console.debug('[marvin]', 'SlackChannel.onMention', 'body=', JSON.stringify(body));
@@ -138,7 +138,7 @@ export default class SlackChannel extends Channel {
     }
   }
 
-  private async onDirectMessage({ event, body, ack }: HandlerParams) {
+  protected async onDirectMessage({ event, body, ack }: HandlerParams) {
     try {
       console.info('[marvin]', 'SlackChannel.onDirectMessage', `channel=${event.channel}`);
       console.debug('[marvin]', 'SlackChannel.onDirectMessage', 'body=', JSON.stringify(body));
@@ -155,7 +155,7 @@ export default class SlackChannel extends Channel {
       }
 
       // find an agent that has slack configured
-      const agent = this.findAgent();
+      const agent = this.findAgent(event.channel);
       const thread = event.thread_ts || event.ts || event.event_ts;
       const agentId = agent.id;
       const chatId = `slack-${event.channel}-${thread}`;
@@ -177,39 +177,39 @@ export default class SlackChannel extends Channel {
     }
   }
 
-  private async onSlashCommand({ event, body, ack }: HandlerParams) {
+  protected async onSlashCommand({ event, body, ack }: HandlerParams) {
     console.info('[marvin]', 'SlackChannel.onSlashCommand', `command: ${body.collback_id}`, Object.keys(event), Object.keys(body), ack.toString());
     await ack({ text: `u want me to do /${body.collback_id}? ok whatever, it's not implemented yet, talk to the dev!` });
 
     // TODO: switch (body.collback_id) {
   }
 
-  private async onError(error: Error) {
+  protected async onError(error: Error) {
     console.error('[marvin]', 'SlackChannel.onError', error);
   }
 
-  private async onConnecting() {
+  protected async onConnecting() {
     console.info('[marvin]', 'SlackChannel.onConnecting', 'connecting...');
   }
 
-  private async onConnected() {
+  protected async onConnected() {
     console.info('[marvin]', 'SlackChannel.onConnected', 'connected!');
   }
 
-  private async onReconnecting(attemptNumber: number) {
+  protected async onReconnecting(attemptNumber: number) {
     console.warn('[marvin]', 'SlackChannel.onReconnecting', `reconnecting... (${attemptNumber})`);
   }
 
-  private async onReconnected() {
+  protected async onReconnected() {
     console.warn('[marvin]', 'SlackChannel.onReconnected', 'reconnected!');
   }
 
-  private async onDisconnected(error: Error) {
+  protected async onDisconnected(error: Error) {
     console.warn('[marvin]', 'SlackChannel.onDisconnected', 'disconnected!', error);
   }
 
   // extract the actual text from a Slack event, stripping @marvin mention
-  private extractText(event: { [key: string]: any }): string {
+  protected extractText(event: { [key: string]: any }): string {
     let text: string = (event.text || '');
 
     // TOOD: should remove @bot-name with "" NOT other user's @mentions
@@ -227,7 +227,7 @@ export default class SlackChannel extends Channel {
   }
 
   // find agent using event.channel or fallback to default "marvin"
-  private findAgent(channel?: string): Agent {
+  protected findAgent(channel?: string): Agent {
     console.log('[marvin]', 'SlackChannel.findAgent', channel ? `channel=${channel}` : 'marvin');
 
     // diretly use marvin/orchestrator agent
@@ -245,7 +245,7 @@ export default class SlackChannel extends Channel {
       }
     }
 
-    // fallback: first enabled agent
+    // fallback: default agent (settings.name), fallback doesnt need slack configured
     return this.ctx.agents[this.ctx.config.settings.name]!;
   }
 }

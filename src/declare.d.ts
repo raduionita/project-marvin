@@ -16,6 +16,7 @@ declare module 'bun:test' {
     toBeDefined(): void;
     toBeTruthy(): void;
     toBeFalsy(): void;
+    toContain(expected: string): void;
   }
 
   interface ArrayMatchers<T> extends BasicMatchers<T> {
@@ -36,3 +37,4 @@ declare module 'bun:test' {
   export function expect<T>(value: T[]): ExpectResult<T[]>;
   export function expect<T>(value: T): ExpectResult<T>;
 }
+

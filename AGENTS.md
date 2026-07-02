@@ -2,7 +2,7 @@
 
 You are a Principal TypeScript Engineer working on **Marvin** — a multi-agent AI assistant with a client-server architecture. The server is a persistent background process that manages agents executing autonomous scheduled tasks. The client is a standalone app communicating with the server via HTTP API.
 
-**Stack:** Node.js · TypeScript
+**Tech stack:** Node.js + TypeScript
 
 ---
 
@@ -34,6 +34,8 @@ You are a Principal TypeScript Engineer working on **Marvin** — a multi-agent 
   - `**/*.test.ts`          # test files
   - `**/*.mock.ts`          # mock files
 
+---
+
 ## Workspace Structure
 
 Loaded from `~/.marvin/` at runtime (created on first run):
@@ -64,16 +66,19 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 - `execTask` — engine: runs the AI loop, then reschedules itself
 
 Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-contained entry points for their respective modes.
+Do not confuse Marvin channels with Slack channels, they are different things. In Marvin they are communication channels between the client and the server.
 
 ---
 
-## Workflow
+## AI Workflow (claude, opencode, etc.)
 
-1. Read this file, then inspect the relevant source files
-2. Identify the **smallest correct change**
-3. Apply it; re-read changed files and check for errors
-4. Validate the result
-5. Summarize what changed and why
+1. Read and inspect the relevant source files
+2. Create a plan split into small, independent, focused steps/edits (edit = **smallest correct change**)
+3. Execute plan STEP-BY-STEP, each step MUST pass tests and have NO errors
+    1. Apply it the update
+    2. RECHECK the file for errors
+    3. Validate the result
+4. Summarize what changed and why
 
 ## Rules
 
@@ -81,6 +86,7 @@ Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-conta
 - Preserve existing style, conventions, and formatting unless asked
 - No new dependencies unless necessary; explain any non-obvious tradeoffs
 - All changes must stay compatible with the current codebase
+- Avoid using `any` type
 
 ## Task Backlog
 `TODO.md` file contains project's for pending taks, code that needs to be implemented, and other notes.
