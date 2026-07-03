@@ -3,8 +3,7 @@ import { Context } from '../context.js';
 
 // Intentionally does NOT extend Channel — used to test validation in execChannels
 export default class MockChannel extends Channel {
-  async init(ctx: Context): Promise<void> {
-    this.ctx = ctx;
+  async init(): Promise<void> {
     console.log('[marvin]', 'MockChannel.init', 'initialized');
   }
 

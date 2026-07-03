@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { Server } from './server.js';
 import { Client } from './client.js';
 import { Context } from './context.js';

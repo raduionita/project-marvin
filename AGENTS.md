@@ -77,7 +77,7 @@ Do not confuse Marvin channels with Slack channels, they are different things. I
 3. Execute plan STEP-BY-STEP, each step MUST pass tests and have NO errors
     1. Apply it the update
     2. RECHECK the file for errors
-    3. Validate the result
+    3. Validate the result (run `tsc --noEmit`)
 4. Summarize what changed and why
 
 ## Rules
@@ -86,7 +86,8 @@ Do not confuse Marvin channels with Slack channels, they are different things. I
 - Preserve existing style, conventions, and formatting unless asked
 - No new dependencies unless necessary; explain any non-obvious tradeoffs
 - All changes must stay compatible with the current codebase
-- Avoid using `any` type
+- Avoid using `as any`
+- run `tsc --noEmit` to check for type errors
 
 ## Task Backlog
 `TODO.md` file contains project's for pending taks, code that needs to be implemented, and other notes.

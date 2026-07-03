@@ -93,10 +93,7 @@ class MockSlackChannel extends SlackChannel {
   private _sok: SlackMockSocketModeClient | null = null;
   private _web!: SlackMockWebClient;
 
-  async init(ctx: Context) {
-    // Set up this.ctx directly (parent's abstract init cannot be called).
-    this.ctx = ctx;
-
+  async init() {
     // Set up mock SDK clients (cast to parent types for compatibility).
     this._sok = new MockSocketModeClient();
     (this as SlackChannel & { sok: SlackMockSocketModeClient }).sok = this._sok as unknown as SocketModeClient;
@@ -375,8 +372,8 @@ test('findSlackAgent returns agent with slack configured', async () => {
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = { enabled: true, channels: { slack: 'C123' }, tasks: {}, model: {} as never, identity: '' } as Agent;
-  (ctx.agents as Record<string, Agent>)['agent-2'] = { enabled: true, channels: {}, tasks: {}, model: {} as never, identity: '' } as Agent;
+  (ctx.agents as Record<string, Agent>)['agent-1'] = { id: 'agent-1', enabled: true, channels: { slack: 'C123' }, tasks: {}, model: {} as never, identity: '' } as Agent;
+  (ctx.agents as Record<string, Agent>)['agent-2'] = { id: 'agent-2', enabled: true, channels: {}, tasks: {}, model: {} as never, identity: '' } as Agent;
 
   const configChannels = ((ctx.config.agents as Record<string, { channels: Record<string, string> }>)['agent-1'])?.channels || {};
   expect(configChannels.slack).toBe('C123');

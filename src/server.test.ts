@@ -15,8 +15,14 @@ function mockConfig(channels: Config['channels'] = {}): Config {
   } as Config;
 }
 
+function mockContext(): Context {
+  const ctx = new Context();
+  return ctx;
+}
+
 function mockServer(): Server {
-  return new Server();
+  const ctx = mockContext();
+  return new Server(ctx);
 }
 
 // tests
@@ -25,7 +31,6 @@ test('execChannels loads enabled channels with valid provider', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
   const server = mockServer();
 
-  server.initContext();
   await server.initConfig(config);
   await server.initChannels();
 
@@ -37,7 +42,6 @@ test('execChannels skips disabled channels', async () => {
   const config = mockConfig({ disabledChannel: { enabled: false } });
   const server = mockServer();
 
-  server.initContext();
   await server.initConfig(config);
   await server.initChannels();
 
@@ -48,7 +52,6 @@ test('execChannels warns on missing provider', async () => {
   const config = mockConfig({ unknownProvider: { enabled: true } });
   const server = mockServer();
 
-  server.initContext();
   await server.initConfig(config);
   await server.initChannels();
 
@@ -60,7 +63,6 @@ test('execChannels skips non-Channel classes', async () => {
   const config = mockConfig({ badChannel: { enabled: true } });
   const server = mockServer();
 
-  server.initContext();
   await server.initConfig(config);
   await server.initChannels();
 
@@ -71,7 +73,6 @@ test('execChannels stores channels in ctx.channels', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
   const server = mockServer();
 
-  server.initContext();
   await server.initConfig(config);
   await server.initChannels();
 
