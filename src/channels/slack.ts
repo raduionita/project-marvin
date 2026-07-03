@@ -1,16 +1,29 @@
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
-import { WebClient } from '@slack/web-api';
+import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import { Channel, Message, Agent } from '../types.js';
 import { Context } from '../context.js';
 import * as constants from '../constants.js';
 
-type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>, ack: (response?: Record<string, unknown>) => Promise<void> };
+export type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>, ack: (response?: Record<string, unknown>) => Promise<void> };
 
-type SlackResponse = { ts: string; ok: boolean; error: string | undefined; message?: string, channel?: string };
+export type SlackResponse = { ts: string; ok: boolean; error: string | undefined; message?: string, channel?: string };
+
+export interface ISocketModeClient {
+  start: () => Promise<any>;
+  disconnect: () => Promise<void>;
+  emit: (event: string, ...args: unknown[]) => void;
+  on: (event: string, handler: (...args: any[]) => any) => void;
+}
+
+export interface IWebClient {
+  chat: {
+    postMessage: (args: ChatPostMessageArguments) => Promise<ChatPostMessageResponse>;
+  };
+}
 
 export default class SlackChannel extends Channel {
-  protected sok!: SocketModeClient;
-  protected web!: WebClient;
+  protected sok!: ISocketModeClient;
+  protected web!: IWebClient;
 
   async init() {
     console.log('[marvin]', 'SlackChannel.init', this.ctx.config.channels.slack);
