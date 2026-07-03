@@ -44,10 +44,11 @@ export class Server extends App {
     this.dropAgents();
     this.dropModels();
     await this.dropChannels();
-    this.dropHttp();
+    await this.dropHttp();
     await this.dropBrowser();
   }
 
+  // sets up handlers for SIGINT, SIGTERM, and unhandledRejection, uncaughtException, exit
   initHandlers() {
     // SIGINT (Ctrl+C)
     process.on('SIGINT', () => {
@@ -80,6 +81,7 @@ export class Server extends App {
     });
   }
 
+  // create ~/.marvin folder and required files
   initProject() {
     console.log('[marvin]', 'Server.initProject');
 
@@ -600,7 +602,7 @@ export class Server extends App {
   }
 
   // will detach and delete the channel from the context
-  dropChannel(id: string) {
+  async dropChannel(id: string) {
     console.log('[marvin]', 'Server.dropChannel', id);
     const ctx = this.ctx!;
     if (ctx.channels[id]) {
@@ -626,11 +628,20 @@ export class Server extends App {
   }
 
   // will close the server and set to undefined, you will need initHttp() to re-open it
-  dropHttp() {
+  async dropHttp() {
     console.log('[marvin]', 'Server.dropHttp');
-    if (this.ctx!.http) {
-      this.ctx!.http.close();
-      this.ctx!.http = undefined;
-    }
+    return new Promise<void>((resolve) => {
+      if (this.ctx!.http) {
+        this.ctx!.http.close(function (error?: Error|undefined) {
+          if (error) {
+            console.error('[marvin]', 'Server.dropHttp', 'error:', error);
+          }
+          resolve();
+        });
+        this.ctx!.http = undefined;
+      } else {
+        resolve();
+      }
+    });
   }
 }
