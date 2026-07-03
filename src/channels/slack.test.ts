@@ -3,19 +3,11 @@ import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-ap
 import { Context } from '../context.js';
 import { Config, Message, Agent } from '../types.js';
 import SlackChannel from './slack.js';
-import { HandlerParams, SlackResponse, ISocketModeClient, IWebClient } from './slack.js'
+import { type HandlerParams, type SlackResponse, type ISocketModeClient, type IWebClient } from './slack.js'
 
-// ============================================================================
-// Type definitions (replacing all `any` usage)
-// ============================================================================
-
-interface SlackMockServer {
+interface MockServer {
   sendChat: (ctx: Context, chatId: string, agentId: string, input: string) => Promise<{ content: string; steps: number } | null>;
 }
-
-// ============================================================================
-// Mock Slack SDK classes (for full-class integration tests)
-// ============================================================================
 
 class MockSocketModeClient implements ISocketModeClient {
   public started = false;
@@ -59,10 +51,6 @@ class MockWebClient implements IWebClient {
     };
   }
 }
-
-// ============================================================================
-// MockSlackChannel: extends SlackChannel, uses parent's methods via polymorphism
-// ============================================================================
 
 class MockSlackChannel extends SlackChannel {
   constructor(ctx: Context) {
@@ -139,7 +127,7 @@ class MockSlackChannel extends SlackChannel {
       return;
     }
 
-    const server = this.ctx.server as SlackMockServer;
+    const server = this.ctx.server;
     if (!server) {
       console.error('[marvin]', 'SlackChannel.onMention', 'server not available');
       await this.sendMessage({ role: 'assistant', content: '(server not available)' });
@@ -170,7 +158,7 @@ class MockSlackChannel extends SlackChannel {
       // extract the actual message text (strip @marvin mention)
       let text = (event.text as string | undefined) || '';
 
-      const server = this.ctx.server as SlackMockServer;
+      const server = this.ctx.server;
       if (!server) {
         throw new Error('SlackChannel.onDirectMessage: server not available');
       }
@@ -340,14 +328,14 @@ test('findSlackAgent returns agent with slack configured', async () => {
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  ctx.agents['agent-1'] = {
     id: 'agent-1', enabled: true, channels: { slack: 'C123' }, tasks: {}, model: {} as never, identity: '',
   } as Agent;
-  (ctx.agents as Record<string, Agent>)['agent-2'] = {
+  ctx.agents['agent-2'] = {
     id: 'agent-2', enabled: true, channels: {}, tasks: {}, model: {} as never, identity: '',
   } as Agent;
 
-  const configChannels = ((ctx.config.agents as Record<string, { channels: Record<string, string> }>)['agent-1'])?.channels || {};
+  const configChannels = ctx.config.agents['agent-1']?.channels || {};
   expect(configChannels.slack).toBe('C123');
 });
 
@@ -359,17 +347,17 @@ test('findSlackAgent skips disabled agents', async () => {
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-disabled'] = {
+  ctx.agents['agent-disabled'] = {
     id: 'agent-disabled', enabled: false, channels: { slack: 'C456' }, tasks: {}, model: {} as never, identity: '',
   } as Agent;
-  (ctx.agents as Record<string, Agent>)['agent-active'] = {
+  ctx.agents['agent-active'] = {
     id: 'agent-active', enabled: true, channels: { slack: 'C789' }, tasks: {}, model: {} as never, identity: '',
   } as Agent;
 
   let found: string | null = null;
   for (const [agentId, agent] of Object.entries(ctx.agents)) {
     if (!agent.enabled) continue;
-    const channels = ((ctx.config.agents as Record<string, { channels: Record<string, string> }>)?.[agentId] as { channels: Record<string, string> })?.channels || {};
+    const channels = ctx.config.agents[agentId]?.channels || {};
     if (channels.slack) {
       found = agentId;
       break;
@@ -536,7 +524,7 @@ test('init() creates mock clients and calls start()', async () => {
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   expect(ch.sokClient).toBeDefined();
   expect(ch.webClient).toBeDefined();
@@ -553,7 +541,7 @@ test('init() falls back to env vars when config is missing', async () => {
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   expect((ch.sokClient as MockSocketModeClient).started).toBe(true);
 });
@@ -586,10 +574,10 @@ test('drop() disconnects the mock socket', async () => {
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   expect((ch.sokClient as MockSocketModeClient).started).toBe(true);
-  await (ch as SlackChannel).drop();
+  await ch.drop();
 });
 
 test('drop() before init does not throw', async () => {
@@ -611,19 +599,19 @@ test('sendMessage() success returns SlackResponse with ts and ok', async () => {
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.123', channel: 'C123',
     message: { text: 'reply text', ts: '1700000000.123' },
   });
 
-  const result = await (ch as SlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage({ role: 'assistant', content: 'hello' });
+  const result = await ch.sendMessage({ role: 'assistant', content: 'hello' });
 
-  expect((result as SlackResponse)?.ok).toBe(true);
-  expect((result as SlackResponse)?.ts).toBe('1700000000.123');
-  expect((result as SlackResponse)?.channel).toBe('C123');
+  expect(result?.ok).toBe(true);
+  expect(result?.ts).toBe('1700000000.123');
+  expect(result?.channel).toBe('C123');
 });
 
 test('sendMessage() includes thread_ts for threaded messages', async () => {
@@ -636,20 +624,20 @@ test('sendMessage() includes thread_ts for threaded messages', async () => {
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.456', channel: 'C123',
     message: { text: 'thread reply', ts: '1700000000.456' },
   });
 
-  const result = await (ch as SlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage({
+  const result = await ch.sendMessage({
     role: 'assistant', content: 'thread reply', channel: 'C123', thread: '1700000000.999',
   });
 
-  expect((result as SlackResponse)?.ts).toBe('1700000000.456');
-  expect((result as SlackResponse)?.channel).toBe('C123');
+  expect(result?.ts).toBe('1700000000.456');
+  expect(result?.channel).toBe('C123');
 });
 
 test('sendMessage() logs warning on channel mismatch', async () => {
@@ -662,26 +650,26 @@ test('sendMessage() logs warning on channel mismatch', async () => {
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.789', channel: 'C456',
     message: { text: 'sent elsewhere' },
   });
 
-  const result = await (ch as SlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage({
+  const result = await ch.sendMessage({
     role: 'assistant', content: 'sent elsewhere', channel: 'C123',
   });
 
-  expect((result as SlackResponse)?.channel).toBe('C456');
+  expect(result?.channel).toBe('C456');
 });
 
 test('sendMessage() returns undefined when web is not attached', async () => {
   const ch = new MockSlackChannel(mockContext());
   // Don't call init — web is null.
 
-  const result = await (ch as SlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage({ role: 'assistant', content: 'hello' });
+  const result = await ch.sendMessage({ role: 'assistant', content: 'hello' });
 
   expect(result).toBeUndefined();
 });
@@ -700,7 +688,7 @@ test('onMention() happy path: extracts text, finds agent, calls sendChat, sends 
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: SlackMockServer }).server = {
+  (ctx as { server: MockServer }).server = {
     sendChat: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
       sendChatCalled = true;
       expect(chatId).toBe('slack-C123-1700000000.999');
@@ -708,13 +696,13 @@ test('onMention() happy path: extracts text, finds agent, calls sendChat, sends 
       expect(input).toBe('hello there');
       return { content: 'reply from agent', steps: 1 };
     },
-  } as SlackMockServer;
+  } as MockServer;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.111', channel: 'C123',
     message: { text: 'reply from agent' },
   });
@@ -726,7 +714,7 @@ test('onMention() happy path: extracts text, finds agent, calls sendChat, sends 
   let acked = false;
   const ack = async () => { acked = true; };
 
-  await (ch as MockSlackChannel).onMention({
+  await ch.onMention({
     event, body: { callback_id: 'test' }, ack,
   });
 
@@ -746,21 +734,21 @@ test('onMention() with no text content sends (no text content)', async () => {
     model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  let ch = new MockSlackChannel(ctx);
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({ ok: true, ts: '1700000000.222', channel: 'C123' });
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({ ok: true, ts: '1700000000.222', channel: 'C123' });
 
-  const originalSend = (ch as MockSlackChannel).sendMessage.bind(ch);
-  (ch as MockSlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage = async (msg: Message) => {
+  const originalSend = ch.sendMessage.bind(ch);
+  ch.sendMessage = async (msg: Message) => {
     sendMessageCalled = true;
     expect(msg.content).toBe('(no text content)');
     return originalSend(msg);
   };
 
   const event = { text: '<@U12345678>' };
-  await (ch as MockSlackChannel).onMention({ event, body: {}, ack: async () => {} });
+  await ch.onMention({ event, body: {}, ack: async () => {} });
 
   expect(sendMessageCalled).toBe(true);
 });
@@ -777,23 +765,23 @@ test('onMention() with no server sends (server not available)', async () => {
     model: {} as never,
   } as Agent;
 
-  (ctx as Context & { server?: SlackMockServer }).server = undefined;
+  (ctx as Context & { server?: MockServer }).server = undefined;
 
-  const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  let ch = new MockSlackChannel(ctx);
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({ ok: true, ts: '1700000000.333', channel: 'C123' });
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({ ok: true, ts: '1700000000.333', channel: 'C123' });
 
-  const originalSend = (ch as MockSlackChannel).sendMessage.bind(ch);
-  (ch as MockSlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage = async (msg: Message) => {
+  const originalSend = ch.sendMessage.bind(ch);
+  ch.sendMessage = async (msg: Message) => {
     sendMessageCalled = true;
     expect(msg.content).toBe('(server not available)');
     return originalSend(msg);
   };
 
   const event = { text: '<@U12345678> hello', channel: 'C123' };
-  await (ch as MockSlackChannel).onMention({ event, body: {}, ack: async () => {} });
+  await ch.onMention({ event, body: {}, ack: async () => {} });
 
   expect(sendMessageCalled).toBe(true);
 });
@@ -810,25 +798,25 @@ test('onMention() with null sendChat result sends (no response from the AI)', as
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: SlackMockServer }).server = {
+  (ctx as { server: MockServer }).server = {
     sendChat: async () => null,
-  } as SlackMockServer;
+  } as MockServer;
 
-  const ch = new MockSlackChannel(ctx);
+  let ch = new MockSlackChannel(ctx);
   await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({ ok: true, ts: '1700000000.444', channel: 'C123' });
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({ ok: true, ts: '1700000000.444', channel: 'C123' });
 
-  const originalSend = (ch as MockSlackChannel).sendMessage.bind(ch);
-  (ch as MockSlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage = async (msg: Message) => {
+  const originalSend = ch.sendMessage.bind(ch);
+  ch.sendMessage = async (msg: Message) => {
     sendMessageCalled = true;
     expect(msg.content).toBe('(no response from the AI)');
     return originalSend(msg);
   };
 
   const event = { text: '<@U12345678> hello', channel: 'C123' };
-  await (ch as MockSlackChannel).onMention({ event, body: {}, ack: async () => {} });
+  await ch.onMention({ event, body: {}, ack: async () => {} });
 
   expect(sendMessageCalled).toBe(true);
 });
@@ -847,22 +835,22 @@ test('onDirectMessage() happy path: finds agent by channel, calls sendChat, send
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: SlackMockServer }).server = {
+  (ctx as { server: MockServer }).server = {
     sendChat: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
       sendChatCalled = true;
       expect(agentId).toBe('agent-1'); // DM should resolve agent by channel (bug fix)
       return { content: 'DM reply', steps: 1 };
     },
-  } as SlackMockServer;
+  } as MockServer;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({ ok: true, ts: '1700000000.555', channel: 'D456' });
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({ ok: true, ts: '1700000000.555', channel: 'D456' });
 
   const event = { text: '<@U12345678> hi marvin', channel: 'D456' };
-  await (ch as MockSlackChannel).onDirectMessage({ event, body: {}, ack: async () => {} });
+  await ch.onDirectMessage({ event, body: {}, ack: async () => {} });
 
   expect(sendChatCalled).toBe(true);
 });
@@ -879,18 +867,18 @@ test('onDirectMessage() with no text content sends (no text content)', async () 
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: SlackMockServer }).server = {
+  (ctx as { server: MockServer }).server = {
     sendChat: async () => ({ content: 'should not reach here', steps: 0 }),
-  } as SlackMockServer;
+  } as MockServer;
 
-  const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  let ch = new MockSlackChannel(ctx);
+  await ch.init();
 
-  const mockWeb = (ch as MockSlackChannel).webClient!;
-  (mockWeb as MockWebClient).setPostMessageResult({ ok: true, ts: '1700000000.666', channel: 'D456' });
+  const mockWeb = ch.webClient! as MockWebClient;
+  mockWeb.setPostMessageResult({ ok: true, ts: '1700000000.666', channel: 'D456' });
 
-  const originalSend = (ch as MockSlackChannel).sendMessage.bind(ch);
-  (ch as MockSlackChannel & { sendMessage: (message: Message) => Promise<SlackResponse | null | undefined> }).sendMessage = async (msg: Message) => {
+  const originalSend = ch.sendMessage.bind(ch);
+  ch.sendMessage = async (msg: Message) => {
     sendMessageCalled = true;
     // Note: onDirectMessage does NOT check for empty text (unlike onMention),
     // so it proceeds to call sendChat which returns 'should not reach here'.
@@ -899,7 +887,7 @@ test('onDirectMessage() with no text content sends (no text content)', async () 
   };
 
   const event = { text: '<@U12345678>', channel: 'D456' };
-  await (ch as MockSlackChannel).onDirectMessage({ event, body: {}, ack: async () => {} });
+  await ch.onDirectMessage({ event, body: {}, ack: async () => {} });
 
   expect(sendMessageCalled).toBe(true);
 });
@@ -915,16 +903,16 @@ test('onDirectMessage() catches and logs when server is not available (existing 
   } as Agent;
 
   // No server.
-  (ctx as Context & { server?: SlackMockServer }).server = undefined;
+  (ctx as Context & { server?: MockServer }).server = undefined;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   const event = { text: '<@U12345678> hi', channel: 'D456' };
 
   // The real onDirectMessage has a try/catch that logs the error but doesn't re-throw.
   // This test documents the existing behavior: no error is thrown, error is logged.
-  await (ch as MockSlackChannel).onDirectMessage({ event, body: {}, ack: async () => {} });
+  await ch.onDirectMessage({ event, body: {}, ack: async () => {} });
   // If we reach here, the error was caught (existing behavior).
   expect(true).toBe(true);
 });
@@ -937,9 +925,9 @@ test('onSlashCommand() acknowledges with stub response', async () => {
 
   const ctx = mockContext();
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  await (ch as MockSlackChannel).onSlashCommand({
+  await ch.onSlashCommand({
     event: { callback_id: 'doSomething' },
     body: { callback_id: 'doSomething' }, // real code reads body.collback_id (typo in slack.ts line 182)
     ack: async (response?: Record<string, unknown>) => {
@@ -958,13 +946,13 @@ test('onSlashCommand() acknowledges with stub response', async () => {
 test('onError() logs error to console.error', async () => {
   const ctx = mockContext();
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   const originalError = console.error;
   let captured: unknown[][] = [];
   console.error = (...args: unknown[]) => { captured.push(args); };
 
-  await (ch as MockSlackChannel).onError(new Error('test error'));
+  await ch.onError(new Error('test error'));
 
   console.error = originalError;
   expect(captured.length).toBe(1);
@@ -974,13 +962,13 @@ test('onError() logs error to console.error', async () => {
 test('onConnecting() logs connecting message', async () => {
   const ctx = mockContext();
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   const originalInfo = console.info;
   let captured: string[] = [];
   console.info = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
-  await (ch as MockSlackChannel).onConnecting();
+  await ch.onConnecting();
 
   console.info = originalInfo;
   expect(captured.length).toBe(1);
@@ -990,13 +978,13 @@ test('onConnecting() logs connecting message', async () => {
 test('onConnected() logs connected message', async () => {
   const ctx = mockContext();
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   const originalInfo = console.info;
   let captured: string[] = [];
   console.info = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
-  await (ch as MockSlackChannel).onConnected();
+  await ch.onConnected();
 
   console.info = originalInfo;
   expect(captured.length).toBe(1);
@@ -1006,13 +994,13 @@ test('onConnected() logs connected message', async () => {
 test('onReconnecting() logs warning with attempt number', async () => {
   const ctx = mockContext();
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   const originalWarn = console.warn;
   let captured: string[] = [];
   console.warn = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
-  await (ch as MockSlackChannel).onReconnecting(3);
+  await ch.onReconnecting(3);
 
   console.warn = originalWarn;
   expect(captured.length).toBe(1);
@@ -1023,13 +1011,13 @@ test('onReconnecting() logs warning with attempt number', async () => {
 test('onReconnected() logs reconnected message', async () => {
   const ctx = mockContext();
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   const originalWarn = console.warn;
   let captured: string[] = [];
   console.warn = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
-  await (ch as MockSlackChannel).onReconnected();
+  await ch.onReconnected();
 
   console.warn = originalWarn;
   expect(captured.length).toBe(1);
@@ -1039,13 +1027,13 @@ test('onReconnected() logs reconnected message', async () => {
 test('onDisconnected() logs warning with error', async () => {
   const ctx = mockContext();
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
   const originalWarn = console.warn;
   let captured: string[] = [];
   console.warn = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
-  await (ch as MockSlackChannel).onDisconnected(new Error('network error'));
+  await ch.onDisconnected(new Error('network error'));
 
   console.warn = originalWarn;
   expect(captured.length).toBe(1);
@@ -1073,9 +1061,9 @@ test('findAgent() returns agent whose channels.slack matches the passed channel'
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const agent = (ch as MockSlackChannel).findAgent('C123');
+  const agent = ch.findAgent('C123');
   expect(agent.id).toBe('agent-1');
 });
 
@@ -1089,9 +1077,9 @@ test('findAgent() returns default agent when no channel is passed', async () => 
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const agent = (ch as MockSlackChannel).findAgent();
+  const agent = ch.findAgent();
   expect(agent.id).toBe('marvin');
 });
 
@@ -1112,9 +1100,9 @@ test('findAgent() skips disabled agents and returns next enabled with slack conf
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const agent = (ch as MockSlackChannel).findAgent('C789');
+  const agent = ch.findAgent('C789');
   expect(agent.id).toBe('active-agent');
 });
 
@@ -1128,9 +1116,9 @@ test('findAgent() fallback checks default agent slack config (bug fix)', async (
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const agent = (ch as MockSlackChannel).findAgent('CUNKNOWN');
+  const agent = ch.findAgent('CUNKNOWN');
   expect(agent.id).toBe('marvin');
   expect(agent.channels.slack).toBe('CDEFAULT');
 });
@@ -1145,8 +1133,8 @@ test('findAgent() returns default even when it has no slack config (existing beh
   } as Agent;
 
   const ch = new MockSlackChannel(ctx);
-  await (ch as MockSlackChannel).init();
+  await ch.init();
 
-  const agent = (ch as MockSlackChannel).findAgent('CUNKNOWN');
+  const agent = ch.findAgent('CUNKNOWN');
   expect(agent.id).toBe('marvin');
 });
