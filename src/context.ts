@@ -28,6 +28,6 @@ export class Context {
   // root (~/) app folder 
   public root: string = '';
 
-  public isDry: boolean = false;
+  public isDry: boolean = process.argv.includes('--dry');
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
 }

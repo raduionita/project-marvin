@@ -85,6 +85,9 @@ export class Server extends App {
   initProject() {
     console.log('[marvin]', 'Server.initProject');
 
+    // set root to the app folder (where package.json lives)
+    this.ctx!.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/server\.ts$/, '');
+
     // create project/workspace folder (~/.marvin)
     const home = join(homedir(), '.marvin');
     if (!existsSync(home)) {
@@ -119,23 +122,23 @@ export class Server extends App {
     if (config) {
       this.ctx!.config = config;
       return;
-    } else {
-      const path = join(this.ctx!.home, 'marvin.json');
-
-      config = {} as Config;
-
-      // at this stage marvin.json MUST exist, but just in case
-      if (!existsSync(path)) {
-        console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
-        this.ctx!.config = constants.DEFAULT_CONFIG as Config;
-        return;
-      }
-
-      const data = readFileSync(path, 'utf8');
-      config = tryJsonParse(data);
-
-      this.ctx!.config = config!;
     }
+
+    const path = join(this.ctx!.home, 'marvin.json');
+
+    config = {} as Config;
+
+    // at this stage marvin.json MUST exist, but just in case
+    if (!existsSync(path)) {
+      console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
+      this.ctx!.config = constants.DEFAULT_CONFIG as Config;
+      return;
+    }
+
+    const data = readFileSync(path, 'utf8');
+    config = tryJsonParse(data);
+
+    this.ctx!.config = config!;
   }
 
   initWatch() {
@@ -155,10 +158,7 @@ export class Server extends App {
 
   initFlags() {
     console.log('[marvin]', 'Server.initFlags');
-
-    const args = process.argv.slice(2);
-
-    this.ctx!.isDry = args.includes('--dry');
+    // const args = process.argv.slice(2);
   }
 
   async initHttp() {
@@ -176,14 +176,25 @@ export class Server extends App {
         return;
       }
 
+      const verb = req.method || 'GET';
+
       console.log('[marvin]', 'Server.initHttp', `command: ${command}`);
 
       try {
         switch (command) {
+          case '_health':
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, data: {} }));
+            break;
           case 'reload':
             await this.execReload();
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, data: {} }));
+            break;
+          case 'status':
+            // TODO: add more info: models, channels, agents, tools
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, data: { state: this.ctx!.state } }));
             break;
           default:
             res.writeHead(400, { 'Content-Type': 'application/json' });

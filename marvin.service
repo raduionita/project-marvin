@@ -1,0 +1,17 @@
+[Unit]
+Description=mArvIn - your AI Sidekick
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/marvin
+EnvironmentFile=%h/.local/share/marvin/env
+ExecStart=/usr/local/bin/marvin --server
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marvin
+
+[Install]
+WantedBy=default.target

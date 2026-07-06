@@ -11,6 +11,9 @@
   "license": "ISC",
   "private": true,
   "main": "marvin.ts",
+  "bin": {
+    "marvin": "src/marvin.ts"
+  },
   "type": "module",
   "scripts": {
     "build": "tsc",

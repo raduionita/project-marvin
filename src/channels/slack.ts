@@ -8,6 +8,8 @@ export type HandlerParams = { event: { [key: string]: any }, body: Record<string
 
 export type SlackResponse = { ts: string; ok: boolean; error: string | undefined; message?: string, channel?: string };
 
+export type SlackConfig = { enabled: boolean, appToken: string, botToken: string };
+
 export interface ISocketModeClient {
   start: () => Promise<any>;
   disconnect: () => Promise<void>;
@@ -28,10 +30,23 @@ export default class SlackChannel extends Channel {
   async init() {
     console.log('[marvin]', 'SlackChannel.init', this.ctx.config.channels.slack);
 
-    const settings = this.ctx.config.channels.slack;
+    const config = this.ctx.config.channels.slack as SlackConfig;
+    if (!config ) {
+      console.error('[marvin]', 'SlackChannel.init', 'no settings found, skipping');
+      return;
+    }
 
-    const appToken = (settings?.appToken || process.env.SLACK_APP_TOKEN || 'NO_SLACK_APP_TOKEN');
-    const botToken = (settings?.botToken || process.env.SLACK_BOT_TOKEN || 'NO_SLACK_BOT_TOKEN');
+    const appToken = (config?.appToken || process.env.SLACK_APP_TOKEN);
+    if (!appToken) {
+      console.error('[marvin]', 'SlackChannel.init', 'no appToken found, skipping');
+      return;
+    }
+
+    const botToken = (config?.botToken || process.env.SLACK_BOT_TOKEN);
+    if (!botToken) {
+      console.error('[marvin]', 'SlackChannel.init', 'no botToken found, skipping');
+      return;
+    }
 
     this.sok = new SocketModeClient({
       appToken: appToken as string,
@@ -39,6 +54,7 @@ export default class SlackChannel extends Channel {
       autoReconnectEnabled: true,
       clientOptions: { retryConfig: { retries: 5 } }
     });
+
     this.web = new WebClient(botToken, {
       logLevel: LogLevel.DEBUG,
       retryConfig: { retries: 5 }
