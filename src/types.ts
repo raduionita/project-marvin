@@ -75,6 +75,7 @@ export abstract class Channel {
     this.ctx = ctx;
   }
 
+  abstract args(): {[key: string]: any};
   abstract init(): Promise<void>;
   abstract drop(): Promise<void>;
   abstract sendMessage(message: Message): Promise<any | null>;

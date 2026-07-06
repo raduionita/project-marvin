@@ -1,6 +1,13 @@
 import { Channel, Message } from '../types.js';
 
 export default class TelegramChannel extends Channel {
+
+  args(): {[key: string]: any} {
+    return {
+      token: '',
+    };
+  }
+
   async init() : Promise<void> {
     console.log('[marvin]', 'TelegramChannel.init', 'attaching...', this.ctx.config.settings);
     console.log('[marvin]', 'TelegramChannel.init', 'attached!');

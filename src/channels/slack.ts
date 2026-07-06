@@ -27,6 +27,13 @@ export default class SlackChannel extends Channel {
   protected sok!: ISocketModeClient;
   protected web!: IWebClient;
 
+  args() {
+    return {
+      appToken: '',
+      botToken: '',
+    };
+  }
+
   async init() {
     console.log('[marvin]', 'SlackChannel.init', this.ctx.config.channels.slack);
 

@@ -11,7 +11,7 @@ configDotenv({ encoding: 'utf8', quiet: true, path: ['.env', '.env.local'] });
   const ctx = new Context();
   
   const args = process.argv.slice(2);
-  const isServer = args.includes('--server');
+  const isServer = args.includes('--server') || args.includes('--serve') || args.includes('--daemon');
 
   if (isServer) {
     console.log('[marvin] starting daemon mode...');

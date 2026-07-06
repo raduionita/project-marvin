@@ -2,6 +2,12 @@ import { Channel, Message } from '../types.js';
 import { Server } from '../server.js';
 
 export default class WhatsAppChannel extends Channel {
+  args(): {[key: string]: any} {
+    return {
+      token: '',
+    };
+  }
+
   async init() : Promise<void> {
     console.log('[marvin]', 'WhatsAppChannel.init', 'attaching...', this.ctx.config.settings);
     console.log('[marvin]', 'WhatsAppChannel.init', 'attached!');
