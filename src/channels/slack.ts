@@ -29,8 +29,8 @@ export default class SlackChannel extends Channel {
 
   args() {
     return {
-      appToken: '',
-      botToken: '',
+      appToken: 'xapp-1-yout-app-token-here',
+      botToken: 'xbot-1-your-bot-token-here',
     };
   }
 

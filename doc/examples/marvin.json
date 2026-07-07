@@ -30,7 +30,9 @@
     "agent-id": {
       "enabled": true,
       "model": "googlex/gemma-4-26b-a4b",
-      "channel": "slack",
+      "channels": {
+        "slack": "slack-channel-id"
+      },
       "tools": ["webSearcn", "webBrowse", "postWordpress"],
       "tasks": {
         "do-something": {
