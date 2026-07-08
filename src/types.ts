@@ -8,7 +8,6 @@ export type Thinking = 'enabled' | 'disabled';
 export type Role = 'system' | 'user' | 'assistant' | 'tool';
 
 export interface Config {
-  timestamp: number;
   settings: {
     name: string;
     port: number;
