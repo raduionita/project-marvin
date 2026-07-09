@@ -391,14 +391,14 @@ export class Server extends App {
 
     // type: agent
     for (const [agentId, agent] of Object.entries(ctx.config.agents)) {
-      const model = ctx.models[agent.model];
+      const model = ctx.models[agent.model || ''];
       if (!model) {
         console.error('[marvin]', 'Server.initAgents', `model not found for agent ${agentId}: ${agent.model}`);
         continue;
       }
 
       const tasks: Record<string, Task> = {};
-      for (const [taskId, task] of Object.entries(agent.tasks)) {
+      for (const [taskId, task] of Object.entries(agent.tasks || {})) {
         let enabled = task.enabled;
 
         // default input to task.input as string/prompt

@@ -14,7 +14,7 @@ export interface Config {
     logLevel: LogLevel;
   };
   channels: Record<string, {
-    enabled: boolean;
+    enabled?: boolean;
     [key: string]: any;
   }>;
   models: Record<string, {
@@ -26,11 +26,11 @@ export interface Config {
   }>;
   agents: Record<string, {
     enabled: boolean;
-    default: boolean;
-    model: string;
+    default?: boolean;
+    model?: string;
     channels: Record<string, string>;
-    tools: string[];
-    tasks: Record<string, {
+    tools?: string[];
+    tasks?: Record<string, {
       enabled: boolean;
       schedule: number;
       maxSteps: number;

@@ -363,7 +363,10 @@ export class Client extends App {
         // for each channel, list enabled agents
         listChannels(this.ctx!).forEach(channel => {
           console.debug('[marvin]', channel);
-          console.debug('[marvin]', '- enabled:', this.ctx!.config.channels[channel]!.enabled);
+          const channelConfig = this.ctx!.config.channels[channel];
+          if (channelConfig) {
+            console.debug('[marvin]', '- enabled:', channelConfig.enabled);
+          }
           console.debug('[marvin]', '- agents:');
           for (const [agentId, agent] of Object.entries(this.ctx!.config.agents)) {
             if (!agent.enabled) continue;

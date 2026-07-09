@@ -208,17 +208,16 @@ class MockSlackChannel extends SlackChannel {
 // ============================================================================
 
 function mockConfig(options: {
-  channels?: Record<string, Record<string, unknown>>;
-  agents?: Record<string, Record<string, unknown>>;
-  models?: Record<string, Record<string, unknown>>;
+  channels?: Partial<Config['channels']>[string];
+  agents?: Record<string, Partial<Config['agents']>[string]>;
+  models?: Record<string, Partial<Config['models']>[string]>;
 } = {}): Config {
   return {
-    timestamp: Date.now(),
-    settings: { name: 'marvin', port: 7331, logLevel: 'info' },
-    channels: options.channels || {},
-    models: options.models || {},
-    agents: options.agents || {},
-  } as Config;
+    settings: { name: 'marvin', port: 7331, logLevel: 'info' as const },
+    channels: options.channels as Config['channels'] || {},
+    models: options.models as Config['models'] || {},
+    agents: options.agents as Config['agents'] || {},
+  };
 }
 
 function mockContext(config?: Config): Context {
