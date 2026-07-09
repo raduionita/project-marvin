@@ -489,60 +489,46 @@ export class Client extends App {
     console.debug('[marvin]', 'Client.execChat');
 
     const cmds = process.argv.slice(2);
-    const flags: Record<string, string> = {};
-    let positional = '';
-
-    for (const arg of cmds) {
-      if (arg.startsWith('--')) {
-        const key = arg.slice(2);
-        const val = cmds[cmds.indexOf(arg) + 1];
-        if (val && !val.startsWith('--')) {
-          flags[key] = val;
-        }
-      } else {
-        positional = arg;
-      }
-    }
-
-    const message = positional;
-    const agentId = flags.agentId || this.ctx!.config.settings?.name;
-
-    // Build URL to server chat endpoint
+    const i = cmds.indexOf('--agentId');
+    const agentId = (i > -1 ? cmds[i + 1] : '') || this.ctx!.config.settings?.name;
+    // build URL to server chat endpoint
     const port = this.ctx!.config?.settings?.port || 7331;
     const url = new URL(`http://localhost:${port}/chat`);
 
+    // TODO: start interactive prompt mode here...loop until /exit/quit/stop
+
+    // prompt interactively
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    const answer = await new Promise<string>((resolve) => {
+      rl.question('Message: ', (ans: string) => {
+        resolve(ans);
+        rl.close();
+      });
+    });
+
+    // if empty answer, exit
+    if (!answer.trim()) {
+      console.warn('[marvin]', 'empty message');
+      return;
+    }
+
+    // dry mode
     if (this.ctx.isDry) {
       console.info('[marvin]', '[dry] would send chat to:', url.toString());
-      console.info('[marvin]', 'message:', message || '(interactive)');
+      console.info('[marvin]', 'message:', answer);
       console.info('[marvin]', 'agent:', agentId);
       return;
     }
 
-    // If no message provided via CLI, prompt interactively
-    let chatMessage = message;
-    if (!chatMessage) {
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
-      const answer = await new Promise<string>((resolve) => {
-        rl.question('Message: ', (ans: string) => {
-          resolve(ans);
-          rl.close();
-        });
-      });
-      if (!answer.trim()) {
-        console.warn('[marvin]', 'empty message');
-        return;
-      }
-      chatMessage = answer;
-    }
-
+    // call chat endpoint
     const res = await fetch(url.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        message: chatMessage,
+        message: answer,
         agentId,
       }),
     });
