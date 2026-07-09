@@ -118,7 +118,7 @@ export abstract class Model {
   }
 
   // sends messages to LLM model
-  abstract sendChat(chat: Chat): Promise<Reply>;
+  abstract sendMessage(chat: Chat): Promise<Reply>;
 }
 
 export interface Agent {

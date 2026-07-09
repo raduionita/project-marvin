@@ -6,7 +6,7 @@ import SlackChannel from './slack.js';
 import { type HandlerParams, type SlackResponse, type ISocketModeClient, type IWebClient } from './slack.js'
 
 interface MockServer {
-  sendChat: (ctx: Context, chatId: string, agentId: string, input: string) => Promise<{ content: string; steps: number } | null>;
+  sendMessage: (ctx: Context, chatId: string, agentId: string, input: string) => Promise<{ content: string; steps: number } | null>;
 }
 
 class MockSocketModeClient implements ISocketModeClient {
@@ -141,9 +141,9 @@ class MockSlackChannel extends SlackChannel {
 
     console.log('[marvin]', 'SlackChannel.onMention', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
-    const result = await server.sendChat(this.ctx, chatId, agentId, text);
+    const result = await server.sendMessage(this.ctx, text, chatId, agentId);
     if (!result) {
-      console.error('[marvin]', 'SlackChannel.onMention', `no result from sendChat for agent ${agentId}`);
+      console.error('[marvin]', 'SlackChannel.onMention', `no result from sendMessage for agent ${agentId}`);
       await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
       return;
     }
@@ -170,7 +170,7 @@ class MockSlackChannel extends SlackChannel {
 
       console.log('[marvin]', 'SlackChannel.onDirectMessage', `processing via agent ${agentId}: ${(text as string).slice(0, 100)}`);
 
-      const result = await server.sendChat(this.ctx, chatId, agentId, text as string);
+      const result = await server.sendMessage(this.ctx, text, chatId, agentId);
 
       if (!result) {
         console.error('[marvin]', 'SlackChannel.onDirectMessage', `no result from processMessage for agent ${agentId}`);
@@ -675,8 +675,8 @@ test('sendMessage() returns undefined when web is not attached', async () => {
 
 // --- onMention() tests ---
 
-test('onMention() happy path: extracts text, finds agent, calls sendChat, sends reply', async () => {
-  let sendChatCalled = false;
+test('onMention() happy path: extracts text, finds agent, calls sendMessage, sends reply', async () => {
+  let sendMessageCalled = false;
 
   const ctx = mockContext(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
@@ -688,8 +688,8 @@ test('onMention() happy path: extracts text, finds agent, calls sendChat, sends 
   } as Agent;
 
   (ctx as { server: MockServer }).server = {
-    sendChat: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
-      sendChatCalled = true;
+    sendMessage: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
+      sendMessageCalled = true;
       expect(chatId).toBe('slack-C123-1700000000.999');
       expect(agentId).toBe('agent-1');
       expect(input).toBe('hello there');
@@ -718,7 +718,7 @@ test('onMention() happy path: extracts text, finds agent, calls sendChat, sends 
   });
 
   expect(acked).toBe(true);
-  expect(sendChatCalled).toBe(true);
+  expect(sendMessageCalled).toBe(true);
 });
 
 test('onMention() with no text content sends (no text content)', async () => {
@@ -785,7 +785,7 @@ test('onMention() with no server sends (server not available)', async () => {
   expect(sendMessageCalled).toBe(true);
 });
 
-test('onMention() with null sendChat result sends (no response from the AI)', async () => {
+test('onMention() with null sendMessage result sends (no response from the AI)', async () => {
   let sendMessageCalled = false;
 
   const ctx = mockContext(mockConfig({
@@ -798,7 +798,7 @@ test('onMention() with null sendChat result sends (no response from the AI)', as
   } as Agent;
 
   (ctx as { server: MockServer }).server = {
-    sendChat: async () => null,
+    sendMessage: async () => null,
   } as MockServer;
 
   let ch = new MockSlackChannel(ctx);
@@ -822,8 +822,8 @@ test('onMention() with null sendChat result sends (no response from the AI)', as
 
 // --- onDirectMessage() tests ---
 
-test('onDirectMessage() happy path: finds agent by channel, calls sendChat, sends reply without thread', async () => {
-  let sendChatCalled = false;
+test('onDirectMessage() happy path: finds agent by channel, calls sendMessage, sends reply without thread', async () => {
+  let sendMessageCalled = false;
 
   const ctx = mockContext(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'D456' }, tasks: {} } },
@@ -835,8 +835,8 @@ test('onDirectMessage() happy path: finds agent by channel, calls sendChat, send
   } as Agent;
 
   (ctx as { server: MockServer }).server = {
-    sendChat: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
-      sendChatCalled = true;
+    sendMessage: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
+      sendMessageCalled = true;
       expect(agentId).toBe('agent-1'); // DM should resolve agent by channel (bug fix)
       return { content: 'DM reply', steps: 1 };
     },
@@ -851,7 +851,7 @@ test('onDirectMessage() happy path: finds agent by channel, calls sendChat, send
   const event = { text: '<@U12345678> hi marvin', channel: 'D456' };
   await ch.onDirectMessage({ event, body: {}, ack: async () => {} });
 
-  expect(sendChatCalled).toBe(true);
+  expect(sendMessageCalled).toBe(true);
 });
 
 test('onDirectMessage() with no text content sends (no text content)', async () => {
@@ -867,7 +867,7 @@ test('onDirectMessage() with no text content sends (no text content)', async () 
   } as Agent;
 
   (ctx as { server: MockServer }).server = {
-    sendChat: async () => ({ content: 'should not reach here', steps: 0 }),
+    sendMessage: async () => ({ content: 'should not reach here', steps: 0 }),
   } as MockServer;
 
   let ch = new MockSlackChannel(ctx);
@@ -880,7 +880,7 @@ test('onDirectMessage() with no text content sends (no text content)', async () 
   ch.sendMessage = async (msg: Message) => {
     sendMessageCalled = true;
     // Note: onDirectMessage does NOT check for empty text (unlike onMention),
-    // so it proceeds to call sendChat which returns 'should not reach here'.
+    // so it proceeds to call sendMessage which returns 'should not reach here'.
     expect(msg.content).toBe('should not reach here');
     return originalSend(msg);
   };

@@ -4,7 +4,7 @@ export class OpenaiModel extends Model {
   provider: Provider = 'openai';
   public baseUrl: string = 'https://api.openai.com';
 
-  async sendChat(chat: Chat): Promise<any> {
+  async sendMessage(chat: Chat): Promise<any> {
     console.log('[marvin]', 'OpenaiModel.chat', 'chat:', JSON.stringify(chat));
     // call the model api
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {

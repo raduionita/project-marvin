@@ -196,6 +196,9 @@ export class Server extends App {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, data: { state: this.ctx!.state } }));
             break;
+          case 'chat':
+            await this.execChat(req, res);
+            break;
           default:
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: false, error: 'Unknown command' }));
@@ -446,143 +449,7 @@ export class Server extends App {
     }
   }
 
-  async sendChat(ctx: Context, chatId: string, agentId: string, input: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
-    const agent = ctx.agents[agentId]!;
-
-    console.log('[marvin]', 'Server.sendChat', `${agentId}: ${input.slice(0, 100)}`);
-
-    // TODO: get chat from cache/store using sessionId
-
-    const chat = { id: chatId, thinking: false, messages: [] } as Chat;
-
-    // load agent IDENTITY.md as system message
-    chat.messages.push({ role: 'system', content: agent.identity });
-
-    // load task input as user message
-    chat.messages.push({ role: 'user', content: input });
-
-    // TODO this needs a type, Model.chat should return a proper Reply/Response/Result type
-    let reply: Reply;
-
-    // AI loop: call model, execute tool calls, repeat until done
-    let steps = -1;
-    do {
-      steps++;
-
-      // core of the AI loop: call model, execute tool calls, repeat until done
-      reply = await agent.model.sendChat(chat);
-
-      // trim result, this can be really big
-      console.info('[marvin]', 'Server.sendChat', `step=${steps}`, JSON.stringify(reply));
-
-      if (reply.stop) {
-        console.warn('[marvin]', 'Server.sendChat', `force stop at step ${steps}`);
-        break;
-      }
-
-      // execute any tool calls
-      if (reply.message.tools && reply.message.tools.length > 0) {
-        const results: string[] = [];
-
-        for (const tool of reply.message.tools) {
-          console.log('[marvin]', 'Server.sendChat', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
-
-          // TODO check for stop tool call, if found, stop the AI loop
-
-          try {
-            const args = JSON.parse(tool.arguments);
-            const result = await execTool(ctx as any, tool.name, args);
-            results.push(JSON.stringify(result));
-          } catch (err) {
-            console.error('[marvin]', 'Server.sendChat', `tool ${tool.name} failed:`, err);
-            results.push(`Error: ${(err as Error).message}`);
-          }
-        }
-
-        // TODO: all this tool exec logic needs to be checked and tested (unit)
-
-        // add tool call to chat history
-        chat.messages.push({ role: 'tool', content: results.join('\n'), toolId: reply.message.tools[0]?.id });
-      }
-
-      // if model produced content without pending tool calls, we're done
-      if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
-        break;
-      }
-    } while (steps < maxSteps - 1);
-
-    // warn if max steps reached
-    if (steps >= maxSteps) {
-      console.warn('[marvin]', 'Server.sendChat', `max steps (${maxSteps}) reached for ${agentId}`);
-    }
-
-    // TODO: more info here 
-    return { content: reply?.message?.content || '', steps };
-  }
-
-  async execTask(ctx: Context, agentId: string, taskId: string) {
-    const agent = ctx.agents[agentId]!;
-    const task = agent.tasks[taskId]!;
-
-    if (!agent.enabled || !task.enabled) return;
-
-    console.log('[marvin]', 'Server.execTask', `${agentId}/${taskId}`);
-
-    const maxSteps = task.maxSteps || constants.DEFAULT_MAX_STEPS;
-
-    // TODO: create a new chat or use it to retrieve the chat from cache
-    const chatId = `task-${taskId}-${Date.now()}`;
-
-    const result = await this.sendChat(ctx, agentId, chatId, task.input, maxSteps);
-    if (!result) {
-      console.error('[marvin]', 'Server.execTask', `no result from sendChat for agent ${agentId}`);
-      return;
-    }
-
-    const { content, steps } = result;
-
-    // send final result through configured channels
-    for (const [channelId, groupId] of Object.entries(agent.channels)) {
-      const channel = ctx.channels[channelId];
-
-      // verify channel exists, warn if not, then skip
-      if (!channel) {
-        console.warn('[marvin]', 'Server.execTask', `channel ${channelId} not found, skipping`);
-        continue;
-      }
-
-      // try to send, log error if failed, continue
-      try {
-        await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
-      } catch (err) {
-        console.error('[marvin]', 'Server.execTask', `channel ${channelId} send failed:`, err);
-      }
-    }
-
-    // re-schedule next execution
-    task.timeout = setTimeout(this.execTask.bind(this), task.schedule, ctx, agentId, taskId);
-  }
-
-  async execReload() {
-    console.log('[marvin]', 'Server.execReload');
-    this.ctx!.state = 'reloading';
-
-    // drop in reverse order
-    this.dropAgents();
-    this.dropModels();
-    this.dropChannels();
-    this.dropHttp();
-
-    // re-init in dependency order
-    await this.initHttp();
-    await this.initChannels();
-    await this.initModels();
-    await this.initAgents();
-
-    this.ctx!.state = 'running';
-  }
-
-  dropAgents() {
+  dropAgents() {-
     console.log('[marvin]', 'Server.dropAgents');
     const ctx = this.ctx!;
     for (const agent of Object.values(ctx.agents)) {
@@ -654,5 +521,198 @@ export class Server extends App {
         resolve();
       }
     });
+  }
+
+  async execTask(ctx: Context, agentId: string, taskId: string) {
+    const agent = ctx.agents[agentId]!;
+    const task = agent.tasks[taskId]!;
+
+    if (!agent.enabled || !task.enabled) return;
+
+    console.log('[marvin]', 'Server.execTask', `${agentId}/${taskId}`);
+
+    const maxSteps = task.maxSteps || constants.DEFAULT_MAX_STEPS;
+
+    // TODO: create a new chat or use it to retrieve the chat from cache
+    const chatId = `task-${taskId}-${Date.now()}`;
+
+    const result = await this.sendMessage(ctx, task.input, agentId, chatId, maxSteps);
+    if (!result) {
+      console.error('[marvin]', 'Server.execTask', `no result from sendMessage for agent ${agentId}`);
+      return;
+    }
+
+    const { content, steps } = result;
+
+    // send final result through configured channels
+    for (const [channelId, groupId] of Object.entries(agent.channels)) {
+      const channel = ctx.channels[channelId];
+
+      // verify channel exists, warn if not, then skip
+      if (!channel) {
+        console.warn('[marvin]', 'Server.execTask', `channel ${channelId} not found, skipping`);
+        continue;
+      }
+
+      // try to send, log error if failed, continue
+      try {
+        await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
+      } catch (err) {
+        console.error('[marvin]', 'Server.execTask', `channel ${channelId} send failed:`, err);
+      }
+    }
+
+    // re-schedule next execution
+    task.timeout = setTimeout(this.execTask.bind(this), task.schedule, ctx, agentId, taskId);
+  }
+
+  async execReload() {
+    console.log('[marvin]', 'Server.execReload');
+    this.ctx!.state = 'reloading';
+
+    // drop in reverse order
+    this.dropAgents();
+    this.dropModels();
+    this.dropChannels();
+    this.dropHttp();
+
+    // re-init in dependency order
+    await this.initHttp();
+    await this.initChannels();
+    await this.initModels();
+    await this.initAgents();
+
+    this.ctx!.state = 'running';
+  }
+
+  private async execChat(req: http.IncomingMessage, res: http.ServerResponse) {
+    const ctx = this.ctx!;
+
+    // TODO: basic token auth (check ctx.config.settings.apiToken if set)
+    // const auth = req.headers['authorization'] || req.url?.split('token=')[1];
+    // if (ctx.config.settings.apiToken && auth !== ctx.config.settings.apiToken) {
+    //   res.writeHead(401, { 'Content-Type': 'application/json' });
+    //   res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+    //   return;
+    // }
+
+    try {
+      // read body as JSON
+      const body = await new Promise<{[key: string]: any}>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => {
+          try {
+            const raw = Buffer.concat(chunks).toString('utf8');
+            resolve(raw ? JSON.parse(raw) : null);
+          } catch (err) {
+            reject(err);
+          }
+        });
+        req.on('error', reject);
+      });
+      
+      const message = body?.message as string | undefined;
+
+      if (!message) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing "message" in body' }));
+        return;
+      }
+
+      const agentId = (body.agentId as string | undefined) || ctx.config.settings.name; // default to marvin (orchestrator)
+      const maxSteps = (body.maxSteps as number | undefined) ?? constants.DEFAULT_MAX_STEPS;
+
+      const chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const result = await this.sendMessage(ctx, message, agentId, chatId, maxSteps);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        data: {
+          content: result.content,
+          steps: result.steps,
+          agentId,
+        },
+      }));
+    } catch (err) {
+      console.error('[marvin]', 'Server.execChat', 'error:', err);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
+    }
+  }
+
+  async sendMessage(ctx: Context, message: string, chatId: string, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
+    const agent = ctx.agents[agentId]!;
+
+    console.log('[marvin]', 'Server.sendMessage', `${agentId}: ${message.slice(0, 100)}`);
+
+    // TODO: get chat from cache/store using sessionId
+
+    const chat = { id: chatId, thinking: false, messages: [] } as Chat;
+
+    // load agent IDENTITY.md as system message
+    chat.messages.push({ role: 'system', content: agent.identity });
+
+    // load task input as user message
+    chat.messages.push({ role: 'user', content: message });
+
+    // TODO this needs a type, Model.chat should return a proper Reply/Response/Result type
+    let reply: Reply;
+
+    // AI loop: call model, execute tool calls, repeat until done
+    let steps = -1;
+    do {
+      steps++;
+
+      // core of the AI loop: call model, execute tool calls, repeat until done
+      reply = await agent.model.sendMessage(chat);
+
+      // trim result, this can be really big
+      console.info('[marvin]', 'Server.sendMessage', `step=${steps}`, JSON.stringify(reply));
+
+      if (reply.stop) {
+        console.warn('[marvin]', 'Server.sendMessage', `force stop at step ${steps}`);
+        break;
+      }
+
+      // execute any tool calls
+      if (reply.message.tools && reply.message.tools.length > 0) {
+        const results: string[] = [];
+
+        for (const tool of reply.message.tools) {
+          console.log('[marvin]', 'Server.sendMessage', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+
+          // TODO check for stop tool call, if found, stop the AI loop
+
+          try {
+            const args = JSON.parse(tool.arguments);
+            const result = await execTool(ctx as any, tool.name, args);
+            results.push(JSON.stringify(result));
+          } catch (err) {
+            console.error('[marvin]', 'Server.sendMessage', `tool ${tool.name} failed:`, err);
+            results.push(`Error: ${(err as Error).message}`);
+          }
+        }
+
+        // TODO: all this tool exec logic needs to be checked and tested (unit)
+
+        // add tool call to chat history
+        chat.messages.push({ role: 'tool', content: results.join('\n'), toolId: reply.message.tools[0]?.id });
+      }
+
+      // if model produced content without pending tool calls, we're done
+      if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
+        break;
+      }
+    } while (steps < maxSteps - 1);
+
+    // warn if max steps reached
+    if (steps >= maxSteps) {
+      console.warn('[marvin]', 'Server.sendMessage', `max steps (${maxSteps}) reached for ${agentId}`);
+    }
+
+    // TODO: more info here 
+    return { content: reply?.message?.content || '', steps };
   }
 }

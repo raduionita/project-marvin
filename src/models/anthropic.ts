@@ -4,7 +4,7 @@ export default class AnthropicModel extends Model {
   provider: Provider = 'anthropic';
   public baseUrl: string = 'https://api.anthropic.com';
 
-  async sendChat(chat: Chat): Promise<any> {
+  async sendMessage(chat: Chat): Promise<any> {
     console.log('[marvin]', 'AnthropicModel.chat', 'chat:', JSON.stringify(chat));
     // call the model api
     const response = await fetch(`${this.baseUrl}/v1/messages`, {

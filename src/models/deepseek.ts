@@ -4,8 +4,8 @@ export default class DeepseekModel extends Model {
   provider: Provider = 'deepseek';
   public baseUrl: string = 'https://api.deepseek.com';
 
-  async sendChat(chat: Chat) : Promise<Reply> {
-    console.log('[marvin]', 'DeepseekModel.sendChat', 'chat:', JSON.stringify(chat));
+  async sendMessage(chat: Chat) : Promise<Reply> {
+    console.log('[marvin]', 'DeepseekModel.sendMessage', 'chat:', JSON.stringify(chat));
     // call the model api
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',

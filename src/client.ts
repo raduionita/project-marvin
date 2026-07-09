@@ -150,6 +150,7 @@ export class Client extends App {
       case 'update' : await this.execUpdate(); break;
       case 'version': await this.execVersion(); break;
       case 'status' : await this.execStatus(); break;
+      case 'chat'   : await this.execChat(); break;
       case 'reload' : await this.execReload(); break;
 
       case 'channels' : await this.execChannels(); break;
@@ -172,6 +173,7 @@ export class Client extends App {
     console.info('[marvin]', '  version ', 'show the current version');
     console.info('[marvin]', '  reload  ', 'reload the daemon');
     console.info('[marvin]', '  status  ', 'check the daemon status');
+    console.info('[marvin]', '  chat    ', 'send a chat message');
     console.info('[marvin]', '  channels', 'list, init, bind, drop channels');
   }
 
@@ -480,6 +482,80 @@ export class Client extends App {
       } break;
       // case 'drop' : await this.execChannelsDelete(); break;
       default: console.warn('[marvin]', 'unknown command: channels', cmd); break;
+    }
+  }
+
+  async execChat(): Promise<void> {
+    console.debug('[marvin]', 'Client.execChat');
+
+    const cmds = process.argv.slice(2);
+    const flags: Record<string, string> = {};
+    let positional = '';
+
+    for (const arg of cmds) {
+      if (arg.startsWith('--')) {
+        const key = arg.slice(2);
+        const val = cmds[cmds.indexOf(arg) + 1];
+        if (val && !val.startsWith('--')) {
+          flags[key] = val;
+        }
+      } else {
+        positional = arg;
+      }
+    }
+
+    const message = positional;
+    const agentId = flags.agentId || this.ctx!.config.settings?.name;
+
+    // Build URL to server chat endpoint
+    const port = this.ctx!.config?.settings?.port || 7331;
+    const url = new URL(`http://localhost:${port}/chat`);
+
+    if (this.ctx.isDry) {
+      console.info('[marvin]', '[dry] would send chat to:', url.toString());
+      console.info('[marvin]', 'message:', message || '(interactive)');
+      console.info('[marvin]', 'agent:', agentId);
+      return;
+    }
+
+    // If no message provided via CLI, prompt interactively
+    let chatMessage = message;
+    if (!chatMessage) {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+      const answer = await new Promise<string>((resolve) => {
+        rl.question('Message: ', (ans: string) => {
+          resolve(ans);
+          rl.close();
+        });
+      });
+      if (!answer.trim()) {
+        console.warn('[marvin]', 'empty message');
+        return;
+      }
+      chatMessage = answer;
+    }
+
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: chatMessage,
+        agentId,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('[marvin]', 'chat error:', (data as { error?: string }).error || res.statusText);
+      return;
+    }
+    const result = data as { ok: boolean; data: { content: string; steps: number; agentId: string } };
+    if (result.ok) {
+      console.info('[marvin]', `agent=${result.data.agentId} steps=${result.data.steps}`);
+      console.info('[marvin]', result.data.content);
     }
   }
 
