@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/.local/share/marvin
-EnvironmentFile=%h/.local/share/marvin/env
+EnvironmentFile=%h/.local/share/marvin/.env
 ExecStart=/usr/local/bin/marvin --server
 Restart=on-failure
 RestartSec=10

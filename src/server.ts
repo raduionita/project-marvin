@@ -1,34 +1,31 @@
-import * as http from 'http';
+
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'fs';
 
-import { Browser } from 'playwright';
-import { chromium } from 'playwright-extra';
-import stealth from 'puppeteer-extra-plugin-stealth';
+
 
 import { Context } from './context.js';
 import { tryJsonParse } from './helpers.js';
-import { execTool } from './tools/index.js';
-import { App, Config, Model, Agent, Task, Chat, Tool, Channel, Message, Reply } from './types.js';
+import { App, Config, System, Model, Agent, Task, Chat, Tool, Channel, Message, Reply } from './types.js';
 import * as constants from './constants.js';
-import { listTools } from './tools/index.js';
+import { listSystems } from './systems/index.js';
+import { listTools, execTool } from './tools/index.js';
 import { listChannels } from './channels/index.js';
 import { listModels } from './models/index.js';
 
 export class Server extends App {
   // initialize the app/server and its internal systems
-  async init(): Promise<void> {
+  async init() {
     console.log('[marvin]', 'Server.init');
 
-    this.initHandlers();
-    this.initProject();
-    this.initConfig();
-    this.initWatch();
-    this.initFlags();
-    await this.initBrowser();
+          this.initHandlers();
+          this.initProject();
+          this.initConfig();
+          this.initWatch();
+          this.initFlags();
+    await this.initSystems();
     await this.initTools();
-    await this.initHttp();
     await this.initChannels();
     await this.initModels();
     await this.initAgents();
@@ -38,27 +35,35 @@ export class Server extends App {
   async drop() {
     console.log('[marvin]', 'Server.drop');
 
-    if (this.ctx!.state !== 'running') return;
-    this.ctx!.state = 'stopped';
+    if (this.ctx.state !== 'running') return;
+    this.ctx.state = 'stopped';
 
-    this.dropAgents();
-    this.dropModels();
+          this.dropAgents();
+          this.dropModels();
     await this.dropChannels();
-    await this.dropHttp();
-    await this.dropBrowser();
+    await this.dropSystems();
   }
 
   // sets up handlers for SIGINT, SIGTERM, and unhandledRejection, uncaughtException, exit
   initHandlers() {
+    // process exit (graceful shutdown = stopServer)
+    process.on('exit', async (code) => {
+      console.log('[marvin]', 'Server.initHandlers', `process.exit(${code})`);
+      // cleanup
+      await this.drop();
+    });
+
     // SIGINT (Ctrl+C)
     process.on('SIGINT', () => {
       console.log('[marvin]', 'Server.initHandlers', 'SIGINT');
+      // goto process.on('exit') instead
       process.exit(0);
     });
 
     // SIGTERM (kill)
     process.on('SIGTERM', () => {
       console.log('[marvin]', 'Server.initHandlers', 'SIGTERM');
+      // goto process.on('exit')
       process.exit(0);
     });
 
@@ -73,12 +78,6 @@ export class Server extends App {
       console.error('[marvin]', 'Server.initHandlers', 'uncaughtException:', err);
       // TODO: decide if the exception should trigger a shutdown
     });
-
-    // process exit (graceful shutdown = stopServer)
-    process.on('exit', async (code) => {
-      console.log('[marvin]', 'Server.initHandlers', `process.exit(${code})`);
-      await this.drop();
-    });
   }
 
   // create ~/.marvin folder and required files
@@ -86,7 +85,7 @@ export class Server extends App {
     console.log('[marvin]', 'Server.initProject');
 
     // set root to the app folder (where package.json lives)
-    this.ctx!.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/server\.ts$/, '');
+    this.ctx.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/server\.ts$/, '');
 
     // create project/workspace folder (~/.marvin)
     const home = join(homedir(), '.marvin');
@@ -95,7 +94,7 @@ export class Server extends App {
     }
 
     // set home (~/.marvin)
-    this.ctx!.home = home;
+    this.ctx.home = home;
 
     // agents folder (~/.marvin/agents)
     const apath = join(home, 'agents');
@@ -120,31 +119,31 @@ export class Server extends App {
   initConfig(config?: Config | undefined) {
     console.log('[marvin]', 'Server.initConfig', config !== undefined);
     if (config) {
-      this.ctx!.config = config;
+      this.ctx.config = config;
       return;
     }
 
-    const path = join(this.ctx!.home, 'marvin.json');
+    const path = join(this.ctx.home, 'marvin.json');
 
     config = {} as Config;
 
     // at this stage marvin.json MUST exist, but just in case
     if (!existsSync(path)) {
       console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
-      this.ctx!.config = constants.DEFAULT_CONFIG as Config;
+      this.ctx.config = constants.DEFAULT_CONFIG as Config;
       return;
     }
 
     const data = readFileSync(path, 'utf8');
     config = tryJsonParse(data);
 
-    this.ctx!.config = config!;
+    this.ctx.config = config!;
   }
 
   initWatch() {
     console.log('[marvin]', 'Server.initWatch');
 
-    const mpath = join(this.ctx!.home, 'marvin.json');
+    const mpath = join(this.ctx.home, 'marvin.json');
     try {
       let w = watch(mpath, () => {
         console.log('[marvin]', 'Server.initWatch', 'config file changed, reloading...');
@@ -161,88 +160,26 @@ export class Server extends App {
     // const args = process.argv.slice(2);
   }
 
-  async initHttp() {
-    console.log('[marvin]', 'Server.initHttp');
-
-    const ctx = this.ctx!;
-    const port = ctx.config.settings.port || 7331;
-    const server = http.createServer(async (req, res) => {
-      const url = new URL(req.url || '/', `http://localhost:${port}`);
-      const command = url.pathname.split('/')[1];
-
-      if (!command) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'No command provided' }));
-        return;
-      }
-
-      const verb = req.method || 'GET';
-
-      console.log('[marvin]', 'Server.initHttp', `command: ${command}`);
-
+  async initSystems() {
+    console.log('[marvin]', 'Server.initSystems');
+    const files = listSystems(this.ctx).map(f => f.replace('.ts', ''));
+    for (const name of files) {
       try {
-        switch (command) {
-          case '_health':
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, data: {} }));
-            break;
-          case 'reload':
-            await this.execReload();
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, data: {} }));
-            break;
-          case 'status':
-            // TODO: add more info: models, channels, agents, tools
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, data: { state: this.ctx!.state } }));
-            break;
-          case 'chat':
-            await this.execChat(req, res);
-            break;
-          default:
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Unknown command' }));
-            return;
+        const Module = await import(`./systems/${name}.js`);
+        const Class = Module.default;
+        if (!Class || !(Class.prototype instanceof System)) {
+          console.warn('[marvin]', 'Server.initSystems', `${name} does not export a System class, skipping`);
+          continue;
         }
+        // register instance of System
+        const instance = new Class(this.ctx);
+        await instance.init();
+        this.ctx.systems[name] = instance;
+        console.log('[marvin]', 'Server.initSystems', `loaded: ${name}`);
       } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
+        console.error('[marvin]', 'Server.initSystems', `failed to load ${name}:`, err);
       }
-    });
-
-    server.on('error', (err) => {
-      console.error('[marvin]', 'Server.initHttp', 'error:', err);
-    });
-
-    await new Promise<void>((resolve) => {
-      ctx.http = server;
-      server.listen(port, () => {
-        console.log(`[marvin] HTTP Server listening on port ${port}`);
-        resolve();
-      });
-    });
-  }
-
-  async initBrowser() {
-    console.log('[marvin]', 'Server.initBrowser');
-
-    chromium.use(stealth());
-
-    const browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-        '--disable-extensions',
-        '--disable-background-networking',
-        '--disable-background-timer-throttling',
-        '--disable-renderer-backgrounding'
-      ],
-      // todo: proxies
-    });
-
-    this.ctx!.browser = browser;
+    }
   }
 
   async initTools() {
@@ -271,8 +208,8 @@ export class Server extends App {
   async initChannels() {
     console.log('[marvin]', 'Server.initChannels');
 
-    const files = listChannels(this.ctx!).map(f => f.replace('.ts', ''));
-    for (const [id, config] of Object.entries(this.ctx!.config.channels) as [string, Config['channels'][string]][]) {
+    const files = listChannels(this.ctx).map(f => f.replace('.ts', ''));
+    for (const [id, config] of Object.entries(this.ctx.config.channels) as [string, Config['channels'][string]][]) {
       if (!config.enabled) continue;
 
       const file = files.find(f => f === id);
@@ -302,7 +239,7 @@ export class Server extends App {
   async initModels() {
     console.log('[marvin]', 'Server.initModels');
 
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
 
     // config models
     const files = listModels(this).map(f => f.replace('.ts', ''))
@@ -367,7 +304,7 @@ export class Server extends App {
   async initAgents() {
     console.log('[marvin]', 'Server.initAgents');
 
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
 
     // type: orchestrator/supervisor
     const agentId = ctx.config.settings.name;
@@ -449,9 +386,9 @@ export class Server extends App {
     }
   }
 
-  dropAgents() {-
+  dropAgents() {
     console.log('[marvin]', 'Server.dropAgents');
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     for (const agent of Object.values(ctx.agents)) {
       for (const task of Object.values(agent.tasks)) {
         if (task.timeout) clearTimeout(task.timeout);
@@ -462,13 +399,13 @@ export class Server extends App {
 
   dropModels() {
     console.log('[marvin]', 'Server.dropModels');
-    this.ctx!.models = {};
+    this.ctx.models = {};
   }
 
   // will detach and delete ALL channels from the context
   async dropChannels() {
     console.log('[marvin]', 'Server.dropChannels');
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     for (const channel of Object.values(ctx.channels)) {
       try {
         await channel.drop();
@@ -482,7 +419,7 @@ export class Server extends App {
   // will detach and delete the channel from the context
   async dropChannel(id: string) {
     console.log('[marvin]', 'Server.dropChannel', id);
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     if (ctx.channels[id]) {
       try {
         ctx.channels[id].drop();
@@ -493,34 +430,17 @@ export class Server extends App {
     }
   }
 
-  async dropBrowser() {
-    console.log('[marvin]', 'Server.dropBrowser');
-    if (this.ctx!.browser) {
+  async dropSystems() {
+    console.log('[marvin]', 'Server.dropSystems');
+    const ctx = this.ctx;
+    for (const system of Object.values(ctx.systems)) {
       try {
-        await this.ctx!.browser.close();
+        await system.drop();
       } catch (err) {
-        console.error('[marvin]', 'Server.dropBrowser', 'error:', err);
+        console.error('[marvin]', 'Server.dropSystems', `error detaching system:`, err);
       }
-      this.ctx!.browser = null;
     }
-  }
-
-  // will close the server and set to undefined, you will need initHttp() to re-open it
-  async dropHttp() {
-    console.log('[marvin]', 'Server.dropHttp');
-    return new Promise<void>((resolve) => {
-      if (this.ctx!.http) {
-        this.ctx!.http.close(function (error?: Error|undefined) {
-          if (error) {
-            console.error('[marvin]', 'Server.dropHttp', 'error:', error);
-          }
-          resolve();
-        });
-        this.ctx!.http = undefined;
-      } else {
-        resolve();
-      }
-    });
+    ctx.systems = {};
   }
 
   async execTask(ctx: Context, agentId: string, taskId: string) {
@@ -568,78 +488,21 @@ export class Server extends App {
 
   async execReload() {
     console.log('[marvin]', 'Server.execReload');
-    this.ctx!.state = 'reloading';
+    this.ctx.state = 'reloading';
 
     // drop in reverse order
-    this.dropAgents();
-    this.dropModels();
-    this.dropChannels();
-    this.dropHttp();
+          this.dropAgents();
+          this.dropModels();
+    await this.dropChannels();
+    await this.dropSystems();
 
     // re-init in dependency order
-    await this.initHttp();
+    await this.initSystems();
     await this.initChannels();
     await this.initModels();
     await this.initAgents();
 
-    this.ctx!.state = 'running';
-  }
-
-  private async execChat(req: http.IncomingMessage, res: http.ServerResponse) {
-    const ctx = this.ctx!;
-
-    // TODO: basic token auth (check ctx.config.settings.apiToken if set)
-    // const auth = req.headers['authorization'] || req.url?.split('token=')[1];
-    // if (ctx.config.settings.apiToken && auth !== ctx.config.settings.apiToken) {
-    //   res.writeHead(401, { 'Content-Type': 'application/json' });
-    //   res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
-    //   return;
-    // }
-
-    try {
-      // read body as JSON
-      const body = await new Promise<{[key: string]: any}>((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        req.on('data', (chunk: Buffer) => chunks.push(chunk));
-        req.on('end', () => {
-          try {
-            const raw = Buffer.concat(chunks).toString('utf8');
-            resolve(raw ? JSON.parse(raw) : null);
-          } catch (err) {
-            reject(err);
-          }
-        });
-        req.on('error', reject);
-      });
-      
-      const message = body?.message as string | undefined;
-
-      if (!message) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Missing "message" in body' }));
-        return;
-      }
-
-      const agentId = (body.agentId as string | undefined) || ctx.config.settings.name; // default to marvin (orchestrator)
-      const maxSteps = (body.maxSteps as number | undefined) ?? constants.DEFAULT_MAX_STEPS;
-
-      const chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const result = await this.sendMessage(ctx, message, agentId, chatId, maxSteps);
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        ok: true,
-        data: {
-          content: result.content,
-          steps: result.steps,
-          agentId,
-        },
-      }));
-    } catch (err) {
-      console.error('[marvin]', 'Server.execChat', 'error:', err);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
-    }
+    this.ctx.state = 'running';
   }
 
   async sendMessage(ctx: Context, message: string, chatId: string, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {

@@ -133,7 +133,7 @@ test('initConfig() accepts an external Config object', () => {
   const client = new Client(ctx);
 
   const customConfig = {
-    settings: { name: 'custom', port: 9999, logLevel: 'debug' as const },
+    settings: { name: 'custom', port: 9999, host: '127.0.0.1', logLevel: 'debug' as const, apiToken: 'changeme' },
     channels: {},
     models: {},
     agents: {},
@@ -158,7 +158,7 @@ test('initConfig() does nothing when config is already set on ctx', () => {
   const ctx = makeContext();
   const preloadedConfig = {
     timestamp: Date.now(),
-    settings: { name: 'preloaded', port: 8080, logLevel: 'warn' as const },
+    settings: { name: 'preloaded', port: 8080, host: '127.0.0.1', logLevel: 'debug' as const, apiToken: 'changeme' },
     channels: {},
     models: {},
     agents: {},

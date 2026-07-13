@@ -213,7 +213,7 @@ function mockConfig(options: {
   models?: Record<string, Partial<Config['models']>[string]>;
 } = {}): Config {
   return {
-    settings: { name: 'marvin', port: 7331, logLevel: 'info' as const },
+    settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: options.channels as Config['channels'] || {},
     models: options.models as Config['models'] || {},
     agents: options.agents as Config['agents'] || {},
@@ -688,7 +688,7 @@ test('onMention() happy path: extracts text, finds agent, calls sendMessage, sen
   } as Agent;
 
   (ctx as { server: MockServer }).server = {
-    sendMessage: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
+    sendMessage: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
       sendMessageCalled = true;
       expect(chatId).toBe('slack-C123-1700000000.999');
       expect(agentId).toBe('agent-1');
@@ -835,7 +835,7 @@ test('onDirectMessage() happy path: finds agent by channel, calls sendMessage, s
   } as Agent;
 
   (ctx as { server: MockServer }).server = {
-    sendMessage: async (_ctx: Context, chatId: string, agentId: string, input: string) => {
+    sendMessage: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
       sendMessageCalled = true;
       expect(agentId).toBe('agent-1'); // DM should resolve agent by channel (bug fix)
       return { content: 'DM reply', steps: 1 };

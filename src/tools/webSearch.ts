@@ -1,6 +1,7 @@
 import { Tool } from '../types.js';
 import type { Context } from '../context.js';
 import { delay, rand, tryJsonParse } from '../helpers.js';
+import type BrowserSystem from '../systems/browser.js';
 
 const SEARCH_START_TAG = "DDG.pageLayout.load('d',";
 const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
@@ -19,13 +20,14 @@ export default class WebSearchTool extends Tool {
   }
 
   async call(args: { query: string }) {
-    if (!this.ctx.browser) {
+    if (!this.ctx.systems['browser']) {
       throw new Error('webSearch: Browser is not initialized in the server context');
     }
 
+    const system = this.ctx.systems['browser'] as BrowserSystem;
     const query = args.query;
     const url = `https://duckduckgo.com?q=${query}&df=d`;
-    const browserCtx = await this.ctx.browser.newContext({
+    const bctx = await system.newContext({
       viewport: { width: 1200, height: 800 },
       javaScriptEnabled: true,
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36',
@@ -33,7 +35,7 @@ export default class WebSearchTool extends Tool {
       bypassCSP: true,
     });
 
-    await browserCtx.route('**/*', (route) => {
+    await bctx.route('**/*', (route) => {
       const request = route.request();
       if (request.url().includes('links.duckduckgo.com/d.js') || request.isNavigationRequest()) {
         return route.continue();
@@ -42,7 +44,7 @@ export default class WebSearchTool extends Tool {
       }
     });
 
-    const page = await browserCtx.newPage();
+    const page = await bctx.newPage();
     page.setDefaultNavigationTimeout(15_000);
 
     try {
@@ -67,7 +69,7 @@ export default class WebSearchTool extends Tool {
       console.error('[marvin]', 'webSearch', 'error:', error);
     } finally {
       await page.close();
-      await browserCtx.close();
+      await bctx.close();
     }
 
     return { results: [] };

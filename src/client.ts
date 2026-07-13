@@ -147,6 +147,7 @@ export class Client extends App {
       case 'help'   : await this.execHelp();   break;
       case 'start'  : await this.execStart(); break;
       case 'pause'  : await this.execPause();  break;
+      case 'upgrade':
       case 'update' : await this.execUpdate(); break;
       case 'version': await this.execVersion(); break;
       case 'status' : await this.execStatus(); break;
@@ -184,7 +185,7 @@ export class Client extends App {
     // check if daemon is already running
     if (!this.ctx.isDry) {
       try {
-        const status = execSync(`systemctl --user is-active marvin 2>/dev/null || true`, { encoding: 'utf8' }).trim();
+        const status = execSync(['systemctl', '--user', 'is-active', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
         if (status === 'active') {
           console.info('[marvin]', 'marvin daemon is already running. use "marvin reload" to apply config changes');
           return;
@@ -240,15 +241,15 @@ export class Client extends App {
 
     if (!this.ctx.isDry) {
       // git pull from main
-      execSync(`git -C ${root} pull origin main`, { stdio: 'inherit' });
+      execSync(['git', '-C', root, 'pull', 'origin', 'main'].join(' '), { stdio: 'inherit' });
 
       // Reinstall dependencies
       console.log('[marvin] reinstalling dependencies...');
-      execSync(`cd ${root} && bun install`, { stdio: 'inherit' });
+      execSync(['bun', 'install'].join(' '), { cwd: root, stdio: 'inherit' });
 
       // Restart service
       console.log('[marvin] restarting service...');
-      execSync(`systemctl --user restart marvin`, { stdio: 'inherit' });
+      execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
 
       console.log('[marvin] update complete');
     } else {
@@ -291,7 +292,7 @@ export class Client extends App {
         // service status
         if (!this.ctx.isDry) {
           try {
-            const status = execSync(`systemctl --user status marvin 2>&1 || true`, { encoding: 'utf8' });
+            const status = execSync(['systemctl', '--user', 'status', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
             console.log('[marvin]', 'service status:', status.trim());
           } catch {
             console.log('[marvin] service is not running.');
@@ -307,7 +308,13 @@ export class Client extends App {
         if (!this.ctx.isDry) {
           try {
             const url = new URL(`http://localhost:${port}/_health`);
-            const response = await fetch(url.toString());
+            const response = await fetch(url.toString(), {
+              method: 'GET',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.ctx!.config.settings.apiToken}`,
+              },
+            });
             if (response.ok) {
               console.log('[marvin]', `server is healthy (port ${port}).`);
             } else {
@@ -488,12 +495,16 @@ export class Client extends App {
   async execChat(): Promise<void> {
     console.debug('[marvin]', 'Client.execChat');
 
+    type Result = { ok: boolean; data: { content: string; steps: number; agentId: string, chatId: string } };
+
     const cmds = process.argv.slice(2);
     const i = cmds.indexOf('--agentId');
     const agentId = (i > -1 ? cmds[i + 1] : '') || this.ctx!.config.settings?.name;
     // build URL to server chat endpoint
     const port = this.ctx!.config?.settings?.port || 7331;
-    const url = new URL(`http://localhost:${port}/chat`);
+    const host = this.ctx!.config?.settings?.host || '127.0.0.1';
+    const url = new URL(`http://${host}:${port}/chat`);
+    let   chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     // TODO: start interactive prompt mode here...loop until /exit/quit/stop
 
@@ -524,23 +535,25 @@ export class Client extends App {
     }
 
     // call chat endpoint
-    const res = await fetch(url.toString(), {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: answer,
-        agentId,
+        agentId: agentId,
+        chatId: chatId,
       }),
     });
 
-    const data = await res.json();
+    const json = await res.json();
     if (!res.ok) {
-      console.error('[marvin]', 'chat error:', (data as { error?: string }).error || res.statusText);
+      console.error('[marvin]', 'chat error:', (json as { error?: string }).error || res.statusText);
       return;
     }
-    const result = data as { ok: boolean; data: { content: string; steps: number; agentId: string } };
+    const result = json as Result;
+          chatId = result.data.chatId;
     if (result.ok) {
-      console.info('[marvin]', `agent=${result.data.agentId} steps=${result.data.steps}`);
+      console.info('[marvin]', `agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
       console.info('[marvin]', result.data.content);
     }
   }

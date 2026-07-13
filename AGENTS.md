@@ -76,7 +76,7 @@ Do not confuse Marvin channels with Slack channels, they are different things. I
 2. Create a plan split into small, independent, focused steps/edits (edit = **smallest correct change**)
 3. Execute plan STEP-BY-STEP, each step MUST pass tests and have NO errors
     1. Apply it the update
-    2. RECHECK the file for errors (run `tsc --noEmit`)
+    2. RECHECK the file for errors (run `npx tsc --noEmit`)
     3. Validate the result (run `bun test`)
 4. Summarize what changed and why
 

@@ -1,5 +1,5 @@
 import { Tool } from '../types.js';
-import type { Context } from '../context.js';
+import type BrowserSystem from '../systems/browser.js';
 
 export default class WebBrowseTool extends Tool {
   name() { return 'webBrowse'; }
@@ -15,12 +15,13 @@ export default class WebBrowseTool extends Tool {
   }
 
   async call(args: { url: string }) {
-    if (!this.ctx.browser) {
+    if (!this.ctx.systems['browser']) {
       throw new Error('webBrowse: Browser is not initialized in the server context');
     }
 
+    const system = this.ctx.systems['browser'] as BrowserSystem;
     const url = args.url;
-    const browserCtx = await this.ctx.browser.newContext({
+    const bctx = await system.newContext({
       viewport: { width: 1200, height: 800 },
       javaScriptEnabled: true,
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36',
@@ -28,7 +29,7 @@ export default class WebBrowseTool extends Tool {
       bypassCSP: true,
     });
 
-    await browserCtx.route('**/*', (route) => {
+    await bctx.route('**/*', (route) => {
       const request = route.request();
       if (request.isNavigationRequest()) {
         return route.continue();
@@ -37,7 +38,7 @@ export default class WebBrowseTool extends Tool {
       }
     });
 
-    const page = await browserCtx.newPage();
+    const page = await bctx.newPage();
     page.setDefaultNavigationTimeout(15_000);
 
     try {
@@ -54,7 +55,7 @@ export default class WebBrowseTool extends Tool {
       throw error;
     } finally {
       await page.close();
-      await browserCtx.close();
+      await bctx.close();
     }
   }
 }

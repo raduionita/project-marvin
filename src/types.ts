@@ -10,8 +10,10 @@ export type Role = 'system' | 'user' | 'assistant' | 'tool';
 export interface Config {
   settings: {
     name: string;
+    host: string;
     port: number;
     logLevel: LogLevel;
+    apiToken?: string;
   };
   channels: Record<string, {
     enabled?: boolean;
@@ -44,6 +46,18 @@ export abstract class App {
 
   constructor(ctx: Context) {
     console.log('[marvin]', 'App.constructor', this.constructor.name);
+    this.ctx = ctx;
+  }
+
+  abstract init(): Promise<void>;
+  abstract drop(): Promise<void>;
+}
+
+export abstract class System {
+  public ctx: Context;
+
+  constructor(ctx: Context) {
+    console.log('[marvin]', 'System.constructor', this.constructor.name);
     this.ctx = ctx;
   }
 

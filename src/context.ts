@@ -1,6 +1,6 @@
 import * as http from 'http';
 import { type Browser } from 'playwright';
-import { type Config, type Model, type Channel, type Tool, type Agent } from './types.js';
+import { type Config, type Model, type Channel, type Tool, type Agent, type System } from './types.js';
 import { type Server } from './server.js';
 import { type Client } from './client.js';
 
@@ -11,11 +11,9 @@ export class Context {
   public client?: Client;
 
   public config: Config = {} as Config;
-  public browser: Browser | null = null;
-  public http: http.Server | undefined;
 
   // TODO: later consider moving browser, http, watch (file watcher) to a separate group "systems"
-  public systems: Record<string, any> = {};
+  public systems: Record<string, System> = {};
 
   // channels, models, agents
   public channels: Record<string, Channel> = {};

@@ -9,8 +9,10 @@ export const DEFAULT_MAX_STEPS = 20;
 export const DEFAULT_CONFIG = {
   settings: {
     name: 'marvin',
+    host: '127.0.0.1',
     port: 7331,
     logLevel: 'info',
+    apiToken: 'changeme',
   },
   channels: {},
   models: {},

@@ -8,7 +8,7 @@ import { Server } from './server.js';
 function mockConfig(channels: Config['channels'] = {}): Config {
   return {
     timestamp: Date.now(),
-    settings: { name: 'marvin', port: 7331, logLevel: 'info' },
+    settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: channels,
     models: {},
     agents: {},
