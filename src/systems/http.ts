@@ -2,6 +2,7 @@ import * as http from 'http';
 
 import { System } from '../types.js';
 import * as constants from '../constants.js';
+import ServeCommand from '../commands/serve.js';
 
 export default class ApiSystem extends System {
   private port: number = 7331;
@@ -133,8 +134,8 @@ export default class ApiSystem extends System {
 
   private async handleReload(req: http.IncomingMessage, res: http.ServerResponse) {
     console.debug('[marvin]', 'ApiSystem.handleReload');
-
-    this.ctx.server?.execReload();
+    const cmd = this.ctx.command as ServeCommand;
+    cmd.execReload();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, data: {} }));
   }
@@ -171,15 +172,10 @@ export default class ApiSystem extends System {
       const agentId = (body.agentId as string | undefined) || ctx.config.settings.name; // default to marvin (orchestrator)
       const maxSteps = (body.maxSteps as number | undefined) ?? constants.DEFAULT_MAX_STEPS;
 
-      if (!this.ctx.server) {
-        console.error('[marvin]', 'ApiSystem.handleChat', 'server not available');
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Server not available' }));
-        return;
-      }
+      const server = this.ctx.command as ServeCommand;
 
       // send message to the LLM
-      const result = await this.ctx.server.sendMessage(ctx, message, agentId, chatId, maxSteps);
+      const result = await server.sendMessage(ctx, message, agentId, chatId, maxSteps);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({

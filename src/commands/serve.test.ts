@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
-import { Context } from './types.js';
-import { Channel, Config, App } from './types.js';
-import { Server } from './server.js';
+import { Context } from '../types.js';
+import { Channel, Config } from '../types.js';
+import ServeCommand from './serve.js';
 
 // helpers
 
@@ -20,9 +20,9 @@ function mockContext(): Context {
   return ctx;
 }
 
-function mockServer(): Server {
+function mockServer(): ServeCommand {
   const ctx = mockContext();
-  return new Server(ctx);
+  return new ServeCommand(ctx);
 }
 
 // tests
@@ -31,7 +31,6 @@ test('execChannels loads enabled channels with valid provider', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
   const server = mockServer();
 
-  await server.initConfig(config);
   await server.initChannels();
 
   expect(server.ctx!.channels['channel.mock']).toBeDefined();
@@ -42,7 +41,6 @@ test('execChannels skips disabled channels', async () => {
   const config = mockConfig({ disabledChannel: { enabled: false } });
   const server = mockServer();
 
-  await server.initConfig(config);
   await server.initChannels();
 
   expect(server.ctx!.channels['disabledChannel']).toBeUndefined();
@@ -52,7 +50,6 @@ test('execChannels warns on missing provider', async () => {
   const config = mockConfig({ unknownProvider: { enabled: true } });
   const server = mockServer();
 
-  await server.initConfig(config);
   await server.initChannels();
 
 
@@ -63,7 +60,6 @@ test('execChannels skips non-Channel classes', async () => {
   const config = mockConfig({ badChannel: { enabled: true } });
   const server = mockServer();
 
-  await server.initConfig(config);
   await server.initChannels();
 
   expect(server.ctx!.channels['badChannel']).toBeUndefined();
@@ -73,7 +69,6 @@ test('execChannels stores channels in ctx.channels', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
   const server = mockServer();
 
-  await server.initConfig(config);
   await server.initChannels();
 
   expect(Object.keys(server.ctx!.channels).length).toBeGreaterThan(0);

@@ -1,9 +1,10 @@
 import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
-import { Context } from '../types.js';
+import { Command, Context } from '../types.js';
 import { Config, Message, Agent } from '../types.js';
 import SlackChannel from './slack.js';
 import { type HandlerParams, type SlackResponse, type ISocketModeClient, type IWebClient } from './slack.js'
+import ServeCommand from '../commands/serve.js';
 
 interface MockServer {
   sendMessage: (ctx: Context, chatId: string, agentId: string, input: string) => Promise<{ content: string; steps: number } | null>;
@@ -127,7 +128,7 @@ class MockSlackChannel extends SlackChannel {
       return;
     }
 
-    const server = this.ctx.server;
+    const server = this.ctx.command as ServeCommand;
     if (!server) {
       console.error('[marvin]', 'SlackChannel.onMention', 'server not available');
       await this.sendMessage({ role: 'assistant', content: '(server not available)' });
@@ -158,7 +159,7 @@ class MockSlackChannel extends SlackChannel {
       // extract the actual message text (strip @marvin mention)
       let text = (event.text as string | undefined) || '';
 
-      const server = this.ctx.server;
+      const server = this.ctx.command as ServeCommand;
       if (!server) {
         throw new Error('SlackChannel.onDirectMessage: server not available');
       }
@@ -687,7 +688,7 @@ test('onMention() happy path: extracts text, finds agent, calls sendMessage, sen
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: MockServer }).server = {
+  (ctx as { command: Command }).command = {
     sendMessage: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
       sendMessageCalled = true;
       expect(chatId).toBe('slack-C123-1700000000.999');
@@ -695,7 +696,7 @@ test('onMention() happy path: extracts text, finds agent, calls sendMessage, sen
       expect(input).toBe('hello there');
       return { content: 'reply from agent', steps: 1 };
     },
-  } as MockServer;
+  } as ServeCommand;
 
   const ch = new MockSlackChannel(ctx);
   await ch.init();
@@ -797,9 +798,9 @@ test('onMention() with null sendMessage result sends (no response from the AI)',
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: MockServer }).server = {
-    sendMessage: async () => null,
-  } as MockServer;
+  (ctx as { command: Command }).command = {
+    // sendMessage: ,
+  } as ServeCommand;
 
   let ch = new MockSlackChannel(ctx);
   await ch.init();
@@ -834,13 +835,13 @@ test('onDirectMessage() happy path: finds agent by channel, calls sendMessage, s
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: MockServer }).server = {
+  (ctx as { command: Command }).command = {
     sendMessage: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
       sendMessageCalled = true;
       expect(agentId).toBe('agent-1'); // DM should resolve agent by channel (bug fix)
       return { content: 'DM reply', steps: 1 };
     },
-  } as MockServer;
+  } as ServeCommand;
 
   const ch = new MockSlackChannel(ctx);
   await ch.init();
@@ -866,9 +867,11 @@ test('onDirectMessage() with no text content sends (no text content)', async () 
     model: {} as never,
   } as Agent;
 
-  (ctx as { server: MockServer }).server = {
-    sendMessage: async () => ({ content: 'should not reach here', steps: 0 }),
-  } as MockServer;
+  (ctx as { command: Command }).command = {
+    sendMessage: async (ctx: Context, input: string, chatId: string, agentId: string) => {
+      return { content: 'should not reach here', steps: 0 };
+    }
+  } as ServeCommand;
 
   let ch = new MockSlackChannel(ctx);
   await ch.init();

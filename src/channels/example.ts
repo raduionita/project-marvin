@@ -1,5 +1,4 @@
 import { Channel, Message } from '../types.js';
-import { Server } from '../server.js';
 
 export default class ExampleChannel extends Channel {
   args(): {[key: string]: any} {

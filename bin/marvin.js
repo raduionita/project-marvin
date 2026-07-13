@@ -1,3 +1,5 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
-import { Server } from '../src/server.js';
+// import { Server } from '../src/marvin.js';
+
+console.log(process.argv);

@@ -3,6 +3,7 @@ import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@s
 import { Channel, Message, Agent } from '../types.js';
 import { Context } from '../types.js';
 import * as constants from '../constants.js';
+import ServeCommand from '../commands/serve.js';
 
 export type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>, ack: (response?: Record<string, unknown>) => Promise<void> };
 
@@ -142,7 +143,7 @@ export default class SlackChannel extends Channel {
       }
 
       // get the server reference from context
-      const server = this.ctx.server;
+      const server = this.ctx.command as ServeCommand;
       // this should never happen, but just in case throw an error
       if (!server) {
         console.error('[marvin]', 'SlackChannel.onMention', 'server not available');
@@ -184,7 +185,7 @@ export default class SlackChannel extends Channel {
       const text = this.extractText(event);
 
       // get the server reference from context
-      const server = this.ctx.server;
+      const server = this.ctx.command as ServeCommand;
       if (!server) {
         throw new Error('SlackChannel.onMention: server not available');
       }

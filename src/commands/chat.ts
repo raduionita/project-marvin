@@ -1,0 +1,71 @@
+import readline from 'readline';
+
+import { Command } from "../types";
+
+type Result = { ok: boolean; data: { content: string; steps: number; agentId: string, chatId: string } };
+
+export default class ChatCommand extends Command {
+  async init() {
+    console.debug('[marvin]', 'ChatCommand.init');
+
+    const cmds = process.argv.slice(2);
+    const i = cmds.indexOf('--agentId');
+    const agentId = (i > -1 ? cmds[i + 1] : '') || this.ctx!.config.settings?.name;
+    // build URL to server chat endpoint
+    const port = this.ctx!.config?.settings?.port || 7331;
+    const host = this.ctx!.config?.settings?.host || '127.0.0.1';
+    const url = new URL(`http://${host}:${port}/chat`);
+    let   chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // TODO: start interactive prompt mode here...loop until /exit/quit/stop
+
+    // prompt interactively
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    const answer = await new Promise<string>((resolve) => {
+      rl.question('Message: ', (ans: string) => {
+        resolve(ans);
+        rl.close();
+      });
+    });
+
+    // if empty answer, exit
+    if (!answer.trim()) {
+      console.warn('[marvin]', 'empty message');
+      return;
+    }
+
+    // dry mode
+    if (this.ctx.isDry) {
+      console.info('[marvin]', '[dry] would send chat to:', url.toString());
+      console.info('[marvin]', 'message:', answer);
+      console.info('[marvin]', 'agent:', agentId);
+      return;
+    }
+
+    // call chat endpoint
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: answer,
+        agentId: agentId,
+        chatId: chatId,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok) {
+      console.error('[marvin]', 'chat error:', (json as { error?: string }).error || res.statusText);
+      return;
+    }
+    const result = json as Result;
+          chatId = result.data.chatId;
+    if (result.ok) {
+      console.info('[marvin]', `agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
+      console.info('[marvin]', result.data.content);
+    }
+  }
+}

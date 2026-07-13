@@ -3,27 +3,22 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'fs';
 
+import { Context, Command, Config, System, Model, Agent, Task, Chat, Tool, Channel, Message, Reply  } from '../types.js';
+import { tryJsonParse } from '../helpers.js';
+import * as constants from '../constants.js';
+import { listSystems } from '../systems/index.js';
+import { listTools, execTool } from '../tools/index.js';
+import { listChannels } from '../channels/index.js';
+import { listModels } from '../models/index.js';
 
-
-import { Context } from './types.js';
-import { tryJsonParse } from './helpers.js';
-import { App, Config, System, Model, Agent, Task, Chat, Tool, Channel, Message, Reply } from './types.js';
-import * as constants from './constants.js';
-import { listSystems } from './systems/index.js';
-import { listTools, execTool } from './tools/index.js';
-import { listChannels } from './channels/index.js';
-import { listModels } from './models/index.js';
-
-export class Server extends App {
+// `marvin serve [help] [--dry]`
+export default class ServeCommand extends Command {
   // initialize the app/server and its internal systems
   async init() {
-    console.log('[marvin]', 'Server.init');
+    console.log('[marvin]', 'ServeCommand.init');
 
-          this.initHandlers();
           this.initProject();
-          this.initConfig();
           this.initWatch();
-          this.initFlags();
     await this.initSystems();
     await this.initTools();
     await this.initChannels();
@@ -33,7 +28,7 @@ export class Server extends App {
 
   // will drop all the resources from the context
   async drop() {
-    console.log('[marvin]', 'Server.drop');
+    console.log('[marvin]', 'ServeCommand.drop');
 
     if (this.ctx.state !== 'running') return;
     this.ctx.state = 'stopped';
@@ -44,45 +39,9 @@ export class Server extends App {
     await this.dropSystems();
   }
 
-  // sets up handlers for SIGINT, SIGTERM, and unhandledRejection, uncaughtException, exit
-  initHandlers() {
-    // process exit (graceful shutdown = stopServer)
-    process.on('exit', async (code) => {
-      console.log('[marvin]', 'Server.initHandlers', `process.exit(${code})`);
-      // cleanup
-      await this.drop();
-    });
-
-    // SIGINT (Ctrl+C)
-    process.on('SIGINT', () => {
-      console.log('[marvin]', 'Server.initHandlers', 'SIGINT');
-      // goto process.on('exit') instead
-      process.exit(0);
-    });
-
-    // SIGTERM (kill)
-    process.on('SIGTERM', () => {
-      console.log('[marvin]', 'Server.initHandlers', 'SIGTERM');
-      // goto process.on('exit')
-      process.exit(0);
-    });
-
-    // unhandled rejection from promise
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('[marvin]', 'Server.initHandlers', 'unhandledRejection:', promise, 'reason:', reason);
-      // TODO: decide if the rejection should trigger a shutdown
-    });
-
-    // uncaught exception
-    process.on('uncaughtException', (err) => {
-      console.error('[marvin]', 'Server.initHandlers', 'uncaughtException:', err);
-      // TODO: decide if the exception should trigger a shutdown
-    });
-  }
-
   // create ~/.marvin folder and required files
   initProject() {
-    console.log('[marvin]', 'Server.initProject');
+    console.log('[marvin]', 'ServeCommand.initProject');
 
     // set root to the app folder (where package.json lives)
     this.ctx.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/server\.ts$/, '');
@@ -116,97 +75,68 @@ export class Server extends App {
     }
   }
 
-  initConfig(config?: Config | undefined) {
-    console.log('[marvin]', 'Server.initConfig', config !== undefined);
-    if (config) {
-      this.ctx.config = config;
-      return;
-    }
-
-    const path = join(this.ctx.home, 'marvin.json');
-
-    config = {} as Config;
-
-    // at this stage marvin.json MUST exist, but just in case
-    if (!existsSync(path)) {
-      console.error('[marvin]', 'Server.initConfig', 'Config file not found:', path);
-      this.ctx.config = constants.DEFAULT_CONFIG as Config;
-      return;
-    }
-
-    const data = readFileSync(path, 'utf8');
-    config = tryJsonParse(data);
-
-    this.ctx.config = config!;
-  }
-
   initWatch() {
-    console.log('[marvin]', 'Server.initWatch');
+    console.log('[marvin]', 'ServeCommand.initWatch');
 
     const mpath = join(this.ctx.home, 'marvin.json');
     try {
       let w = watch(mpath, () => {
-        console.log('[marvin]', 'Server.initWatch', 'config file changed, reloading...');
+        console.log('[marvin]', 'ServeCommand.initWatch', 'config file changed, reloading...');
         this.execReload();
       });
       w.close();
     } catch (err) {
-      console.warn('[marvin]', 'Server.initWatch', 'config file watcher failed:', (err as Error).message);
+      console.warn('[marvin]', 'ServeCommand.initWatch', 'config file watcher failed:', (err as Error).message);
     }
   }
 
-  initFlags() {
-    console.log('[marvin]', 'Server.initFlags');
-    // const args = process.argv.slice(2);
-  }
-
   async initSystems() {
-    console.log('[marvin]', 'Server.initSystems');
+    console.log('[marvin]', 'ServeCommand.initSystems');
     const files = listSystems(this.ctx).map(f => f.replace('.ts', ''));
     for (const name of files) {
       try {
-        const Module = await import(`./systems/${name}.js`);
+        const Module = await import(`../systems/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof System)) {
-          console.warn('[marvin]', 'Server.initSystems', `${name} does not export a System class, skipping`);
+          console.warn('[marvin]', 'ServeCommand.initSystems', `${name} does not export a System class, skipping`);
           continue;
         }
         // register instance of System
         const instance = new Class(this.ctx);
         await instance.init();
         this.ctx.systems[name] = instance;
-        console.log('[marvin]', 'Server.initSystems', `loaded: ${name}`);
+        console.log('[marvin]', 'ServeCommand.initSystems', `loaded: ${name}`);
       } catch (err) {
-        console.error('[marvin]', 'Server.initSystems', `failed to load ${name}:`, err);
+        console.error('[marvin]', 'ServeCommand.initSystems', `failed to load ${name}:`, err);
       }
     }
   }
 
   async initTools() {
-    console.log('[marvin]', 'Server.initTools');
+    console.log('[marvin]', 'ServeCommand.initTools');
 
     const files = listTools(this.ctx).map(f => f.replace('.ts', ''));
     for (const file of files) {
       const name = file;
       try {
-        const Module = await import(`./tools/${name}.js`);
+        const Module = await import(`../tools/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
-          console.warn('[marvin]', 'Server.initTools', `${file} does not export a Tool class, skipping`);
+          console.warn('[marvin]', 'ServeCommand.initTools', `${file} does not export a Tool class, skipping`);
           continue;
         }
         // register instance of Tool
         const instance = new Class(this.ctx);
         this.ctx.tools[instance.name()] = instance;
-        console.log('[marvin]', 'Server.initTools', `loaded: ${instance.name()}`);
+        console.log('[marvin]', 'ServeCommand.initTools', `loaded: ${instance.name()}`);
       } catch (err) {
-        console.error('[marvin]', 'Server.initTools', `failed to load ${file}:`, err);
+        console.error('[marvin]', 'ServeCommand.initTools', `failed to load ${file}:`, err);
       }
     }
   }
 
   async initChannels() {
-    console.log('[marvin]', 'Server.initChannels');
+    console.log('[marvin]', 'ServeCommand.initChannels');
 
     const files = listChannels(this.ctx).map(f => f.replace('.ts', ''));
     for (const [id, config] of Object.entries(this.ctx.config.channels) as [string, Config['channels'][string]][]) {
@@ -214,35 +144,36 @@ export class Server extends App {
 
       const file = files.find(f => f === id);
       if (!file) {
-        console.warn('[marvin]', 'Server.initChannels', `no file for file "${file}", skipping ${id}`);
+        console.warn('[marvin]', 'ServeCommand.initChannels', `no file for file "${file}", skipping ${id}`);
         continue;
       }
 
       try {
-        const Module = await import(`./channels/${file}.js`);
+        const Module = await import(`../channels/${file}.js`);
         const Class = Module.default;
+        // must be a Channel class
         if (!Class || !(Class.prototype instanceof Channel)) {
-          console.warn('[marvin]', 'Server.initChannels', `${file} does not export a Channel class, skipping ${id}`);
+          console.warn('[marvin]', 'ServeCommand.initChannels', `${file} does not export a Channel class, skipping ${id}`);
           continue;
         }
         // register instance of Channel 
         const instance = new Class(this.ctx);
         await instance.init();
         this.ctx.channels[id] = instance;
-        console.log('[marvin]', 'Server.initChannels', `loaded: ${id}`);
+        console.log('[marvin]', 'ServeCommand.initChannels', `loaded: ${id}`);
       } catch (err) {
-        console.error('[marvin]', 'Server.initChannels', `failed to load ${id}:`, err);
+        console.error('[marvin]', 'ServeCommand.initChannels', `failed to load ${id}:`, err);
       }
     }
   }
 
   async initModels() {
-    console.log('[marvin]', 'Server.initModels');
+    console.log('[marvin]', 'ServeCommand.initModels');
 
     const ctx = this.ctx;
 
     // config models
-    const files = listModels(this).map(f => f.replace('.ts', ''))
+    const files = listModels(ctx).map(f => f.replace('.ts', ''))
     for (const [modelId, model] of Object.entries(ctx.config.models)) {
       if (!model.enabled) continue;
 
@@ -250,18 +181,18 @@ export class Server extends App {
 
       const file = files.find(f => f === provider);
       if (!file) {
-        console.warn('[marvin]', 'Server.initModels', `no file for provider "${provider}", skipping ${modelId}`);
+        console.warn('[marvin]', 'ServeCommand.initModels', `no file for provider "${provider}", skipping ${modelId}`);
         continue;
       }
 
       try {
         // import the model provider
-        const Module = await import(`./models/${provider}.js`);
+        const Module = await import(`../models/${provider}.js`);
         const Class = Module.default;
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[marvin]', 'Server.initModels', `${modelId} does not export a Model class, skipping`);
+          console.error('[marvin]', 'ServeCommand.initModels', `${modelId} does not export a Model class, skipping`);
           continue;
         }
         
@@ -269,9 +200,9 @@ export class Server extends App {
         const instance = new Class(model);
         ctx.models[modelId] = instance;
 
-        console.log('[marvin]', 'Server.initModels', `loaded: ${modelId} (${provider} ${model.model})`);
+        console.log('[marvin]', 'ServeCommand.initModels', `loaded: ${modelId} (${provider} ${model.model})`);
       } catch (err) {
-        console.error('[marvin]', 'Server.initModels', `failed to load ${modelId}:`, err);
+        console.error('[marvin]', 'ServeCommand.initModels', `failed to load ${modelId}:`, err);
       }
     }
 
@@ -281,12 +212,12 @@ export class Server extends App {
 
       try {
         // import the model provider
-        const Module = await import(`./models/fallback.js`);
+        const Module = await import(`../models/fallback.js`);
         const Class = Module.default;
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[marvin]', 'Server.initModels', `${modelId} does not export a Model class!`);
+          console.error('[marvin]', 'ServeCommand.initModels', `${modelId} does not export a Model class!`);
           process.exit(1);
         }
 
@@ -294,15 +225,15 @@ export class Server extends App {
         ctx.models[modelId] = instance;
 
         // warn because fallback model is not a good idea, and does NOTHING
-        console.warn('[marvin]', 'Server.initModels', `loaded: ${modelId}`);
+        console.warn('[marvin]', 'ServeCommand.initModels', `loaded: ${modelId}`);
       } catch (err) {
-        console.error('[marvin]', 'Server.initModels', `failed to load ${modelId}:`, err);
+        console.error('[marvin]', 'ServeCommand.initModels', `failed to load ${modelId}:`, err);
       }
     }
   }
 
   async initAgents() {
-    console.log('[marvin]', 'Server.initAgents');
+    console.log('[marvin]', 'ServeCommand.initAgents');
 
     const ctx = this.ctx;
 
@@ -315,7 +246,7 @@ export class Server extends App {
     // load agent system prompt (~/.marvin/IDENTITY.md)
     let identity = readFileSync(join(ctx.home, 'MARVIN.md'), 'utf8').trim();
     if (!identity) {
-      console.warn('[marvin]', 'Server.initAgents', `no MARVIN.md found for agent ${agentId}, using default`);
+      console.warn('[marvin]', 'ServeCommand.initAgents', `no MARVIN.md found for agent ${agentId}, using default`);
       identity = constants.MARVIN_MD;
     }
     
@@ -333,7 +264,7 @@ export class Server extends App {
     for (const [agentId, agent] of Object.entries(ctx.config.agents)) {
       const model = ctx.models[agent.model || ''];
       if (!model) {
-        console.error('[marvin]', 'Server.initAgents', `model not found for agent ${agentId}: ${agent.model}`);
+        console.error('[marvin]', 'ServeCommand.initAgents', `model not found for agent ${agentId}: ${agent.model}`);
         continue;
       }
 
@@ -352,7 +283,7 @@ export class Server extends App {
         }
 
         if (!input) {
-          console.warn('[marvin]', 'Server.initAgents', `no input found for task ${taskId}, disabling`);
+          console.warn('[marvin]', 'ServeCommand.initAgents', `no input found for task ${taskId}, disabling`);
           enabled = false;
         }
 
@@ -365,13 +296,13 @@ export class Server extends App {
           timeout: setTimeout(this.execTask.bind(this), task.schedule, ctx, agentId, taskId),
         } as Task;
 
-        console.log('[marvin]', 'Server.initAgents', `agent ${agentId} task ${taskId} scheduled (${task.schedule}ms)`);
+        console.log('[marvin]', 'ServeCommand.initAgents', `agent ${agentId} task ${taskId} scheduled (${task.schedule}ms)`);
       }
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
       let identity = readFileSync(join(ctx.home, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
       if (!identity) {
-        console.warn('[marvin]', 'Server.initAgents', `no IDENTITY.md found for agent ${agentId}, using default`);
+        console.warn('[marvin]', 'ServeCommand.initAgents', `no IDENTITY.md found for agent ${agentId}, using default`);
         identity = constants.IDENTITY_MD;
       }
 
@@ -387,7 +318,7 @@ export class Server extends App {
   }
 
   dropAgents() {
-    console.log('[marvin]', 'Server.dropAgents');
+    console.log('[marvin]', 'ServeCommand.dropAgents');
     const ctx = this.ctx;
     for (const agent of Object.values(ctx.agents)) {
       for (const task of Object.values(agent.tasks)) {
@@ -398,19 +329,19 @@ export class Server extends App {
   }
 
   dropModels() {
-    console.log('[marvin]', 'Server.dropModels');
+    console.log('[marvin]', 'ServeCommand.dropModels');
     this.ctx.models = {};
   }
 
   // will detach and delete ALL channels from the context
   async dropChannels() {
-    console.log('[marvin]', 'Server.dropChannels');
+    console.log('[marvin]', 'ServeCommand.dropChannels');
     const ctx = this.ctx;
     for (const channel of Object.values(ctx.channels)) {
       try {
         await channel.drop();
       } catch (err) {
-        console.error('[marvin]', 'Server.dropChannels', `error detaching channel:`, err);
+        console.error('[marvin]', 'ServeCommand.dropChannels', `error detaching channel:`, err);
       }
     }
     ctx.channels = {};
@@ -418,26 +349,26 @@ export class Server extends App {
 
   // will detach and delete the channel from the context
   async dropChannel(id: string) {
-    console.log('[marvin]', 'Server.dropChannel', id);
+    console.log('[marvin]', 'ServeCommand.dropChannel', id);
     const ctx = this.ctx;
     if (ctx.channels[id]) {
       try {
         ctx.channels[id].drop();
       } catch (err) {
-        console.error('[marvin]', 'Server.dropChannel', `error detaching channel:`, err);
+        console.error('[marvin]', 'ServeCommand.dropChannel', `error detaching channel:`, err);
       }
       delete ctx.channels[id];
     }
   }
 
   async dropSystems() {
-    console.log('[marvin]', 'Server.dropSystems');
+    console.log('[marvin]', 'ServeCommand.dropSystems');
     const ctx = this.ctx;
     for (const system of Object.values(ctx.systems)) {
       try {
         await system.drop();
       } catch (err) {
-        console.error('[marvin]', 'Server.dropSystems', `error detaching system:`, err);
+        console.error('[marvin]', 'ServeCommand.dropSystems', `error detaching system:`, err);
       }
     }
     ctx.systems = {};
@@ -449,7 +380,7 @@ export class Server extends App {
 
     if (!agent.enabled || !task.enabled) return;
 
-    console.log('[marvin]', 'Server.execTask', `${agentId}/${taskId}`);
+    console.log('[marvin]', 'ServeCommand.execTask', `${agentId}/${taskId}`);
 
     const maxSteps = task.maxSteps || constants.DEFAULT_MAX_STEPS;
 
@@ -458,7 +389,7 @@ export class Server extends App {
 
     const result = await this.sendMessage(ctx, task.input, agentId, chatId, maxSteps);
     if (!result) {
-      console.error('[marvin]', 'Server.execTask', `no result from sendMessage for agent ${agentId}`);
+      console.error('[marvin]', 'ServeCommand.execTask', `no result from sendMessage for agent ${agentId}`);
       return;
     }
 
@@ -470,7 +401,7 @@ export class Server extends App {
 
       // verify channel exists, warn if not, then skip
       if (!channel) {
-        console.warn('[marvin]', 'Server.execTask', `channel ${channelId} not found, skipping`);
+        console.warn('[marvin]', 'ServeCommand.execTask', `channel ${channelId} not found, skipping`);
         continue;
       }
 
@@ -478,7 +409,7 @@ export class Server extends App {
       try {
         await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
       } catch (err) {
-        console.error('[marvin]', 'Server.execTask', `channel ${channelId} send failed:`, err);
+        console.error('[marvin]', 'ServeCommand.execTask', `channel ${channelId} send failed:`, err);
       }
     }
 
@@ -487,7 +418,7 @@ export class Server extends App {
   }
 
   async execReload() {
-    console.log('[marvin]', 'Server.execReload');
+    console.log('[marvin]', 'ServeCommand.execReload');
     this.ctx.state = 'reloading';
 
     // drop in reverse order
@@ -508,7 +439,7 @@ export class Server extends App {
   async sendMessage(ctx: Context, message: string, chatId: string, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
     const agent = ctx.agents[agentId]!;
 
-    console.log('[marvin]', 'Server.sendMessage', `${agentId}: ${message.slice(0, 100)}`);
+    console.log('[marvin]', 'ServeCommand.sendMessage', `${agentId}: ${message.slice(0, 100)}`);
 
     // TODO: get chat from cache/store using sessionId
 
@@ -532,10 +463,10 @@ export class Server extends App {
       reply = await agent.model.sendMessage(chat);
 
       // trim result, this can be really big
-      console.info('[marvin]', 'Server.sendMessage', `step=${steps}`, JSON.stringify(reply));
+      console.info('[marvin]', 'ServeCommand.sendMessage', `step=${steps}`, JSON.stringify(reply));
 
       if (reply.stop) {
-        console.warn('[marvin]', 'Server.sendMessage', `force stop at step ${steps}`);
+        console.warn('[marvin]', 'ServeCommand.sendMessage', `force stop at step ${steps}`);
         break;
       }
 
@@ -544,7 +475,7 @@ export class Server extends App {
         const results: string[] = [];
 
         for (const tool of reply.message.tools) {
-          console.log('[marvin]', 'Server.sendMessage', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+          console.log('[marvin]', 'ServeCommand.sendMessage', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
           // TODO check for stop tool call, if found, stop the AI loop
 
@@ -553,7 +484,7 @@ export class Server extends App {
             const result = await execTool(ctx as any, tool.name, args);
             results.push(JSON.stringify(result));
           } catch (err) {
-            console.error('[marvin]', 'Server.sendMessage', `tool ${tool.name} failed:`, err);
+            console.error('[marvin]', 'ServeCommand.sendMessage', `tool ${tool.name} failed:`, err);
             results.push(`Error: ${(err as Error).message}`);
           }
         }
@@ -572,7 +503,7 @@ export class Server extends App {
 
     // warn if max steps reached
     if (steps >= maxSteps) {
-      console.warn('[marvin]', 'Server.sendMessage', `max steps (${maxSteps}) reached for ${agentId}`);
+      console.warn('[marvin]', 'ServeCommand.sendMessage', `max steps (${maxSteps}) reached for ${agentId}`);
     }
 
     // TODO: more info here 

@@ -1,9 +1,21 @@
 // @ts-expect-error - mock is exported at runtime by Bun but not in type definitions
 import { test, expect, mock } from 'bun:test';
-import { Context } from './types.js';
-import { Client } from './client.js';
-import { DEFAULT_CONFIG } from './constants.js';
-import type { Config, LogLevel } from './types.js';
+import { Context } from '../types.js';
+import { DEFAULT_CONFIG } from '../constants.js';
+import type { Config, LogLevel } from '../types.js';
+
+class Client {
+  ctx: Context;
+  constructor(ctx: Context) { this.ctx = ctx; }
+  
+  init() { return Promise.resolve(); }
+  drop() { return Promise.resolve(); }
+
+  initHandlers() { }
+  initProject() { }
+  initConfig() { }
+  initCommands() { }
+}
 
 // Mock process.exit to throw instead of exiting (Bun tests don't throw by default)
 const originalExit = process.exit;
@@ -244,21 +256,21 @@ test('initCommands() warns on unknown command', async () => {
 
 // ── exec* commands ──────────────────────────────────────────────────────────
 
-test('execStart() outputs bootstrap info', async () => {
+test('execSetup() outputs bootstrap info', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
   process.argv = ['node', 'marvin', 'start'];
-  await client.execStart();
+  await client.execSetup();
   expect(true).toBe(true);
 });
 
-test('execStart() in dry mode prints dry messages', async () => {
+test('execSetup() in dry mode prints dry messages', async () => {
   const ctx = makeContext(true);
   const client = new Client(ctx);
 
   process.argv = ['node', 'marvin', 'start'];
-  await client.execStart();
+  await client.execSetup();
   expect(true).toBe(true);
 });
 
