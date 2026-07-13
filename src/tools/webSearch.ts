@@ -1,5 +1,5 @@
 import { Tool } from '../types.js';
-import type { Context } from '../context.js';
+import type { Context } from '../types.js';
 import { delay, rand, tryJsonParse } from '../helpers.js';
 import type BrowserSystem from '../systems/browser.js';
 

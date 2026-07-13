@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { Context } from './context.js';
+import { Context } from './types.js';
 import { Channel, Config, App } from './types.js';
 import { Server } from './server.js';
 

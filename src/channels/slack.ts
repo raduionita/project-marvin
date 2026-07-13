@@ -1,7 +1,7 @@
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import { Channel, Message, Agent } from '../types.js';
-import { Context } from '../context.js';
+import { Context } from '../types.js';
 import * as constants from '../constants.js';
 
 export type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>, ack: (response?: Record<string, unknown>) => Promise<void> };

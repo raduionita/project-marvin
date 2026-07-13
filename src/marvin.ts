@@ -2,7 +2,7 @@
 
 import { Server } from './server.js';
 import { Client } from './client.js';
-import { Context } from './context.js';
+import { Context } from './types.js';
 import { configDotenv } from 'dotenv';
 
 configDotenv({ encoding: 'utf8', quiet: true, path: ['.env', '.env.local'] });

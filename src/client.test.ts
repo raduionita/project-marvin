@@ -1,6 +1,6 @@
 // @ts-expect-error - mock is exported at runtime by Bun but not in type definitions
 import { test, expect, mock } from 'bun:test';
-import { Context } from './context.js';
+import { Context } from './types.js';
 import { Client } from './client.js';
 import { DEFAULT_CONFIG } from './constants.js';
 import type { Config, LogLevel } from './types.js';

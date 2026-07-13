@@ -1,4 +1,5 @@
-import { type Context } from './context.js';
+import type { Server } from './server.js';
+import type { Client } from './client.js';
 
 export type Mode = 'client' | 'server';
 
@@ -215,4 +216,30 @@ export interface Reply {
     prompt: number;
   };
   // TODO: research if choices?! would be useful
+}
+
+export class Context {
+  public state: 'running' | 'reloading' | 'stopped' = 'running';
+
+  public server?: Server;
+  public client?: Client;
+
+  public config: Config = {} as Config;
+
+  // TODO: later consider moving browser, http, watch (file watcher) to a separate group "systems"
+  public systems: Record<string, System> = {};
+
+  // channels, models, agents
+  public channels: Record<string, Channel> = {};
+  public tools   : Record<string, Tool> = {};
+  public models  : Record<string, Model> = {};
+  public agents  : Record<string, Agent> = {};
+
+  // home (~/.marvin) data folder
+  public home: string = '';
+  // root (~/) app folder
+  public root: string = '';
+
+  public isDry: boolean = process.argv.includes('--dry');
+  public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
 }

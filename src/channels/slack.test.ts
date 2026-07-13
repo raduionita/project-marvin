@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
-import { Context } from '../context.js';
+import { Context } from '../types.js';
 import { Config, Message, Agent } from '../types.js';
 import SlackChannel from './slack.js';
 import { type HandlerParams, type SlackResponse, type ISocketModeClient, type IWebClient } from './slack.js'

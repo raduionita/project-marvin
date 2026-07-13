@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { listChannels } from './index.js';
-import { Context } from '../context.js';
+import { Context } from '../types.js';
 import { Config } from '../types.js';
 
 function mockContext(config: Config = {} as Config): Context {

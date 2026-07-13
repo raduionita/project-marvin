@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import GetDateTool from './getDate.js';
-import { Context } from '../context.js';
+import { Context } from '../types.js';
 
 function mockContext(): Context {
   const ctx = new Context();

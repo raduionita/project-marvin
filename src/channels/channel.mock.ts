@@ -1,5 +1,5 @@
 import { Channel, Message } from '../types.js';
-import { Context } from '../context.js';
+import { Context } from '../types.js';
 
 // Intentionally does NOT extend Channel — used to test validation in execChannels
 export default class MockChannel extends Channel {

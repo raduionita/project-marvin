@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'fs';
 
 
 
-import { Context } from './context.js';
+import { Context } from './types.js';
 import { tryJsonParse } from './helpers.js';
 import { App, Config, System, Model, Agent, Task, Chat, Tool, Channel, Message, Reply } from './types.js';
 import * as constants from './constants.js';
