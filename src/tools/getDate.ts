@@ -14,6 +14,8 @@ export default class GetDateTool extends Tool {
   }
 
   async call(args: any) {
+    console.debug('[GetDateTool.call]', args);
+    
     return new Date(args.timestamp || Date.now()).toLocaleDateString();
   }
 }

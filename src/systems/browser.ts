@@ -8,7 +8,7 @@ export default class BrowserSystem extends System {
   private browser: Browser | undefined;
 
   public async init(): Promise<void> {
-    console.log('[marvin]', 'BrowserSystem.init');
+    console.log('BrowserSystem.init');
     
     chromium.use(stealth());
 
@@ -31,19 +31,19 @@ export default class BrowserSystem extends System {
     if (this.browser) {
       try {
         await this.browser.close();
-        console.log('[marvin]', 'BrowserSystem.drop', 'closed');
+        console.log('BrowserSystem.drop', 'closed');
       } catch (err) {
-        console.error('[marvin]', 'BrowserSystem.drop', 'error:', err);
+        console.error('BrowserSystem.drop', 'error:', err);
       }
       this.browser = undefined;
     } else {
-      console.log('[marvin]', 'BrowserSystem.drop', 'already closed');
+      console.log('BrowserSystem.drop', 'already closed');
     }
   }
 
   public async newContext(options?: BrowserContextOptions) : Promise<BrowserContext> {
     if (!this.browser) {
-      console.error('[marvin]', 'BrowserSystem.newContext', 'browser not initialized');
+      console.error('BrowserSystem.newContext', 'browser not initialized');
       throw new Error('BrowserSystem.newContext: browser not initialized');
     }
     return await this.browser.newContext(options);

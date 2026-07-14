@@ -43,21 +43,23 @@ export class Command {
   public ctx: Context;
 
   constructor(ctx: Context) {
-    console.debug('[marvin]', 'Command.constructor', this.constructor.name);
+    console.debug(`[${this.constructor.name||'Command'}.constructor]`);
     this.ctx = ctx;
     this.ctx.command = this;
   }
 
-  async init(): Promise<void> { console.debug('[marvin]', 'Command.init'); }
-  async drop(): Promise<void> { console.debug('[marvin]', 'Command.drop'); }
+  async init(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.init]`); }
+  async drop(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 
 export class Context {
   public state: 'running' | 'reloading' | 'stopped' = 'running';
 
-  public command: Command = new (class extends Command { })(this);
+  public command: Command = {} as Command;
 
   public config: Config = {} as Config;
+
+  public cache: Cache = new Cache();
 
   // TODO: later consider moving browser, http, watch (file watcher) to a separate group "systems"
   public systems: Record<string, System> = {};
@@ -73,15 +75,17 @@ export class Context {
   // root (~/) app folder
   public root: string = '';
 
-  public isDry: boolean = process.argv.includes('--dry');
+  public isDry: boolean = process.argv.includes('--dry') || process.argv.includes('-dry');
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
+
+  public get isDebug() { return this.config.settings.logLevel === 'debug'; }
 }
 
 export abstract class System {
   public ctx: Context;
 
   constructor(ctx: Context) {
-    console.log('[marvin]', 'System.constructor', this.constructor.name);
+    console.log('System.constructor', this.constructor.name);
     this.ctx = ctx;
   }
 
@@ -93,7 +97,7 @@ export abstract class Tool {
   public ctx: Context;
 
   constructor(ctx: Context) {
-    console.log('[marvin]', 'Tool.constructor', this.constructor.name);
+    console.log('Tool.constructor', this.constructor.name);
     this.ctx = ctx;
   }
 
@@ -108,7 +112,7 @@ export abstract class Channel {
   public ctx: Context;
 
   constructor(ctx: Context) {
-    console.log('[marvin]', 'Channel.constructor', this.constructor.name);
+    console.log('Channel.constructor', this.constructor.name);
     this.ctx = ctx;
   }
 
@@ -239,4 +243,18 @@ export interface Reply {
     prompt: number;
   };
   // TODO: research if choices?! would be useful
+}
+
+export class Cache {
+  private cache: Record<string, any> = {}; // chatId: chat
+
+  saveChat(chatId: string, chat: Chat): void {
+    this.cache[chatId] = chat;
+  }
+
+  findChat(chatId: string): Chat {
+    return this.cache[chatId] || { id: chatId, messages: [], thinking: false, userId: '', tools: [] };
+  }
+
+  // TODO: async persist to file (in the workspace folder)
 }

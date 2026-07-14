@@ -10,7 +10,7 @@ export default class ApiSystem extends System {
   private server: http.Server | undefined;
 
   public async init(): Promise<void> {
-    console.log('[marvin]', 'ApiSystem.init');
+    console.log('ApiSystem.init');
 
     this.port = this.ctx.config.settings.port || 7331;
     this.host = this.ctx.config.settings.host || '127.0.0.1';
@@ -36,7 +36,7 @@ export default class ApiSystem extends System {
         return;
       }
 
-      console.debug('[marvin]', 'ApiSystem.init', `command: ${command}`);
+      console.debug('[ApiSystem.init]', `command: ${command}`);
 
       try {
         switch (command) {
@@ -65,27 +65,27 @@ export default class ApiSystem extends System {
   }
 
   public drop(): Promise<void> {
-    console.log('[marvin]', 'ApiSystem.drop');
+    console.log('ApiSystem.drop');
     return new Promise<void>((resolve) => {
       if (this.server) {
         this.server.close(function (error?: Error|undefined) {
           if (error) {
-            console.error('[marvin]', 'ApiSystem.drop', 'error:', error);
+            console.error('ApiSystem.drop', 'error:', error);
           } else {
-            console.log('[marvin]', 'ApiSystem.drop', 'closed');
+            console.log('ApiSystem.drop', 'closed');
           }
           resolve();
         });
         this.server = undefined;
       } else {
-        console.log('[marvin]', 'ApiSystem.drop', 'already closed');
+        console.log('ApiSystem.drop', 'already closed');
         resolve();
       }
     });
   }
 
   private async listen() {
-    console.log('[marvin]', 'ApiSystem.listen');
+    console.log('ApiSystem.listen');
     return new Promise<void>((resolve) => {
       this.server!.listen(this.port, this.host, () => {
         console.log(`[marvin] API server listening on port ${this.port}`);
@@ -114,18 +114,18 @@ export default class ApiSystem extends System {
   }
 
   private async handleError(err: Error) {
-    console.error('[marvin]', 'ApiSystem.init', 'error:', err);
+    console.error('ApiSystem.init', 'error:', err);
   }
 
   private async handleHealth(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[marvin]', 'ApiSystem.handleHealth');
+    console.debug('[ApiSystem.handleHealth]');
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, data: {} }));
   }
 
   private async handleStatus(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[marvin]', 'ApiSystem.handleStatus');
+    console.debug('[ApiSystem.handleStatus]');
 
     // TODO: add more info: models, channels, agents, tools
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -133,7 +133,7 @@ export default class ApiSystem extends System {
   }
 
   private async handleReload(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[marvin]', 'ApiSystem.handleReload');
+    console.debug('[ApiSystem.handleReload]');
     const cmd = this.ctx.command as ServeCommand;
     cmd.execReload();
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -141,7 +141,7 @@ export default class ApiSystem extends System {
   }
 
   private async handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[marvin]', 'ApiSystem.handleChat', 'body:', req.url);
+    console.debug('[ApiSystem.handleChat]', 'body:', req.url);
     
     const ctx = this.ctx;
 
@@ -188,14 +188,14 @@ export default class ApiSystem extends System {
         },
       }));
     } catch (err) {
-      console.error('[marvin]', 'ApiSystem.handleChat', 'error:', err);
+      console.error('ApiSystem.handleChat', 'error:', err);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
     }
   }
 
   private async handleUnknown(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[marvin]', 'ApiSystem.handleUnknown');
+    console.debug('[ApiSystem.handleUnknown]');
 
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Unknown command' }));

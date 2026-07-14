@@ -1,37 +1,40 @@
 import { execSync } from "node:child_process";
 import { Command } from "../types";
 
-export default class StatusChannel extends Command {
+export default class StatusCommand extends Command {
   async init() {
-    console.debug('[marvin]', 'StatusChannel.init');
+    console.debug('[StatusCommand.init]');
 
     const cmds = process.argv.slice(2);
     const cmd = cmds[1];
 
     switch (cmd) {
       case 'help'   : 
-        console.debug('[marvin]', 'usage: marvin status [command]', 'check the daemon status');
-        console.debug('[marvin]', 'commands:');
-        console.debug('[marvin]', '  help    ', 'show this help');
+        console.debug('usage: marvin status [command]', 'check the daemon status');
+        console.debug('commands:');
+        console.debug('  help    ', 'show this help');
       break;
       default: {
         // service status
-        if (!this.ctx.isDry) {
+        if (this.ctx.isDry) {
+          console.log('[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
+        } else {
           try {
             const status = execSync(['systemctl', '--user', 'status', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
-            console.log('[marvin]', 'service status:', status.trim());
+            console.log('service status:', status.trim());
           } catch {
-            console.log('[marvin] service is not running.');
+            console.log('service is not running.');
           }
-        } else {
-          console.log('[marvin] [dry] would check systemd service status: marvin');
         }
 
         // TODO: replace health w/ GET status
 
-        // health check
         const port = this.ctx!.config?.settings?.port || 7331;
-        if (!this.ctx.isDry) {
+        
+        // health check
+        if (this.ctx.isDry) {
+          console.log('[dry] check health: fetch http://localhost:' + port + '/_health');
+        } else {
           try {
             const url = new URL(`http://localhost:${port}/_health`);
             const response = await fetch(url.toString(), {
@@ -42,21 +45,15 @@ export default class StatusChannel extends Command {
               },
             });
             if (response.ok) {
-              console.log('[marvin]', `server is healthy (port ${port}).`);
+              console.log(`server is healthy (port ${port}).`);
             } else {
-              console.warn(`[marvin]`, `server responded with ${response.status}.`);
+              console.warn(`server responded with ${response.status}.`);
             }
           } catch (err) {
-            console.error(`[marvin]`,`cannot reach server at localhost:${port}.`);
+            console.error(`[StatusCommand.init]`,`cannot reach server at localhost:${port}.`);
           }
-        } else {
-          console.log('[marvin] [dry] would check health endpoint: http://localhost:' + port + '/_health');
         } 
       } break;
     }
-  }
-
-  async drop() {
-    console.debug('[marvin]', 'StatusChannel.drop');
   }
 }

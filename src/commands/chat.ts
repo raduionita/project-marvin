@@ -6,7 +6,7 @@ type Result = { ok: boolean; data: { content: string; steps: number; agentId: st
 
 export default class ChatCommand extends Command {
   async init() {
-    console.debug('[marvin]', 'ChatCommand.init');
+    console.debug('[ChatCommand.init]');
 
     const cmds = process.argv.slice(2);
     const i = cmds.indexOf('--agentId');
@@ -33,39 +33,38 @@ export default class ChatCommand extends Command {
 
     // if empty answer, exit
     if (!answer.trim()) {
-      console.warn('[marvin]', 'empty message');
+      console.warn('empty message');
       return;
     }
 
-    // dry mode
+    // send chat message to server /chat
     if (this.ctx.isDry) {
-      console.info('[marvin]', '[dry] would send chat to:', url.toString());
-      console.info('[marvin]', 'message:', answer);
-      console.info('[marvin]', 'agent:', agentId);
-      return;
-    }
+      console.info('[dry] send chat: fetch', url.toString());
+      console.info('message:', answer);
+      console.info('agent:', agentId);
+    } else {
+      // call chat endpoint
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: answer,
+          agentId: agentId,
+          chatId: chatId,
+        }),
+      });
 
-    // call chat endpoint
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: answer,
-        agentId: agentId,
-        chatId: chatId,
-      }),
-    });
-
-    const json = await res.json();
-    if (!res.ok) {
-      console.error('[marvin]', 'chat error:', (json as { error?: string }).error || res.statusText);
-      return;
-    }
-    const result = json as Result;
-          chatId = result.data.chatId;
-    if (result.ok) {
-      console.info('[marvin]', `agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
-      console.info('[marvin]', result.data.content);
+      const json = await res.json();
+      if (!res.ok) {
+        console.error('chat error:', (json as { error?: string }).error || res.statusText);
+        return;
+      }
+      const result = json as Result;
+            chatId = result.data.chatId;
+      if (result.ok) {
+        console.info(`agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
+        console.info(result.data.content);
+      }
     }
   }
 }

@@ -2,17 +2,19 @@ import { Command } from "../types";
 
 export default class HelpCommand extends Command {
   async init() {
-    console.debug('[marvin]', 'HelpCommand.init');
+    console.debug('[HelpCommand.init]');
 
-    console.info('[marvin]', 'usage: marvin [command] [options]');
-    console.info('[marvin]', 'commands:');
-    console.info('[marvin]', '  help    ', 'show this help');
-    console.info('[marvin]', '  setup   ', 'setup the project and service');
-    console.info('[marvin]', '  update  ', 'update Marvin to the latest version');
-    console.info('[marvin]', '  version ', 'show the current version');
-    console.info('[marvin]', '  reload  ', 'reload the daemon');
-    console.info('[marvin]', '  status  ', 'check the daemon status');
-    console.info('[marvin]', '  chat    ', 'send a chat message');
-    console.info('[marvin]', '  channels', 'list, init, bind, drop channels');
+    console.info('usage: marvin [command] [options]');
+    console.info('commands:');
+    console.info('  help    ', 'show this help');
+    console.info('  init    ', 'initialize the project and service');
+    console.info('  halt    ', 'stop the app service');
+    console.info('  serve   ', 'start the app service');
+    console.info('  update  ', 'update Marvin to the latest version');
+    console.info('  version ', 'show the current version');
+    console.info('  reload  ', 'reload the daemon');
+    console.info('  status  ', 'check the daemon status');
+    console.info('  chat    ', 'send a chat message');
+    console.info('  channels', 'list, init, bind, drop channels');
   }
 }

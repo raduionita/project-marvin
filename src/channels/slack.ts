@@ -36,23 +36,28 @@ export default class SlackChannel extends Channel {
   }
 
   async init() {
-    console.log('[marvin]', 'SlackChannel.init', this.ctx.config.channels.slack);
+    console.log('SlackChannel.init', this.ctx.config.channels.slack);
+
+    if (this.ctx.isDry) {
+      console.info('[dry]', 'channel slack attached');
+      return;
+    }
 
     const config = this.ctx.config.channels.slack as SlackConfig;
     if (!config ) {
-      console.error('[marvin]', 'SlackChannel.init', 'no settings found, skipping');
+      console.error('SlackChannel.init', 'no settings found, skipping');
       return;
     }
 
     const appToken = (config?.appToken || process.env.SLACK_APP_TOKEN);
     if (!appToken) {
-      console.error('[marvin]', 'SlackChannel.init', 'no appToken found, skipping');
+      console.error('SlackChannel.init', 'no appToken found, skipping');
       return;
     }
 
     const botToken = (config?.botToken || process.env.SLACK_BOT_TOKEN);
     if (!botToken) {
-      console.error('[marvin]', 'SlackChannel.init', 'no botToken found, skipping');
+      console.error('SlackChannel.init', 'no botToken found, skipping');
       return;
     }
 
@@ -82,25 +87,31 @@ export default class SlackChannel extends Channel {
 
     await this.sok.start();
 
-    console.log('[marvin]', 'SlackChannel.init', 'started');
+    console.log('channel slack started');
   }
 
   async drop() {
     if (this.sok) {
-      console.log('[marvin]', 'SlackChannel.drop');
+      console.debug('[SlackChannel.drop');
       await this.sok.disconnect();
-      console.log('[marvin]', 'SlackChannel.drop', 'dropped');
+      console.info('channel slack dropped');
     }
   }
 
   // send a message to Slack, optionally as a thread reply
   async sendMessage(message: Message) : Promise<SlackResponse | undefined> {
-    if (!this.web) {
-      console.warn('[marvin]', 'SlackChannel.sendMessage', 'not attached, skipping submit');
-      return;
+    console.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
+
+    if (this.ctx.isDry) {
+      console.info('[dry] send message to:', message.channel);
+      return { ts: '0000000000.000000', ok: true, error: '', message: '(dry)', channel: message.channel };
     }
 
-    console.log('[marvin]', 'SlackChannel.sendMessage', JSON.stringify(message));
+    // need web client
+    if (!this.web) {
+      console.error('[SlackChannel.sendMessage]', 'not attached, skipping submit');
+      return;
+    }
 
     // send the message
     const response = await this.web.chat.postMessage({
@@ -113,7 +124,7 @@ export default class SlackChannel extends Channel {
 
     // we should know if there is a mismatch between the channel in the message and the response
     if (response.channel !== message.channel) {
-      console.warn('[marvin]', 'SlackChannel.sendMessage', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
+      console.warn('SlackChannel.sendMessage', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
     }
 
     return {
@@ -127,9 +138,9 @@ export default class SlackChannel extends Channel {
 
   protected async onMention({ event, body, ack }: HandlerParams) {
     try {
-      console.info('[marvin]', 'SlackChannel.onMention', `channel=${event.channel} thread=${event.thread_ts}|${event.ts}`);
-      console.debug('[marvin]', 'SlackChannel.onMention', 'body=', JSON.stringify(body));
-      console.debug('[marvin]', 'SlackChannel.onMention', 'event=', JSON.stringify(event));
+      console.debug('[SlackChannel.onMention]', `channel=${event.channel} thread=${event.thread_ts}|${event.ts}`);
+      console.debug('[SlackChannel.onMention]', 'body=', JSON.stringify(body));
+      console.debug('[SlackChannel.onMention]', 'event=', JSON.stringify(event));
       
       // acknowledge the event
       await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
@@ -137,7 +148,7 @@ export default class SlackChannel extends Channel {
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
       if (!text) {
-        console.warn('[marvin]', 'SlackChannel.onMention', 'no text content');
+        console.warn('SlackChannel.onMention', 'no text content');
         await this.sendMessage({ role: 'assistant', content: '(no text content)' });
         return; 
       }
@@ -146,7 +157,7 @@ export default class SlackChannel extends Channel {
       const server = this.ctx.command as ServeCommand;
       // this should never happen, but just in case throw an error
       if (!server) {
-        console.error('[marvin]', 'SlackChannel.onMention', 'server not available');
+        console.error('SlackChannel.onMention', 'server not available');
         await this.sendMessage({ role: 'assistant', content: '(server not available)' });
         return;
       }
@@ -157,27 +168,27 @@ export default class SlackChannel extends Channel {
       const agentId = agent.id;
       const chatId: string = `slack-${event.channel}-${thread}`;
 
-      console.log('[marvin]', 'SlackChannel.onMention', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      console.info(`processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await server.sendMessage(this.ctx, text, chatId, agentId);
       if (!result) {
-        console.error('[marvin]', 'SlackChannel.onMention', `no result from sendMessage for agent ${agentId}`);
+        console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
         await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
         return;
       }
 
       await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel, thread: thread });
     } catch (error) {
-      console.error('[marvin]', 'SlackChannel.onMention', error);
+      console.error('[SlackChannel.onMention]', error);
     }
   }
 
   protected async onDirectMessage({ event, body, ack }: HandlerParams) {
     try {
-      console.info('[marvin]', 'SlackChannel.onDirectMessage', `channel=${event.channel}`);
-      console.debug('[marvin]', 'SlackChannel.onDirectMessage', 'body=', JSON.stringify(body));
-      console.debug('[marvin]', 'SlackChannel.onDirectMessage', 'event=', JSON.stringify(event));
+      console.info('SlackChannel.onDirectMessage', `channel=${event.channel}`);
+      console.debug('[SlackChannel.onDirectMessage]', 'body=', JSON.stringify(body));
+      console.debug('[SlackChannel.onDirectMessage]', 'event=', JSON.stringify(event));
       
       await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
 
@@ -196,52 +207,52 @@ export default class SlackChannel extends Channel {
       const agentId = agent.id;
       const chatId = `slack-${event.channel}-${thread}`;
 
-      console.log('[marvin]', 'SlackChannel.onDirectMessage', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      console.log('SlackChannel.onDirectMessage', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await server.sendMessage(this.ctx, text, chatId, agentId);
 
       if (!result) {
-        console.error('[marvin]', 'SlackChannel.onDirectMessage', `no result from processMessage for agent ${agentId}`);
+        console.error('SlackChannel.onDirectMessage', `no result from processMessage for agent ${agentId}`);
         return;
       }
 
       // DMs don't have threads, just send a new message
       await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel });
     } catch (error) {
-      console.error('[marvin]', 'SlackChannel.onDirectMessage', error);
+      console.error('SlackChannel.onDirectMessage', error);
     }
   }
 
   protected async onSlashCommand({ event, body, ack }: HandlerParams) {
-    console.info('[marvin]', 'SlackChannel.onSlashCommand', `command: ${body.collback_id}`, Object.keys(event), Object.keys(body), ack.toString());
+    console.info('SlackChannel.onSlashCommand', `command: ${body.collback_id}`, Object.keys(event), Object.keys(body), ack.toString());
     await ack({ text: `u want me to do /${body.collback_id}? ok whatever, it's not implemented yet, talk to the dev!` });
 
     // TODO: switch (body.collback_id) {
   }
 
   protected async onError(error: Error) {
-    console.error('[marvin]', 'SlackChannel.onError', error);
+    console.error('SlackChannel.onError', error);
   }
 
   protected async onConnecting() {
-    console.info('[marvin]', 'SlackChannel.onConnecting', 'connecting...');
+    console.info('SlackChannel.onConnecting', 'connecting...');
   }
 
   protected async onConnected() {
-    console.info('[marvin]', 'SlackChannel.onConnected', 'connected!');
+    console.info('SlackChannel.onConnected', 'connected!');
   }
 
   protected async onReconnecting(attemptNumber: number) {
-    console.warn('[marvin]', 'SlackChannel.onReconnecting', `reconnecting... (${attemptNumber})`);
+    console.warn('SlackChannel.onReconnecting', `reconnecting... (${attemptNumber})`);
   }
 
   protected async onReconnected() {
-    console.warn('[marvin]', 'SlackChannel.onReconnected', 'reconnected!');
+    console.warn('SlackChannel.onReconnected', 'reconnected!');
   }
 
   protected async onDisconnected(error: Error) {
-    console.warn('[marvin]', 'SlackChannel.onDisconnected', 'disconnected!', error);
+    console.warn('SlackChannel.onDisconnected', 'disconnected!', error);
   }
 
   // extract the actual text from a Slack event, stripping @marvin mention
@@ -264,7 +275,7 @@ export default class SlackChannel extends Channel {
 
   // find agent using event.channel or fallback to default "marvin"
   protected findAgent(channel?: string): Agent {
-    console.log('[marvin]', 'SlackChannel.findAgent', channel ? `channel=${channel}` : 'marvin');
+    console.log('SlackChannel.findAgent', channel ? `channel=${channel}` : 'marvin');
 
     // diretly use marvin/orchestrator agent
     if (!channel) {

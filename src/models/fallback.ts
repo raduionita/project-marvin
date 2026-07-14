@@ -5,7 +5,7 @@ export default class FallbackModel extends Model {
   public baseUrl: string = 'http://localhost:1234';
 
   async sendMessage(chat: Chat) : Promise<Reply> {
-    console.log('[marvin]', 'FallbackModel.sendMessage', 'chat:', JSON.stringify(chat));
+    console.debug('[FallbackModel.sendMessage]', 'chat:', JSON.stringify(chat));
 
     return {
       id: Date.now().toString(),

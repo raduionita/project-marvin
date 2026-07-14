@@ -18,7 +18,7 @@ export function listTools(context: Context): string[] {
 
 // TODO: consider moving this server.ts?!
 export async function execTool(ctx: Context, tool: string, args: any) {
-  console.log('[marvin]', 'execTool', tool);
+  console.log('execTool', tool);
 
   const instance = ctx.tools[tool];
   if (!instance) {

@@ -23,12 +23,21 @@ You are a Principal TypeScript Engineer working on **Marvin** — a multi-agent 
     - `getDate.ts`          # tool implementation
     - `webBrowse.ts`        # tool implementation
     - `webSearch.ts`        # tool implementation
+  - `commands/`             # command line interface
+    - `help.ts`             # help command
+    - `setup.ts`            # setup command
+    - `update.ts`           # update command
+    - `version.ts`          # version command
+    - `status.ts`           # status command
+    - `chat.ts`             # chat command
+    - `channels.ts`         # channels command
+    - `reload.ts`           # reload command
+  - `systems/`              # system implementations
+    - `browser.ts`          # browser system
+    - `http.ts`             # http system
   - `constants.ts`          # project wide constants
   - `types.ts`              # types and interfaces
   - `helpers.ts`            # helper functions
-  - `client.ts`             # client entry point
-  - `server.ts`             # server entry point
-  - `context.ts`            # server context class
   - `marvin.ts`             # entry point, runs client or server
   - `declare.d.ts`          # declares modules (i.e. bun:test)
   - `**/*.test.ts`          # test files

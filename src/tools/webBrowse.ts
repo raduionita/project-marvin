@@ -15,6 +15,13 @@ export default class WebBrowseTool extends Tool {
   }
 
   async call(args: { url: string }) {
+    console.debug('[WebBrowseTool.call]', args);
+
+    if (this.ctx.isDry) {
+      console.info('[dry] browse:', args.url);
+      return { title: '', body: '' };
+    }
+    
     if (!this.ctx.systems['browser']) {
       throw new Error('webBrowse: Browser is not initialized in the server context');
     }
@@ -51,7 +58,7 @@ export default class WebBrowseTool extends Tool {
       const text = await body.innerText();
       return { title, body: text.split('\n').map((line: string) => line.trim()).filter((line: string) => line.length > 0).join('\n') };
     } catch (error) {
-      console.error('[marvin]', 'webBrowse', 'error:', error);
+      console.error('webBrowse', 'error:', error);
       throw error;
     } finally {
       await page.close();

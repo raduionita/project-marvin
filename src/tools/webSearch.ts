@@ -20,6 +20,13 @@ export default class WebSearchTool extends Tool {
   }
 
   async call(args: { query: string }) {
+    console.debug('[WebSearchTool.call]', args);
+
+    if (this.ctx.isDry) {
+      console.info('[dry] search:', args.query);
+      return { results: [] };
+    }
+
     if (!this.ctx.systems['browser']) {
       throw new Error('webSearch: Browser is not initialized in the server context');
     }
@@ -66,7 +73,7 @@ export default class WebSearchTool extends Tool {
         link: o.c
       })) };
     } catch (error) {
-      console.error('[marvin]', 'webSearch', 'error:', error);
+      console.error('[WebSearchTool.call]', 'error:', error);
     } finally {
       await page.close();
       await bctx.close();
