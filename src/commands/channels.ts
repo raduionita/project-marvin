@@ -11,12 +11,13 @@ export default class ChannelsCommand extends Command {
     console.debug('[ChannelsCommand.init]');
 
     const cmds = process.argv.slice(2);
-    const cmd = cmds[1];
+    const cmd = cmds[1] || 'help';
 
     switch (cmd) {
       default: 
         console.warn('unknown command: channels', cmd); 
-      case 'help'   : 
+      case ''       :  
+      case 'help'   : // default = empty = help 
         console.log('usage: marvin channels [command]');
         console.log('commands:');
         console.log('  help    ', 'show this help');

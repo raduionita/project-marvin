@@ -3,11 +3,10 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'fs';
 
-import { Context, Command, Config, System, Model, Agent, Task, Chat, Tool, Channel, Message, Reply  } from '../types.js';
-import { tryJsonParse } from '../helpers.js';
+import { Context, Command, Config, System, Model, Agent, Task, Tool, Channel, Message, Reply  } from '../types.js';
 import * as constants from '../constants.js';
 import { listSystems } from '../systems/index.js';
-import { listTools, execTool } from '../tools/index.js';
+import { listTools } from '../tools/index.js';
 import { listChannels } from '../channels/index.js';
 import { listModels } from '../models/index.js';
 
@@ -149,8 +148,9 @@ export default class ServeCommand extends Command {
         }
         // register instance of Tool
         const instance = new Class(this.ctx);
-        this.ctx.tools[instance.name()] = instance;
-        console.info(`tool [${instance.name()}] loaded`);
+        const meta = instance.meta();
+        this.ctx.tools[meta.name] = instance;
+        console.info(`tool [${meta.name}] loaded`);
       } catch (err) {
         console.error('[ServeCommand.initTools]', `failed to load ${file}:`, err);
       }
@@ -196,20 +196,21 @@ export default class ServeCommand extends Command {
 
     // config models
     const files = listModels(ctx).map(f => f.replace('.ts', ''))
-    for (const [modelId, model] of Object.entries(ctx.config.models)) {
-      if (!model.enabled) continue;
-
-      const provider = model.provider;
-
-      const file = files.find(f => f === provider);
-      if (!file) {
-        console.error('[ServeCommand.initModels]', `no file for provider "${provider}", skipping ${modelId}`);
-        continue;
-      }
-
+    for (const [modelId, config] of Object.entries(ctx.config.models)) {
       try {
+        if (!config.enabled) {
+          console.warn('[ServeCommand.initModels]', `model ${modelId} is disabled, skipping`);
+          continue;
+        }
+
+        const file = files.find(f => f === config.provider);
+        if (!file) {
+          console.error('[ServeCommand.initModels]', `no file for provider "${config.provider}", skipping ${modelId}`);
+          continue;
+        }
+
         // import the model provider
-        const Module = await import(`../models/${provider}.js`);
+        const Module = await import(`../models/${config.provider}.js`);
         const Class = Module.default;
 
         // must be a Model class
@@ -219,10 +220,10 @@ export default class ServeCommand extends Command {
         }
         
         // save instance (needed by agents)
-        const instance = new Class(model);
+        const instance = new Class(this.ctx, config);
         ctx.models[modelId] = instance;
 
-        console.info(`model [${modelId}] loaded (${provider} ${model.model})`);
+        console.info(`model [${modelId}] loaded (${config.provider} ${config.model})`);
       } catch (err) {
         console.error('[ServeCommand.initModels]', `failed to load ${modelId}:`, err);
       }
@@ -243,7 +244,7 @@ export default class ServeCommand extends Command {
           process.exit(1);
         }
 
-        const instance = new Class({provider: 'fallback', model: 'fallback'});
+        const instance = new Class(this.ctx, {provider: 'fallback', model: 'fallback'});
         ctx.models[modelId] = instance;
 
         // warn because fallback model is not a good idea, and does NOTHING
@@ -489,6 +490,16 @@ export default class ServeCommand extends Command {
     this.ctx.state = 'running';
   }
 
+  async  execTool(tool: string, args: any) : Promise<{[key:string]:any}> {
+    console.debug('[ServeCommand.execTool]', tool);
+
+    const instance = this.ctx.tools[tool];
+    if (!instance) {
+      throw new Error(`ServeCommand.execTool: Tool ${tool} not found`);
+    }
+    return await instance.call(args);
+  }
+
   async sendMessage(ctx: Context, message: string, chatId: string, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
     console.debug('[ServeCommand.sendMessage]', `${agentId}: ${message.slice(0, 100)}`);
     
@@ -514,6 +525,7 @@ export default class ServeCommand extends Command {
 
     // AI loop: call model, execute tool calls, repeat until done
     let steps = -1;
+    let final = false;
     do {
       steps++;
 
@@ -521,41 +533,47 @@ export default class ServeCommand extends Command {
       reply = await agent.model.sendMessage(chat);
 
       // trim result, this can be really big
-      console.info(`step=${steps}`, JSON.stringify(reply));
+      console.info('[ServeCommand.sendMessage]', `step=${steps}`, JSON.stringify(reply));
 
       // force stop
       if (reply.stop) {
-        console.warn('ServeCommand.sendMessage', `force stop at step ${steps}`);
+        console.info('[ServeCommand.sendMessage]', `response force stop at step ${steps}`);
         break;
       }
 
       // execute any tool calls
       if (reply.message.tools && reply.message.tools.length > 0) {
-        const results: string[] = [];
-
         for (const tool of reply.message.tools) {
-          console.log('ServeCommand.sendMessage', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+          console.log('[ServeCommand.sendMessage]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
-          // TODO check for stop tool call, if found, stop the AI loop
+          if (tool.name === constants.FINAL_ANSWER_NAME) {
+            final = true;
+            break;
+          }
 
+          let result: any;
           try {
             const args = JSON.parse(tool.arguments);
-            const result = await execTool(ctx as any, tool.name, args);
-            results.push(JSON.stringify(result));
+            result = await this.execTool(tool.name, args);
           } catch (err) {
-            console.error('ServeCommand.sendMessage', `tool ${tool.name} failed:`, err);
-            results.push(`Error: ${(err as Error).message}`);
+            console.error('[ServeCommand.sendMessage]', `tool ${tool.name} failed:`, err);
+            result = {error: (err as Error).message};
           }
+
+          // add tool call to chat history
+          chat.messages.push({ role: 'tool', content: JSON.stringify(result), toolId: tool.id });
         }
-
-        // TODO: all this tool exec logic needs to be checked and tested (unit)
-
-        // add tool call to chat history
-        chat.messages.push({ role: 'tool', content: results.join('\n'), toolId: reply.message.tools[0]?.id });
       }
 
       // if model produced content without pending tool calls, we're done
-      if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
+      // if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
+      //   console.info('[ServeCommand.sendMessage]', `response without tool calls, stopping the AI loop`);
+      //   break;
+      // }
+
+      // if final answer tool call is found, we're done
+      if (final) {
+        console.info('[ServeCommand.sendMessage]', `found final answer tool call, stopping the AI loop`);
         break;
       }
     } while (steps < maxSteps - 1);

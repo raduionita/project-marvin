@@ -1,27 +1,33 @@
-import { Tool } from '../types.js';
+import { Tool, type ToolMeta } from '../types.js';
 import type BrowserSystem from '../systems/browser.js';
 
 export default class WebBrowseTool extends Tool {
-  name() { return 'webBrowse'; }
-  info() { return 'Browse the web'; }
-  args() {
-    return {
-      url: {
-        type: 'string',
-        description: 'URL to browse',
-        required: true,
+  public meta: ToolMeta = {
+    type: 'function',
+    function: {
+      name: 'web_browse',
+      description: 'Browse the web',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: {
+            type: 'string',
+            description: 'URL to browse',
+          }
+        },
+        required: ['url'],
       }
-    };
+    },
   }
 
-  async call(args: { url: string }) {
+  public async call(args: { url: string }) {
     console.debug('[WebBrowseTool.call]', args);
 
     if (this.ctx.isDry) {
       console.info('[dry] browse:', args.url);
       return { title: '', body: '' };
     }
-    
+
     if (!this.ctx.systems['browser']) {
       throw new Error('webBrowse: Browser is not initialized in the server context');
     }

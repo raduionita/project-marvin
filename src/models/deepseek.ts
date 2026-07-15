@@ -15,13 +15,14 @@ export default class DeepseekModel extends Model {
       },
       body: JSON.stringify({
         model: this.model,
-        messages: chat.messages,
+        messages: chat.messages.map(m => JSON.parse(JSON.stringify({role: m.role, content: m.content, name: m.name, tool_call_id: m.toolId }))),
         stream: false,
         thinking: chat.thinking,
         user_id: chat.userId,
-        tool_choice: chat.tools ? 'auto' : 'none',
         reasoning_effort: this.reasoning, // TODO: this should be configurable depending on the task
         response_format: { type: this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
+        tools: this.tools,
+        tool_choice: this.tools ? 'auto' : 'none',
         temperature: this.temperature,
         top_p: this.topP,
         max_tokens: this.maxTokens,

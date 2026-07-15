@@ -1,5 +1,5 @@
 import { Tool } from '../types.js';
-import type { Context } from '../types.js';
+import type { ToolMeta } from '../types.js';
 import { delay, rand, tryJsonParse } from '../helpers.js';
 import type BrowserSystem from '../systems/browser.js';
 
@@ -7,19 +7,25 @@ const SEARCH_START_TAG = "DDG.pageLayout.load('d',";
 const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
 
 export default class WebSearchTool extends Tool {
-  name() { return 'webSearch'; }
-  info() { return 'Search the web'; }
-  args() {
-    return {
-      query: {
-        type: 'string',
-        description: 'Search query',
-        required: true,
+  public meta: ToolMeta = {
+    type: 'function',
+    function: {
+      name: 'web_search',
+      description: 'Search the web',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query',
+          }
+        },
+        required: ['query'],
       }
-    };
+    },
   }
 
-  async call(args: { query: string }) {
+  public async call(args: { query: string }) {
     console.debug('[WebSearchTool.call]', args);
 
     if (this.ctx.isDry) {

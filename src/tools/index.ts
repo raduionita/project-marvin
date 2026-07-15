@@ -15,14 +15,3 @@ export function listTools(context: Context): string[] {
     f.endsWith('.ts')
   );
 }
-
-// TODO: consider moving this server.ts?!
-export async function execTool(ctx: Context, tool: string, args: any) {
-  console.log('execTool', tool);
-
-  const instance = ctx.tools[tool];
-  if (!instance) {
-    throw new Error(`execTool: Tool ${tool} not found`);
-  }
-  return await instance.call(args);
-}

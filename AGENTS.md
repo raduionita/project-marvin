@@ -25,11 +25,13 @@ You are a Principal TypeScript Engineer working on **Marvin** — a multi-agent 
     - `webSearch.ts`        # tool implementation
   - `commands/`             # command line interface
     - `help.ts`             # help command
-    - `setup.ts`            # setup command
+    - `init.ts`             # init command
+    - `drop.ts`             # drop command
+    - `serve.ts`            # serve command, runs the agents
     - `update.ts`           # update command
     - `version.ts`          # version command
     - `status.ts`           # status command
-    - `chat.ts`             # chat command
+    - `chat.ts`             # chat command, chat with the LLM
     - `channels.ts`         # channels command
     - `reload.ts`           # reload command
   - `systems/`              # system implementations

@@ -93,32 +93,28 @@ export abstract class System {
   abstract drop(): Promise<void>;
 }
 
-export abstract class Tool {
-  public ctx: Context;
+export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string}}, required:string[]}} };
 
-  constructor(ctx: Context) {
-    console.log('Tool.constructor', this.constructor.name);
-    this.ctx = ctx;
+export abstract class Tool {
+  constructor(public readonly ctx: Context) {
+    console.log(`${this.constructor.name||'Tool'}.constructor`);
   }
 
-  abstract name(): string;
-  abstract info(): string;
-  abstract args(): { [name: string]: { type: string; description: string; items?: { type: string }; required: boolean } };
-  abstract call(args: any): Promise<any>;
+  public abstract readonly meta: ToolMeta;
+
+  public abstract call(args: {[key:string]:any}): Promise<{[key:string]:any}>;
 }
 
 // channel interface
 export abstract class Channel {
-  public ctx: Context;
-
-  constructor(ctx: Context) {
-    console.log('Channel.constructor', this.constructor.name);
-    this.ctx = ctx;
+  constructor(public readonly ctx: Context) {
+    console.log(`${this.constructor.name||'Channel'}.constructor`);
   }
 
   abstract args(): {[key: string]: any};
   abstract init(): Promise<void>;
   abstract drop(): Promise<void>;
+
   abstract sendMessage(message: Message): Promise<any | null>;
 }
 
@@ -148,15 +144,18 @@ export abstract class Model {
   public apiKey: string = 'NO_API_KEY';
 
   public temperature: number = 0.7;
-  public topP: number = 0.9;
+  public topP: number = 0.95;
+  public topK: number = 40;
   public maxTokens: number = 8192;
   public n: number = 1;
   public userId: string = 'user-id';
   public reasoning: string = 'high';
   public format: 'text' | 'json' = 'text';
+  public tools: ToolMeta[]; // 
 
-  constructor(config: { [key: string]: any }) {
+  constructor(public readonly ctx: Context, config: { [key: string]: any }) {
     Object.assign(this, config);
+    this.tools = Object.values(this.ctx.tools).map(tool => tool.meta);
   }
 
   // sends messages to LLM model
@@ -184,24 +183,8 @@ export interface Chat {
   thinking: boolean;
   // messages is the chat history
   messages: Message[];
+  // userId is the user's id
   userId?: string;
-  tools?: { 
-    type:'function', 
-    function: {
-      description: string,
-      name: string,
-      strict: boolean,
-      // TODO: verify this again, https://api-docs.deepseek.com/guides/tool_calls
-      parameters: {
-        type: 'object', // force to object
-        required: string[],
-        properties: Record<string, {
-          type: string,
-          description: string,
-        }>,
-      }
-    } 
-  }[];
   // sum/total of all usages (Reply.usage)
   usage?: {
     completion: number;
