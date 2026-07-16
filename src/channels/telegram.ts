@@ -9,8 +9,8 @@ export default class TelegramChannel extends Channel {
   }
 
   async init() : Promise<void> {
-    console.log('TelegramChannel.init', 'attaching...', this.ctx.config.settings);
-    console.log('TelegramChannel.init', 'attached!');
+    console.log('[TelegramChannel.init]', 'attaching...', this.ctx.config.settings);
+    console.log('[TelegramChannel.init]', 'attached!');
   }
 
   async sendMessage(message: Message) {

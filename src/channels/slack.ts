@@ -36,7 +36,7 @@ export default class SlackChannel extends Channel {
   }
 
   async init() {
-    console.log('SlackChannel.init', this.ctx.config.channels.slack);
+    console.log('[SlackChannel.init]', this.ctx.config.channels.slack);
 
     if (this.ctx.isDry) {
       console.info('[dry]', 'channel slack attached');
@@ -45,19 +45,19 @@ export default class SlackChannel extends Channel {
 
     const config = this.ctx.config.channels.slack as SlackConfig;
     if (!config ) {
-      console.error('SlackChannel.init', 'no settings found, skipping');
+      console.error('[SlackChannel.init]', 'no settings found, skipping');
       return;
     }
 
     const appToken = (config?.appToken || process.env.SLACK_APP_TOKEN);
     if (!appToken) {
-      console.error('SlackChannel.init', 'no appToken found, skipping');
+      console.error('[SlackChannel.init]', 'no appToken found, skipping');
       return;
     }
 
     const botToken = (config?.botToken || process.env.SLACK_BOT_TOKEN);
     if (!botToken) {
-      console.error('SlackChannel.init', 'no botToken found, skipping');
+      console.error('[SlackChannel.init]', 'no botToken found, skipping');
       return;
     }
 
@@ -124,7 +124,7 @@ export default class SlackChannel extends Channel {
 
     // we should know if there is a mismatch between the channel in the message and the response
     if (response.channel !== message.channel) {
-      console.warn('SlackChannel.sendMessage', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
+      console.warn('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
     }
 
     return {
@@ -148,7 +148,7 @@ export default class SlackChannel extends Channel {
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
       if (!text) {
-        console.warn('SlackChannel.onMention', 'no text content');
+        console.warn('[SlackChannel.onMention]', 'no text content');
         await this.sendMessage({ role: 'assistant', content: '(no text content)' });
         return; 
       }
@@ -157,7 +157,7 @@ export default class SlackChannel extends Channel {
       const server = this.ctx.command as ServeCommand;
       // this should never happen, but just in case throw an error
       if (!server) {
-        console.error('SlackChannel.onMention', 'server not available');
+        console.error('[SlackChannel.onMention]', 'server not available');
         await this.sendMessage({ role: 'assistant', content: '(server not available)' });
         return;
       }
@@ -186,7 +186,7 @@ export default class SlackChannel extends Channel {
 
   protected async onDirectMessage({ event, body, ack }: HandlerParams) {
     try {
-      console.info('SlackChannel.onDirectMessage', `channel=${event.channel}`);
+      console.info('[SlackChannel.onDirectMessage]', `channel=${event.channel}`);
       console.debug('[SlackChannel.onDirectMessage]', 'body=', JSON.stringify(body));
       console.debug('[SlackChannel.onDirectMessage]', 'event=', JSON.stringify(event));
       
@@ -207,52 +207,52 @@ export default class SlackChannel extends Channel {
       const agentId = agent.id;
       const chatId = `slack-${event.channel}-${thread}`;
 
-      console.log('SlackChannel.onDirectMessage', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await server.sendMessage(this.ctx, text, chatId, agentId);
 
       if (!result) {
-        console.error('SlackChannel.onDirectMessage', `no result from processMessage for agent ${agentId}`);
+        console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
         return;
       }
 
       // DMs don't have threads, just send a new message
       await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel });
     } catch (error) {
-      console.error('SlackChannel.onDirectMessage', error);
+      console.error('[SlackChannel.onDirectMessage]', error);
     }
   }
 
   protected async onSlashCommand({ event, body, ack }: HandlerParams) {
-    console.info('SlackChannel.onSlashCommand', `command: ${body.collback_id}`, Object.keys(event), Object.keys(body), ack.toString());
+    console.info('[SlackChannel.onSlashCommand]', `command: ${body.collback_id}`, Object.keys(event), Object.keys(body), ack.toString());
     await ack({ text: `u want me to do /${body.collback_id}? ok whatever, it's not implemented yet, talk to the dev!` });
 
     // TODO: switch (body.collback_id) {
   }
 
   protected async onError(error: Error) {
-    console.error('SlackChannel.onError', error);
+    console.error('[SlackChannel.onError]', error);
   }
 
   protected async onConnecting() {
-    console.info('SlackChannel.onConnecting', 'connecting...');
+    console.info('[SlackChannel.onConnecting]', 'connecting...');
   }
 
   protected async onConnected() {
-    console.info('SlackChannel.onConnected', 'connected!');
+    console.info('[SlackChannel.onConnected]', 'connected!');
   }
 
   protected async onReconnecting(attemptNumber: number) {
-    console.warn('SlackChannel.onReconnecting', `reconnecting... (${attemptNumber})`);
+    console.warn('[SlackChannel.onReconnecting]', `reconnecting... (${attemptNumber})`);
   }
 
   protected async onReconnected() {
-    console.warn('SlackChannel.onReconnected', 'reconnected!');
+    console.warn('[SlackChannel.onReconnected]', 'reconnected!');
   }
 
   protected async onDisconnected(error: Error) {
-    console.warn('SlackChannel.onDisconnected', 'disconnected!', error);
+    console.warn('[SlackChannel.onDisconnected]', 'disconnected!', error);
   }
 
   // extract the actual text from a Slack event, stripping @marvin mention
@@ -275,7 +275,7 @@ export default class SlackChannel extends Channel {
 
   // find agent using event.channel or fallback to default "marvin"
   protected findAgent(channel?: string): Agent {
-    console.log('SlackChannel.findAgent', channel ? `channel=${channel}` : 'marvin');
+    console.log('[SlackChannel.findAgent]', channel ? `channel=${channel}` : 'marvin');
 
     // diretly use marvin/orchestrator agent
     if (!channel) {

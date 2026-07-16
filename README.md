@@ -50,13 +50,13 @@ journalctl --user -u marvin -f
 
 ```bash
 # Start the server (daemon mode)
-marvin --server
+marvin serve
 
 # Client mode (interacts with the running server)
 marvin
 
 # Reload server config via HTTP
-marvin --reload
+marvin reload
 
 # Bootstrap the system (workspace + service + env)
 marvin init

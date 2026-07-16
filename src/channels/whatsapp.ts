@@ -8,8 +8,8 @@ export default class WhatsAppChannel extends Channel {
   }
 
   async init() : Promise<void> {
-    console.log('WhatsAppChannel.init', 'attaching...', this.ctx.config.settings);
-    console.log('WhatsAppChannel.init', 'attached!');
+    console.log('[WhatsAppChannel.init]', 'attaching...', this.ctx.config.settings);
+    console.log('[WhatsAppChannel.init]', 'attached!');
   }
 
   async sendMessage(message: Message) {

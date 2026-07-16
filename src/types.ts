@@ -85,7 +85,7 @@ export abstract class System {
   public ctx: Context;
 
   constructor(ctx: Context) {
-    console.log('System.constructor', this.constructor.name);
+    console.log('[System.constructor]', this.constructor.name);
     this.ctx = ctx;
   }
 

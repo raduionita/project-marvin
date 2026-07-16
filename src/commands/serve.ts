@@ -158,7 +158,7 @@ export default class ServeCommand extends Command {
   }
 
   async initChannels() {
-    console.log('ServeCommand.initChannels');
+    console.log('[ServeCommand.initChannels]');
 
     const files = listChannels(this.ctx).map(f => f.replace('.ts', ''));
     for (const [id, config] of Object.entries(this.ctx.config.channels) as [string, Config['channels'][string]][]) {
@@ -190,7 +190,7 @@ export default class ServeCommand extends Command {
   }
 
   async initModels() {
-    console.log('ServeCommand.initModels');
+    console.log('[ServeCommand.initModels]');
 
     const ctx = this.ctx;
 
@@ -256,7 +256,7 @@ export default class ServeCommand extends Command {
   }
 
   async initAgents() {
-    console.log('ServeCommand.initAgents');
+    console.log('[ServeCommand.initAgents]');
 
     const ctx = this.ctx;
 
@@ -362,7 +362,7 @@ export default class ServeCommand extends Command {
   }
 
   dropAgents() {
-    console.log('ServeCommand.dropAgents');
+    console.log('[ServeCommand.dropAgents]');
     const ctx = this.ctx;
     for (const agent of Object.values(ctx.agents)) {
       for (const task of Object.values(agent.tasks)) {
@@ -373,19 +373,19 @@ export default class ServeCommand extends Command {
   }
 
   dropModels() {
-    console.log('ServeCommand.dropModels');
+    console.log('[ServeCommand.dropModels]');
     this.ctx.models = {};
   }
 
   // will detach and delete ALL channels from the context
   async dropChannels() {
-    console.log('ServeCommand.dropChannels');
+    console.log('[ServeCommand.dropChannels]');
     const ctx = this.ctx;
     for (const channel of Object.values(ctx.channels)) {
       try {
         await channel.drop();
       } catch (err) {
-        console.error('ServeCommand.dropChannels', `error detaching channel:`, err);
+        console.error('[ServeCommand.dropChannels]', `error detaching channel:`, err);
       }
     }
     ctx.channels = {};
@@ -393,26 +393,26 @@ export default class ServeCommand extends Command {
 
   // will detach and delete the channel from the context
   async dropChannel(id: string) {
-    console.log('ServeCommand.dropChannel', id);
+    console.log('[ServeCommand.dropChannel]', id);
     const ctx = this.ctx;
     if (ctx.channels[id]) {
       try {
         ctx.channels[id].drop();
       } catch (err) {
-        console.error('ServeCommand.dropChannel', `error detaching channel:`, err);
+        console.error('[ServeCommand.dropChannel]', `error detaching channel:`, err);
       }
       delete ctx.channels[id];
     }
   }
 
   async dropSystems() {
-    console.log('ServeCommand.dropSystems');
+    console.log('[ServeCommand.dropSystems]');
     const ctx = this.ctx;
     for (const system of Object.values(ctx.systems)) {
       try {
         await system.drop();
       } catch (err) {
-        console.error('ServeCommand.dropSystems', `error detaching system:`, err);
+        console.error('[ServeCommand.dropSystems]', `error detaching system:`, err);
       }
     }
     ctx.systems = {};
@@ -472,7 +472,7 @@ export default class ServeCommand extends Command {
   }
 
   async execReload() {
-    console.log('ServeCommand.execReload');
+    console.log('[ServeCommand.execReload]');
     this.ctx.state = 'reloading';
 
     // drop in reverse order
@@ -580,7 +580,7 @@ export default class ServeCommand extends Command {
 
     // warn if max steps reached
     if (steps >= maxSteps) {
-      console.warn('ServeCommand.sendMessage', `max steps (${maxSteps}) reached for ${agentId}`);
+      console.warn('[ServeCommand.sendMessage]', `max steps (${maxSteps}) reached for ${agentId}`);
     }
 
     // save chat to cache

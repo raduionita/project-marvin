@@ -89,7 +89,7 @@ class MockSlackChannel extends SlackChannel {
   // Override sendMessage to use the mock web client (parent's expects real WebClient).
   async sendMessage(message: Message): Promise<SlackResponse | undefined> {
     if (!this.web) {
-      console.warn('SlackChannel.sendMessage', 'not attached, skipping submit');
+      console.warn('[SlackChannel.sendMessage]', 'not attached, skipping submit');
       return undefined;
     }
 
@@ -100,7 +100,7 @@ class MockSlackChannel extends SlackChannel {
     });
 
     if (response.channel !== message.channel) {
-      console.warn('SlackChannel.sendMessage', `channel mismatch: expected ${message.channel}, got ${response?.channel}`);
+      console.warn('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.channel}, got ${response?.channel}`);
     }
 
     const msg = response.message as Record<string, unknown> | undefined;
@@ -123,14 +123,14 @@ class MockSlackChannel extends SlackChannel {
     text = text.replace(/\s+/g, ' ').trim();
 
     if (!text) {
-      console.warn('SlackChannel.onMention', 'no text content');
+      console.warn('[SlackChannel.onMention]', 'no text content');
       await this.sendMessage({ role: 'assistant', content: '(no text content)' });
       return;
     }
 
     const server = this.ctx.command as ServeCommand;
     if (!server) {
-      console.error('SlackChannel.onMention', 'server not available');
+      console.error('[SlackChannel.onMention]', 'server not available');
       await this.sendMessage({ role: 'assistant', content: '(server not available)' });
       return;
     }
@@ -140,11 +140,11 @@ class MockSlackChannel extends SlackChannel {
     const agentId = agent.id;
     const chatId: string = `slack-${event.channel}-${thread}`;
 
-    console.log('SlackChannel.onMention', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+    console.log('[SlackChannel.onMention]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
     const result = await server.sendMessage(this.ctx, text, chatId, agentId);
     if (!result) {
-      console.error('SlackChannel.onMention', `no result from sendMessage for agent ${agentId}`);
+      console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
       await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
       return;
     }
@@ -169,23 +169,23 @@ class MockSlackChannel extends SlackChannel {
       const agentId = agent.id;
       const chatId = `slack-${event.channel}-${thread}`;
 
-      console.log('SlackChannel.onDirectMessage', `processing via agent ${agentId}: ${(text as string).slice(0, 100)}`);
+      console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${(text as string).slice(0, 100)}`);
 
       const result = await server.sendMessage(this.ctx, text, chatId, agentId);
 
       if (!result) {
-        console.error('SlackChannel.onDirectMessage', `no result from processMessage for agent ${agentId}`);
+        console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
         return;
       }
 
       await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel as string });
     } catch (error) {
-      console.error('SlackChannel.onDirectMessage', error);
+      console.error('[SlackChannel.onDirectMessage]', error);
     }
   }
 
   async onSlashCommand({ event, body, ack }: HandlerParams) {
-    console.info('SlackChannel.onSlashCommand', `command: ${body.callback_id}`, Object.keys(event), Object.keys(body), ack.toString());
+    console.info('[SlackChannel.onSlashCommand]', `command: ${body.callback_id}`, Object.keys(event), Object.keys(body), ack.toString());
     await ack({ text: `u want me to do /${body.callback_id}? ok whatever, it's not implemented yet, talk to the dev!` });
   }
 

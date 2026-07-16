@@ -105,14 +105,14 @@ await (new class App {
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        console.warn('App.initCommands', `${arg} does not export a Command class, exiting`);
+        console.warn('[App.initCommands]', `${arg} does not export a Command class, exiting`);
         return;
       }
       // create command and init/run it
       this.cmd = new Class(this.ctx);
       this.cmd.init();
     } catch (err) {
-      console.error('App.initCommands', `failed to load ${arg}:`, err);
+      console.error('[App.initCommands]', `failed to load ${arg}:`, err);
     }
   }
 
