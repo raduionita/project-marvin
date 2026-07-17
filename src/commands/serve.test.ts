@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, vi, afterEach } from 'bun:test';
+import { test, expect } from 'bun:test';
 import { Context, Channel, Config, Model, Cache, Chat, Reply, Message, Tool } from '../types.js';
 import ServeCommand from './serve.js';
 import { writeFileSync, mkdirSync } from 'fs';
@@ -30,7 +30,7 @@ function mockServer(ctx?: Context): ServeCommand {
 class MockModel extends Model {
   enabled = true;
   default = true;
-  provider = 'openai';
+  provider = 'openai' as const;
   model = 'mock';
   baseUrl = '';
   apiKey = '';
@@ -61,17 +61,11 @@ class MockModel extends Model {
   setReply(reply: Reply) {
     this._reply = reply;
   }
-
-  get callCount(): number {
-    return this.callCount;
-  }
 }
 
 /** A minimal mock tool. */
 class MockTool extends Tool {
-  meta(): any {
-    return { type: 'function', function: { name: 'mock_tool', description: '', parameters: { type: 'object', properties: {}, required: [] } } };
-  }
+  meta = { type: 'function', function: { name: 'mock_tool', description: '', parameters: { type: 'object', properties: {}, required: [] } } };
   async call(_args: any): Promise<any> {
     return { result: 'tool output' };
   }
@@ -241,11 +235,15 @@ test('sendMessage pushes system and user messages to chat', async () => {
   await server.sendMessage(ctx, 'hello world', 'chat-1', 'marvin', 5);
 
   const chat = ctx.cache.findChat('chat-1');
-  expect(chat.messages.length).toBe(2);
-  expect(chat.messages[0].role).toBe('system');
-  expect(chat.messages[0].content).toBe('You are Marvin.');
-  expect(chat.messages[1].role).toBe('user');
-  expect(chat.messages[1].content).toBe('hello world');
+  // 2 system/user messages + 5 assistant replies from the AI loop
+  expect(chat.messages.length).toBe(7);
+  expect(chat.messages[0]!.role).toBe('system');
+  expect(chat.messages[0]!.content).toBe('You are Marvin.');
+  expect(chat.messages[1]!.role).toBe('user');
+  expect(chat.messages[1]!.content).toBe('hello world');
+  // Verify assistant replies were persisted
+  const assistantMessages = chat.messages.filter((m: Message) => m.role === 'assistant');
+  expect(assistantMessages.length).toBe(5);
 });
 
 test('sendMessage returns content and step count from model reply', async () => {
@@ -288,7 +286,7 @@ test('sendMessage reuses existing chat when chatId already exists', async () => 
   // Actually: first call: system + user + 5 assistant = 7
   // second call: system + user + 5 assistant = 7 more
   expect(chat.messages.length).toBeGreaterThan(4);
-  expect(chat.messages[chat.messages.length - 1].content).toBe('final answer');
+  expect(chat.messages[chat.messages.length - 1]!.content).toBe('final answer');
 });
 
 test('sendMessage calls agent.model.sendMessage maxSteps times when never stopping', async () => {
@@ -372,7 +370,7 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
   const toolMessages = chat.messages.filter((m: Message) => m.role === 'tool');
   expect(toolMessages.length).toBeGreaterThan(0);
   // The tool error message should contain the parse error
-  const errorContent = toolMessages[0].content;
+  const errorContent = toolMessages[0]!.content;
   expect(typeof errorContent).toBe('string');
 });
 
@@ -426,9 +424,14 @@ test('sendMessage throws when agentId does not exist', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
-  await expect(
-    server.sendMessage(ctx, 'hello', 'chat-1', 'nonexistent', 5)
-  ).rejects.toThrow();
+  // Should throw when agentId doesn't exist
+  let threw = false;
+  try {
+    await server.sendMessage(ctx, 'hello', 'chat-1', 'nonexistent', 5);
+  } catch {
+    threw = true;
+  }
+  expect(threw).toBe(true);
 });
 
 test('sendMessage returns content and steps from model reply', async () => {
@@ -524,7 +527,7 @@ test('execTask calls sendMessage and sends result through agent channels', async
   const server = mockServer(ctx);
 
   // Add a task directly to the existing agent (identity is already set by buildTestContext)
-  ctx.agents['marvin'].tasks = {
+  ctx.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -549,7 +552,7 @@ test('execTask skips disabled tasks', async () => {
   const server = mockServer(ctx);
 
   // Add a disabled task directly to the existing agent (identity is already set)
-  ctx.agents['marvin'].tasks = {
+  ctx.agents['marvin']!.tasks = {
     'disabled-task': {
       id: 'disabled-task',
       enabled: false,
@@ -573,7 +576,7 @@ test('execTask skips disabled agents', async () => {
 
   // Disable the agent directly (identity is already set by buildTestContext)
   (ctx.agents['marvin'] as any).enabled = false;
-  ctx.agents['marvin'].tasks = {
+  ctx.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -595,8 +598,8 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   const server = mockServer(ctx);
 
   // Set a missing channel directly (identity is already set by buildTestContext)
-  ctx.agents['marvin'].channels = { 'missing.channel': 'default' };
-  ctx.agents['marvin'].tasks = {
+  ctx.agents['marvin']!.channels = { 'missing.channel': 'default' };
+  ctx.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -608,9 +611,7 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await expect(
-    server.execTask(ctx, 'marvin', 'test-task')
-  ).resolves.toBeUndefined();
+  await server.execTask(ctx, 'marvin', 'test-task');
   // sendMessage was called (execTask tries it), but the channel send failed
   expect((ctx.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
@@ -620,7 +621,7 @@ test('execTask skips disabled tasks', async () => {
   const server = mockServer(ctx);
 
   // Add a disabled task directly to the existing agent (identity is already set)
-  ctx.agents['marvin'].tasks = {
+  ctx.agents['marvin']!.tasks = {
     'disabled-task': {
       id: 'disabled-task',
       enabled: false,
@@ -644,7 +645,7 @@ test('execTask skips disabled agents', async () => {
 
   // Disable the agent directly (identity is already set by buildTestContext)
   (ctx.agents['marvin'] as any).enabled = false;
-  ctx.agents['marvin'].tasks = {
+  ctx.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -666,8 +667,8 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   const server = mockServer(ctx);
 
   // Set a missing channel directly (identity is already set by buildTestContext)
-  ctx.agents['marvin'].channels = { 'missing.channel': 'default' };
-  ctx.agents['marvin'].tasks = {
+  ctx.agents['marvin']!.channels = { 'missing.channel': 'default' };
+  ctx.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -679,9 +680,7 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await expect(
-    server.execTask(ctx, 'marvin', 'test-task')
-  ).resolves.toBeUndefined();
+  await server.execTask(ctx, 'marvin', 'test-task');
   // sendMessage was called (execTask tries it), but the channel send failed
   expect((ctx.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
@@ -778,7 +777,7 @@ test('dropAgents clears all agents and clears their timeouts', async () => {
   const server = mockServer(ctx);
 
   // Add a task with a timeout
-  ctx.agents['marvin'].tasks['test-task'] = {
+  ctx.agents['marvin']!.tasks['test-task'] = {
     id: 'test-task',
     enabled: true,
     schedule: 0,

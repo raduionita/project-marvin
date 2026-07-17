@@ -25,21 +25,21 @@ await (new class App {
   initProcess() {
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
-      console.log(`exit ${code}`);
+      console.log('[App.initProcess]', 'exit', `${code}`);
       // cleanup
       await this.drop();
     });
 
     // SIGINT (Ctrl+C)
     process.on('SIGINT', () => {
-      console.log('SIGINT', 'exiting...');
+      console.log('[App.initProcess]', 'SIGINT', 'exiting...');
       // goto process.on('exit') instead
       process.exit(0);
     });
 
     // SIGTERM (kill)
     process.on('SIGTERM', () => {
-      console.log('SIGTERM', 'exiting...');
+      console.log('[App.initProcess]', 'SIGTERM', 'exiting...');
       // goto process.on('exit')
       process.exit(0);
     });

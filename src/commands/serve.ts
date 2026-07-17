@@ -425,7 +425,7 @@ export default class ServeCommand extends Command {
     const task = agent.tasks[taskId]!;
 
     if (!agent.enabled || !task.enabled) {
-      console.info(`task ${taskId} skipped (agent ${agentId})`);
+      console.info('[ServeCommand.execTask]', `task ${taskId} skipped (agent ${agentId})`);
       return;
     }
 
@@ -435,7 +435,7 @@ export default class ServeCommand extends Command {
     const chatId = `task-${taskId}-${Date.now()}`;
 
     // set task input as user message to LLM
-    const result = await this.sendMessage(ctx, task.input, agentId, chatId, maxSteps);
+    const result = await this.sendMessage(ctx, task.input, chatId, agentId, maxSteps);
     if (!result) {
       console.error('[ServeCommand.execTask]', `no result from sendMessage for agent ${agentId}`);
       return;
@@ -455,7 +455,7 @@ export default class ServeCommand extends Command {
 
       // try to send, log error if failed, continue
       try {
-        console.info(`channel sending message to ${channelId}:${groupId}...`);
+        console.info('[ServeCommand.execTask]', `sending message to channel ${channelId}`);
         await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
       } catch (err) {
         console.error('[ServeCommand.execTask]', `channel ${channelId} send failed:`, err);
@@ -463,7 +463,7 @@ export default class ServeCommand extends Command {
     }
 
     if (this.ctx.isDry) {
-      console.info('[dry] task executed (once)');
+      console.info('[dry]', 'task executed (once)');
       return;
     }
 
@@ -532,6 +532,9 @@ export default class ServeCommand extends Command {
       // core of the AI loop: call model, execute tool calls, repeat until done
       reply = await agent.model.sendMessage(chat);
 
+      // persist assistant reply to chat history
+      chat.messages.push({ role: 'assistant', content: reply.message.content || '' });
+
       // trim result, this can be really big
       console.info('[ServeCommand.sendMessage]', `step=${steps}`, JSON.stringify(reply));
 
@@ -586,7 +589,7 @@ export default class ServeCommand extends Command {
     // save chat to cache
     this.ctx.cache.saveChat(chatId, chat);
 
-    // TODO: more info here 
-    return { content: reply?.message?.content || '', steps };
+    // TODO: more info here
+    return { content: reply?.message?.content || '', steps: steps };
   }
 }

@@ -87,14 +87,13 @@ export default class SlackChannel extends Channel {
 
     await this.sok.start();
 
-    console.log('channel slack started');
+    console.log('[SlackChannel.init]','channel slack started');
   }
 
   async drop() {
     if (this.sok) {
-      console.debug('[SlackChannel.drop');
       await this.sok.disconnect();
-      console.info('channel slack dropped');
+      console.info('[SlackChannel.drop]','channel slack dropped');
     }
   }
 
