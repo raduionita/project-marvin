@@ -25,33 +25,17 @@ export default class WebBrowseTool extends Tool {
 
     if (this.ctx.isDry) {
       console.info('[dry] browse:', args.url);
-      return { title: '', body: '' };
+      return { title: '', body: '', error: '' };
     }
 
     if (!this.ctx.systems['browser']) {
-      throw new Error('webBrowse: Browser is not initialized in the server context');
+      return { title:'', body:'', error: 'webBrowse: Browser is not initialized in the server context' }
     }
 
     const system = this.ctx.systems['browser'] as BrowserSystem;
     const url = args.url;
-    const bctx = await system.newContext({
-      viewport: { width: 1200, height: 800 },
-      javaScriptEnabled: true,
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36',
-      extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
-      bypassCSP: true,
-    });
 
-    await bctx.route('**/*', (route) => {
-      const request = route.request();
-      if (request.isNavigationRequest()) {
-        return route.continue();
-      } else {
-        return route.abort();
-      }
-    });
-
-    const page = await bctx.newPage();
+    const page = await system.newPage();
     page.setDefaultNavigationTimeout(15_000);
 
     try {
@@ -64,11 +48,10 @@ export default class WebBrowseTool extends Tool {
       const text = await body.innerText();
       return { title, body: text.split('\n').map((line: string) => line.trim()).filter((line: string) => line.length > 0).join('\n') };
     } catch (error) {
-      console.error('webBrowse', 'error:', error);
-      throw error;
+      console.error('[WebBrowseTool.call]', 'error:', error);
     } finally {
       await page.close();
-      await bctx.close();
     }
+    return { title: '', body: '', error: 'webBrowse: error' };
   }
 }

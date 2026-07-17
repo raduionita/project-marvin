@@ -466,8 +466,6 @@ export default class ServeCommand extends Command {
       return;
     }
 
-    const { content, steps } = result;
-
     // send final result through configured channels
     for (const [channelId, groupId] of Object.entries(agent.channels)) {
       try {
@@ -479,8 +477,8 @@ export default class ServeCommand extends Command {
           continue;
         }
 
-        const result = await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
-        if (!result.ok) {
+        const reply = await channel.sendMessage({ role: 'assistant', content: result.content, channel: groupId } as Message);
+        if (!reply.ok) {
           console.warn('[ServeCommand.execTask]', `channel ${channelId} send failed, skipping`);
           continue;
         }
@@ -525,8 +523,10 @@ export default class ServeCommand extends Command {
 
     const instance = this.ctx.tools[tool];
     if (!instance) {
-      throw new Error(`ServeCommand.execTool: Tool ${tool} not found`);
+      console.error('[ServeCommand.execTool]', `tool ${tool} not found`);
+      return {tool: tool, error: `tool ${tool} does NOT exist`};
     }
+
     return await instance.call(args);
   }
 

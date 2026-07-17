@@ -34,30 +34,15 @@ export default class WebSearchTool extends Tool {
     }
 
     if (!this.ctx.systems['browser']) {
-      throw new Error('webSearch: Browser is not initialized in the server context');
+      throw new Error('[WebSearchTool.call] ERROR - Browser is not initialized in the server context');
     }
 
     const system = this.ctx.systems['browser'] as BrowserSystem;
     const query = args.query;
     const url = `https://duckduckgo.com?q=${query}&df=d`;
-    const bctx = await system.newContext({
-      viewport: { width: 1200, height: 800 },
-      javaScriptEnabled: true,
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36',
-      extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
-      bypassCSP: true,
-    });
 
-    await bctx.route('**/*', (route) => {
-      const request = route.request();
-      if (request.url().includes('links.duckduckgo.com/d.js') || request.isNavigationRequest()) {
-        return route.continue();
-      } else {
-        return route.abort();
-      }
-    });
 
-    const page = await bctx.newPage();
+    const page = await system.newPage();
     page.setDefaultNavigationTimeout(15_000);
 
     try {
@@ -82,9 +67,7 @@ export default class WebSearchTool extends Tool {
       console.error('[WebSearchTool.call]', 'error:', error);
     } finally {
       await page.close();
-      await bctx.close();
     }
-
     return { results: [] };
   }
 }
