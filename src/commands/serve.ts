@@ -366,7 +366,10 @@ export default class ServeCommand extends Command {
     const ctx = this.ctx;
     for (const agent of Object.values(ctx.agents)) {
       for (const task of Object.values(agent.tasks)) {
-        if (task.timeout) clearTimeout(task.timeout);
+        if (task.timeout) { 
+          console.log('[ServeCommand.dropAgents]', `stopping task ${task.id}`);
+          clearTimeout(task.timeout);
+        }
       }
     }
     ctx.agents = {};
@@ -421,18 +424,40 @@ export default class ServeCommand extends Command {
   async execTask(ctx: Context, agentId: string, taskId: string) {
     console.log('[ServeCommand.execTask]', `${agentId}/${taskId}`);
 
-    const agent = ctx.agents[agentId]!;
-    const task = agent.tasks[taskId]!;
+    // check assistant state
+    if (this.ctx.state  !== 'running') {
+      console.info('[ServeCommand.execTask]', `task ${taskId} skipped (assistant NOT running)`);
+      return;
+    }
 
-    if (!agent.enabled || !task.enabled) {
-      console.info('[ServeCommand.execTask]', `task ${taskId} skipped (agent ${agentId})`);
+    // check if agent exists
+    const agent = ctx.agents[agentId];
+    if (!agent) {
+      console.info('[ServeCommand.execTask]', `task ${taskId} skipped (agent not found)`);
+      return;
+    }
+    // check if agent is enabled
+    if (!agent.enabled) {
+      console.info('[ServeCommand.execTask]', `task ${taskId} skipped (agent disabled)`);
+      return;
+    }
+
+    // check if task exists
+    const task = agent.tasks[taskId]!;
+    if (!task) {
+      console.info('[ServeCommand.execTask]', `task ${taskId} skipped (task not found)`);
+      return;
+    }
+    // check if task is enabled
+    if (!task.enabled) {
+      console.info('[ServeCommand.execTask]', `task ${taskId} skipped (task disabled)`);
       return;
     }
 
     const maxSteps = task.maxSteps || constants.DEFAULT_MAX_STEPS;
 
-    // TODO: create a new chat or use it to retrieve the chat from cache
-    const chatId = `task-${taskId}-${Date.now()}`;
+    // TODO: should tasks have cached chats? chatId = `task-${agentId}-${taskId}-${Date.now()}`;
+    const chatId = undefined; // stateless, design choice, for not
 
     // set task input as user message to LLM
     const result = await this.sendMessage(ctx, task.input, chatId, agentId, maxSteps);
@@ -445,18 +470,23 @@ export default class ServeCommand extends Command {
 
     // send final result through configured channels
     for (const [channelId, groupId] of Object.entries(agent.channels)) {
-      const channel = ctx.channels[channelId];
-
-      // verify channel exists, warn if not, then skip
-      if (!channel) {
-        console.warn('[ServeCommand.execTask]', `channel ${channelId} not found, skipping`);
-        continue;
-      }
-
-      // try to send, log error if failed, continue
       try {
-        console.info('[ServeCommand.execTask]', `sending message to channel ${channelId}`);
-        await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
+        const channel = ctx.channels[channelId];
+
+        // verify channel exists, warn if not, then skip
+        if (!channel) {
+          console.warn('[ServeCommand.execTask]', `channel ${channelId} not found, skipping`);
+          continue;
+        }
+
+        const result = await channel.sendMessage({ role: 'assistant', content: content, channel: groupId } as Message);
+        if (!result.ok) {
+          console.warn('[ServeCommand.execTask]', `channel ${channelId} send failed, skipping`);
+          continue;
+        }
+
+        // try to send, log error if failed, continue
+        console.info('[ServeCommand.execTask]', `message sent to channel ${channelId}:${groupId}`);
       } catch (err) {
         console.error('[ServeCommand.execTask]', `channel ${channelId} send failed:`, err);
       }
@@ -500,96 +530,101 @@ export default class ServeCommand extends Command {
     return await instance.call(args);
   }
 
-  async sendMessage(ctx: Context, message: string, chatId: string, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) {
-    console.debug('[ServeCommand.sendMessage]', `${agentId}: ${message.slice(0, 100)}`);
-    
-    const agent = ctx.agents[agentId]!;
+  async sendMessage(ctx: Context, message: string, chatId: string | undefined, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
+    try {
+      console.debug('[ServeCommand.sendMessage]', chatId, agentId, message.slice(0, 100));
 
-    // get chat from cache/store using sessionId
-    const chat = this.ctx.cache.findChat(chatId);
+      // get chat from cache/store using sessionId
+      const chat = this.ctx.cache.findChat(chatId);
 
-    // load agent IDENTITY.md as system message
-    chat.messages.push({ role: 'system', content: agent.identity });
+      const agent = ctx.agents[agentId]!;
 
-    // load task input as user message
-    chat.messages.push({ role: 'user', content: message });
+      // load agent IDENTITY.md as system message
+      chat.messages.push({ role: 'system', content: agent.identity });
 
-    // return early
-    if (this.ctx.isDry) {
-      console.info('[dry] send messages to:', agent.model.model);
-      return { content: '(dry)', steps: 0 };
-    }
+      // load task input as user message
+      chat.messages.push({ role: 'user', content: message });
 
-    // TODO this needs a type, Model.chat should return a proper Reply/Response/Result type
-    let reply: Reply;
-
-    // AI loop: call model, execute tool calls, repeat until done
-    let steps = -1;
-    let ender = false;
-    do {
-      steps++;
-
-      // core of the AI loop: call model, execute tool calls, repeat until done
-      reply = await agent.model.sendMessage(chat);
-
-      // persist assistant reply to chat history
-      chat.messages.push({ role: 'assistant', content: reply.message.content || '' });
-
-      // trim result, this can be really big
-      console.info('[ServeCommand.sendMessage]', `step=${steps}`, JSON.stringify(reply));
-
-      // force stop
-      if (reply.stop) {
-        console.info('[ServeCommand.sendMessage]', `response force stop at step ${steps}`);
-        break;
+      // return early
+      if (this.ctx.isDry) {
+        console.info('[dry] send messages to:', agent.model.model);
+        return { content: '(dry)', steps: 0 };
       }
 
-      // execute any tool calls
-      if (reply.message.tools && reply.message.tools.length > 0) {
-        for (const tool of reply.message.tools) {
-          console.log('[ServeCommand.sendMessage]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+      // TODO this needs a type, Model.chat should return a proper Reply/Response/Result type
+      let reply: Reply;
 
-          if (tool.name === constants.END_CHAT_NAME) {
-            ender = true;
-            break;
-          }
+      // AI loop: call model, execute tool calls, repeat until done
+      let steps = -1;
+      let ender = false;
+      do {
+        steps++;
 
-          let result: any;
-          try {
-            const args = JSON.parse(tool.arguments);
-            result = await this.execTool(tool.name, args);
-          } catch (err) {
-            console.error('[ServeCommand.sendMessage]', `tool ${tool.name} failed:`, err);
-            result = {error: (err as Error).message};
-          }
+        // core of the AI loop: call model, execute tool calls, repeat until done
+        reply = await agent.model.sendMessage(chat);
 
-          // add tool call to chat history
-          chat.messages.push({ role: 'tool', content: JSON.stringify(result), toolId: tool.id });
+        // persist assistant reply to chat history
+        chat.messages.push({ role: 'assistant', content: reply.message.content || '' });
+
+        // trim result, this can be really big
+        console.info('[ServeCommand.sendMessage]', `step=${steps}`, JSON.stringify(reply));
+
+        // force stop
+        if (reply.stop) {
+          console.info('[ServeCommand.sendMessage]', `response force stop at step ${steps}`);
+          break;
         }
+
+        // execute any tool calls
+        if (reply.message.tools && reply.message.tools.length > 0) {
+          for (const tool of reply.message.tools) {
+            console.log('[ServeCommand.sendMessage]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+
+            if (tool.name === constants.END_CHAT_NAME) {
+              ender = true;
+              break;
+            }
+
+            let result: any;
+            try {
+              const args = JSON.parse(tool.arguments);
+              result = await this.execTool(tool.name, args);
+            } catch (err) {
+              console.error('[ServeCommand.sendMessage]', `tool ${tool.name} failed:`, err);
+              result = {error: (err as Error).message};
+            }
+
+            // add tool call to chat history
+            chat.messages.push({ role: 'tool', content: JSON.stringify(result), toolId: tool.id });
+          }
+        }
+
+        // if model produced content without pending tool calls, we're done
+        // if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
+        //   console.info('[ServeCommand.sendMessage]', `response without tool calls, stopping the AI loop`);
+        //   break;
+        // }
+
+        // if end_chat tool call is found, we're done
+        if (ender) {
+          console.info('[ServeCommand.sendMessage]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
+          break;
+        }
+      } while (steps < maxSteps - 1);
+
+      // warn if max steps reached
+      if (steps >= maxSteps) {
+        console.warn('[ServeCommand.sendMessage]', `max steps (${maxSteps}) reached for ${agentId}`);
       }
 
-      // if model produced content without pending tool calls, we're done
-      // if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
-      //   console.info('[ServeCommand.sendMessage]', `response without tool calls, stopping the AI loop`);
-      //   break;
-      // }
+      // save chat to cache
+      this.ctx.cache.saveChat(chatId, chat);
 
-      // if end_chat tool call is found, we're done
-      if (ender) {
-        console.info('[ServeCommand.sendMessage]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
-        break;
-      }
-    } while (steps < maxSteps - 1);
-
-    // warn if max steps reached
-    if (steps >= maxSteps) {
-      console.warn('[ServeCommand.sendMessage]', `max steps (${maxSteps}) reached for ${agentId}`);
-    }
-
-    // save chat to cache
-    this.ctx.cache.saveChat(chatId, chat);
-
-    // TODO: more info here
-    return { content: reply?.message?.content || '', steps: steps };
+      // TODO: more info here
+      return { content: reply?.message?.content || '', steps: steps };
+    } catch (error) {
+      console.error('[ServeCommand.sendMessage]', error);
+      return null;
+    } 
   }
 }

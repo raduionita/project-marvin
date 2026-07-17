@@ -98,7 +98,7 @@ export default class SlackChannel extends Channel {
   }
 
   // send a message to Slack, optionally as a thread reply
-  async sendMessage(message: Message) : Promise<SlackResponse | undefined> {
+  async sendMessage(message: Message) : Promise<SlackResponse> {
     console.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
 
     if (this.ctx.isDry) {
@@ -109,7 +109,12 @@ export default class SlackChannel extends Channel {
     // need web client
     if (!this.web) {
       console.error('[SlackChannel.sendMessage]', 'not attached, skipping submit');
-      return;
+      throw new Error('SlackChannel.sendMessage: web client not attached');
+    }
+
+    if (!message.channel) {
+      console.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
+      throw new Error('SlackChannel.sendMessage: no channel provided');
     }
 
     // send the message
@@ -121,6 +126,12 @@ export default class SlackChannel extends Channel {
       thread_ts: message.thread || '',
     });
 
+    // check if response is ok
+    if (!response.ok) {
+      console.error('[SlackChannel.sendMessage]', 'response NOT ok:', response);
+      return { ts: '', ok: false, error: response.error, message: '(slack response not ok)' };
+    }
+
     // we should know if there is a mismatch between the channel in the message and the response
     if (response.channel !== message.channel) {
       console.warn('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
@@ -128,8 +139,8 @@ export default class SlackChannel extends Channel {
 
     return {
       ts: response.ts || response.message?.ts || '',
-      ok: response.ok,
-      error: response.error,
+      ok: true,
+      error: response.error || '',
       message: response.message?.text || '',
       channel: response.channel || message.channel || '',
     }
@@ -137,9 +148,9 @@ export default class SlackChannel extends Channel {
 
   protected async onMention({ event, body, ack }: HandlerParams) {
     try {
-      console.debug('[SlackChannel.onMention]', `channel=${event.channel} thread=${event.thread_ts}|${event.ts}`);
-      console.debug('[SlackChannel.onMention]', 'body=', JSON.stringify(body));
-      console.debug('[SlackChannel.onMention]', 'event=', JSON.stringify(event));
+      const thread = event.thread_ts || event.ts || event.event_ts;
+
+      console.debug('[SlackChannel.onMention]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
       
       // acknowledge the event
       await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
@@ -148,7 +159,7 @@ export default class SlackChannel extends Channel {
       const text = this.extractText(event);
       if (!text) {
         console.warn('[SlackChannel.onMention]', 'no text content');
-        await this.sendMessage({ role: 'assistant', content: '(no text content)' });
+        await this.sendMessage({ role: 'assistant', content: '(no text content)', channel: event.channel, thread: thread });
         return; 
       }
 
@@ -157,13 +168,12 @@ export default class SlackChannel extends Channel {
       // this should never happen, but just in case throw an error
       if (!server) {
         console.error('[SlackChannel.onMention]', 'server not available');
-        await this.sendMessage({ role: 'assistant', content: '(server not available)' });
+        await this.sendMessage({ role: 'assistant', content: '(server not available)', channel: event.channel, thread: thread });
         return;
       }
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
-      const thread = event.thread_ts || event.ts || event.event_ts;
       const agentId = agent.id;
       const chatId: string = `slack-${event.channel}-${thread}`;
 
@@ -173,7 +183,7 @@ export default class SlackChannel extends Channel {
       const result = await server.sendMessage(this.ctx, text, chatId, agentId);
       if (!result) {
         console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
-        await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
+        await this.sendMessage({ role: 'assistant', content: '(no response from the AI)', channel: event.channel, thread: thread });
         return;
       }
 
@@ -185,7 +195,9 @@ export default class SlackChannel extends Channel {
 
   protected async onDirectMessage({ event, body, ack }: HandlerParams) {
     try {
-      console.info('[SlackChannel.onDirectMessage]', event.channel, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      const thread = event.thread_ts || event.ts || event.event_ts;
+
+      console.info('[SlackChannel.onDirectMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
       
       await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
 
@@ -195,12 +207,13 @@ export default class SlackChannel extends Channel {
       // get the server reference from context
       const server = this.ctx.command as ServeCommand;
       if (!server) {
-        throw new Error('SlackChannel.onMention: server not available');
+        console.error('[SlackChannel.onDirectMessage]', 'server not available');
+        await this.sendMessage({ role: 'assistant', content: '(ServeCommand.onDirectMessage ERROR - server not available)', channel: event.channel, thread: thread });
+        return;
       }
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
-      const thread = event.thread_ts || event.ts || event.event_ts;
       const agentId = agent.id;
       const chatId = `slack-${event.channel}-${thread}`;
 
@@ -208,14 +221,13 @@ export default class SlackChannel extends Channel {
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await server.sendMessage(this.ctx, text, chatId, agentId);
-
       if (!result) {
         console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
+        await this.sendMessage({ role: 'assistant', content: '(SlackChannel.onDirectMessage ERROR - no response from the AI)', channel: event.channel, thread: thread });
         return;
       }
 
-      // DMs don't have threads, just send a new message
-      await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel });
+      await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel, thread: thread });
     } catch (error) {
       console.error('[SlackChannel.onDirectMessage]', error);
     }

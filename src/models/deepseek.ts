@@ -29,16 +29,28 @@ export default class DeepseekModel extends Model {
       }),
     });
 
+    // check if response is ok
+    if (!response.ok) {
+      console.error('[DeepseekModel.sendMessage]', 'response NOT ok:', response);
+      const body = await response.json();
+      throw new Error(`[DeepseekModel.sendMessage] ERROR ${body.error?.message || body.message || response.statusText}`);
+    }
+
     // extract json from response
     const json = await response.json();
-    // quick stop
-    const stop = json.choices.length === 0 || json.choices[0].finish_reason === 'stop';
+
+    // no choices, no reply
+    if (!json.choices || json.choices.length === 0) {
+      console.warn('[DeepseekModel.sendMessage]', 'no choices, no reply');
+      return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
+    }
+
     // choice 0, for now only one choice is supported
     const choice = json.choices[0];
     // llm chat output as a reply object
     return {
       id: json.id, // as string,
-      stop: stop,
+      stop: json.choices[0].finish_reason === 'stop',
       finish: json.finish_reason,
       message: {
         role: choice.message.role, // always "assistant" here

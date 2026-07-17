@@ -169,13 +169,23 @@ export default class ApiSystem extends System {
       
       const message = body.message as string;
       const chatId = body.chatId || `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const agentId = (body.agentId as string | undefined) || ctx.config.settings.name; // default to marvin (orchestrator)
-      const maxSteps = (body.maxSteps as number | undefined) ?? constants.DEFAULT_MAX_STEPS;
+      const agentId = (body.agentId as string) || ctx.config.settings.name; // default to marvin (orchestrator)
+      const maxSteps = (body.maxSteps as number) ?? constants.DEFAULT_MAX_STEPS;
 
       const server = this.ctx.command as ServeCommand;
+      if (!server) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: '(ServeCommand.sendMessage ERROR - server not available)' }));
+        return;
+      }
 
       // send message to the LLM
-      const result = await server.sendMessage(ctx, message, agentId, chatId, maxSteps);
+      const result = await server.sendMessage(ctx, message, chatId, agentId, maxSteps);
+      if (!result) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: '(ServeCommand.sendMessage ERROR - no LLM result)' }));
+        return;
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({

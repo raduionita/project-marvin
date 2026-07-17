@@ -115,13 +115,14 @@ export abstract class Channel {
   abstract init(): Promise<void>;
   abstract drop(): Promise<void>;
 
-  abstract sendMessage(message: Message): Promise<any | null>;
+  abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;
 }
 
 // task keeps track of the setTimeout id, schedule
 export interface Task {
   id: string;
   enabled: boolean;
+  // TODO: persistant: boolean = false; // should tasks have persistent chats?
   schedule: number;
   maxSteps: number;
   timeout: NodeJS.Timeout | null;
@@ -231,12 +232,14 @@ export interface Reply {
 export class Cache {
   private cache: Record<string, any> = {}; // chatId: chat
 
-  saveChat(chatId: string, chat: Chat): void {
+  saveChat(chatId: string | undefined, chat: Chat): void {
+    if (!chatId) return;
     this.cache[chatId] = chat;
   }
 
-  findChat(chatId: string): Chat {
-    return this.cache[chatId] || { id: chatId, messages: [], thinking: false, userId: '', tools: [] };
+  findChat(chatId: string | undefined): Chat {
+    if (!chatId) return { id: '', messages: [], thinking: false, userId: '' };
+    return this.cache[chatId] || { id: chatId, messages: [], thinking: false, userId: '' };
   }
 
   // TODO: async persist to file (in the workspace folder)
