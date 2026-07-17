@@ -525,7 +525,7 @@ export default class ServeCommand extends Command {
 
     // AI loop: call model, execute tool calls, repeat until done
     let steps = -1;
-    let final = false;
+    let ender = false;
     do {
       steps++;
 
@@ -549,8 +549,8 @@ export default class ServeCommand extends Command {
         for (const tool of reply.message.tools) {
           console.log('[ServeCommand.sendMessage]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
-          if (tool.name === constants.FINAL_ANSWER_NAME) {
-            final = true;
+          if (tool.name === constants.END_CHAT_NAME) {
+            ender = true;
             break;
           }
 
@@ -574,9 +574,9 @@ export default class ServeCommand extends Command {
       //   break;
       // }
 
-      // if final answer tool call is found, we're done
-      if (final) {
-        console.info('[ServeCommand.sendMessage]', `found final answer tool call, stopping the AI loop`);
+      // if end_chat tool call is found, we're done
+      if (ender) {
+        console.info('[ServeCommand.sendMessage]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
         break;
       }
     } while (steps < maxSteps - 1);

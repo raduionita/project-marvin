@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { Context, Channel, Config, Model, Cache, Chat, Reply, Message, Tool } from '../types.js';
 import ServeCommand from './serve.js';
 import { writeFileSync, mkdirSync } from 'fs';
+import * as constants from '../constants.js';
 
 // --- helpers ---
 
@@ -104,7 +105,7 @@ function buildTestContext(opts?: {
     agentModel = 'mock.model',
     agentChannels = { 'test.channel': 'default' },
     isDry = false,
-    replyContent = 'final answer',
+    replyContent = 'end chat',
     replyStop,
     toolCalls,
     customReply,
@@ -253,7 +254,7 @@ test('sendMessage returns content and step count from model reply', async () => 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result.content).toBe('hello from model');
-  // The mock model returns stop=false, no tools, no final answer.
+  // The mock model returns stop=false, no tools, no end chat.
   // The loop runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
   expect(result.steps).toBe(4);
 });
@@ -286,7 +287,7 @@ test('sendMessage reuses existing chat when chatId already exists', async () => 
   // Actually: first call: system + user + 5 assistant = 7
   // second call: system + user + 5 assistant = 7 more
   expect(chat.messages.length).toBeGreaterThan(4);
-  expect(chat.messages[chat.messages.length - 1]!.content).toBe('final answer');
+  expect(chat.messages[chat.messages.length - 1]!.content).toBe('end chat');
 });
 
 test('sendMessage calls agent.model.sendMessage maxSteps times when never stopping', async () => {
@@ -332,7 +333,7 @@ test('sendMessage executes tool calls from model reply', async () => {
 
   await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  // After tool execution, the loop continues (no final answer, no stop).
+  // After tool execution, the loop continues (no end chat, no stop).
   // The model is called: 1 (tool call) + 4 (remaining iterations) = 5 total
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(5);
 
@@ -374,7 +375,7 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
   expect(typeof errorContent).toBe('string');
 });
 
-test('sendMessage stops the AI loop when final answer tool call is found', async () => {
+test('sendMessage stops the AI loop when end chat tool call is found', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
@@ -387,7 +388,7 @@ test('sendMessage stops the AI loop when final answer tool call is found', async
     message: {
       role: 'assistant',
       content: '',
-      tools: [{ id: 'final-1', name: 'final_answer', arguments: '{"answer": "done"}' }],
+      tools: [{ id: 'final-1', name: constants.END_CHAT_NAME, arguments: '{"answer": "done"}' }],
     },
   } as Reply;
 
@@ -395,9 +396,9 @@ test('sendMessage stops the AI loop when final answer tool call is found', async
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  // Should only call the model once — the final answer causes an immediate exit
+  // Should only call the model once — the end chat causes an immediate exit
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
-  expect(result.content).toBe(''); // The final answer content is empty in our reply
+  expect(result.content).toBe(''); // The end chat content is empty in our reply
 });
 
 test('sendMessage returns empty content when reply has no message content', async () => {
@@ -440,7 +441,7 @@ test('sendMessage returns content and steps from model reply', async () => {
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  expect(result.content).toBe('final answer');
+  expect(result.content).toBe('end chat');
   // The model runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
   expect(result.steps).toBe(4);
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(5);
@@ -471,7 +472,7 @@ test('sendMessage warns when max steps are reached (maxSteps=1 with never-stoppi
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
-  // A model that never stops (no stop, no final answer, no tools)
+  // A model that never stops (no stop, no end chat, no tools)
   // Replace the model's reply (not the instance) so the agent's reference stays valid
   const neverStoppingReply: Reply = {
     id: 'reply-6',

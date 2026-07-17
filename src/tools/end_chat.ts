@@ -1,12 +1,12 @@
 import { Tool } from "../types";
 import * as constants from '../constants';
 
-export default class FinalAnswerTool extends Tool {
+export default class EndChatTool extends Tool {
   meta = {
     type: 'function',
     function: {
-      name: constants.FINAL_ANSWER_NAME,
-      description: constants.FINAL_ANSWER_DESCRIPTION,
+      name: constants.END_CHAT_NAME,
+      description: constants.END_CHAT_DESCRIPTION,
       parameters: {
         type: 'object',
         properties: {

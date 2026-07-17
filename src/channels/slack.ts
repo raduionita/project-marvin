@@ -185,9 +185,7 @@ export default class SlackChannel extends Channel {
 
   protected async onDirectMessage({ event, body, ack }: HandlerParams) {
     try {
-      console.info('[SlackChannel.onDirectMessage]', `channel=${event.channel}`);
-      console.debug('[SlackChannel.onDirectMessage]', 'body=', JSON.stringify(body));
-      console.debug('[SlackChannel.onDirectMessage]', 'event=', JSON.stringify(event));
+      console.info('[SlackChannel.onDirectMessage]', event.channel, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
       
       await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
 

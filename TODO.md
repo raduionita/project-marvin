@@ -6,7 +6,7 @@
   - Marvin pipes the messages to the LLM
   - LLM replies to Marvin
   - Marvin sends it back to Slack (same slack channel)
-- Model.chat() NEEDS to return a proper (provider agnostic) result type, or a custom type that supports ALL providers
+- Model.sendMessage() NEEDS to return a proper (provider agnostic) result type, or a custom type that supports ALL providers
 - DRY (Don't Repeat Yourself) feature with flag (--dry), only console.log calls get executed
 - Tools: NEED internal stop tool for the AI loop (e.g. `endChat` or `stopChat`)
 
