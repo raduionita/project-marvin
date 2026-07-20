@@ -43,8 +43,8 @@ export default class SlackChannel extends Channel {
       return;
     }
 
-    const config = this.ctx.config.channels.slack as SlackConfig;
-    if (!config ) {
+    const config = this.ctx.config.channels.slack as SlackConfig | undefined;
+    if (!config) {
       console.error('[SlackChannel.load]', 'no settings found, skipping');
       return;
     }
@@ -123,7 +123,7 @@ export default class SlackChannel extends Channel {
       // OR .markdown_text
       // +  .mrkdwn
       channel: message.channel || '',
-      thread_ts: message.thread || '',
+      thread_ts: message.thread || undefined,
     });
 
     // check if response is ok
@@ -134,11 +134,12 @@ export default class SlackChannel extends Channel {
 
     // we should know if there is a mismatch between the channel in the message and the response
     if (response.channel !== message.channel) {
-      console.warn('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
+      console.error('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
+      return { ts: '', ok: false, error: response.error, message: '(slack channel mismatch)' };
     }
 
     return {
-      ts: response.ts || response.message?.ts || '',
+      ts: response.message?.ts || '',
       ok: true,
       error: response.error || '',
       message: response.message?.text || '',
@@ -152,8 +153,8 @@ export default class SlackChannel extends Channel {
 
       console.debug('[SlackChannel.onMention]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
       
-      // acknowledge the event
-      await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
+      // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
+      await ack();
 
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
@@ -199,7 +200,8 @@ export default class SlackChannel extends Channel {
 
       console.debug('[SlackChannel.onDirectMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
       
-      await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
+      // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
+      await ack();
 
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
@@ -234,10 +236,10 @@ export default class SlackChannel extends Channel {
   }
 
   protected async onSlashCommand({ event, body, ack }: HandlerParams) {
-    console.info('[SlackChannel.onSlashCommand]', `command: ${body.collback_id}`, Object.keys(event), Object.keys(body), ack.toString());
-    await ack({ text: `u want me to do /${body.collback_id}? ok whatever, it's not implemented yet, talk to the dev!` });
+    console.info('[SlackChannel.onSlashCommand]', `command: ${body.callback_id}`, Object.keys(event), Object.keys(body), ack.toString());
+    await ack({ text: `u want me to do /${body.callback_id}? ok whatever, it's not implemented yet, talk to the dev!` });
 
-    // TODO: switch (body.collback_id) {
+    // TODO: switch (body.callback_id) {
   }
 
   protected async onError(error: Error) {

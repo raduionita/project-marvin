@@ -166,7 +166,7 @@ export default class ServeCommand extends Command {
 
       const file = files.find(f => f === id);
       if (!file) {
-        console.error('[ServeCommand.loadChannels]', `no file for file "${file}", skipping ${id}`);
+        console.error('[ServeCommand.loadChannels]', `no file for channel "${id}", skipping`);
         continue;
       }
 
