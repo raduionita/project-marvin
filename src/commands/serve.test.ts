@@ -75,7 +75,7 @@ class MockTool extends Tool {
 /** A mock channel that records sent messages. */
 class TestChannel extends Channel {
   args() { return {}; }
-  async init(): Promise<void> {}
+  async load(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
     console.debug('[TestChannel.sendMessage]', JSON.stringify(message));
@@ -159,14 +159,14 @@ function buildTestContext(opts?: {
   return ctx;
 }
 
-// ==================== initChannels tests (existing, kept) ====================
+// ==================== loadChannels tests (existing, kept) ====================
 
 test('execChannels loads enabled channels with valid provider', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
   const server = mockServer();
   server.ctx.config = config;
 
-  await server.initChannels();
+  await server.loadChannels();
 
   expect(server.ctx!.channels['channel.mock']).toBeDefined();
   expect(server.ctx!.channels['channel.mock'] instanceof Channel).toBe(true);
@@ -177,7 +177,7 @@ test('execChannels skips disabled channels', async () => {
   const server = mockServer();
   server.ctx.config = config;
 
-  await server.initChannels();
+  await server.loadChannels();
 
   expect(server.ctx!.channels['disabledChannel']).toBeUndefined();
 });
@@ -187,7 +187,7 @@ test('execChannels warns on missing provider', async () => {
   const server = mockServer();
   server.ctx.config = config;
 
-  await server.initChannels();
+  await server.loadChannels();
 
   expect(server.ctx!.channels['unknownProvider']).toBeUndefined();
 });
@@ -197,7 +197,7 @@ test('execChannels skips non-Channel classes', async () => {
   const server = mockServer();
   server.ctx.config = config;
 
-  await server.initChannels();
+  await server.loadChannels();
 
   expect(server.ctx!.channels['badChannel']).toBeUndefined();
 });
@@ -207,7 +207,7 @@ test('execChannels stores channels in ctx.channels', async () => {
   const server = mockServer();
   server.ctx.config = config;
 
-  await server.initChannels();
+  await server.loadChannels();
 
   expect(Object.keys(server.ctx!.channels).length).toBeGreaterThan(0);
   expect(Object.keys(server.ctx!.channels)).toContain('channel.mock');
@@ -702,23 +702,23 @@ test('execReload sets state to running after reload', async () => {
   });
   const server = mockServer(ctx);
 
-  // Set up a test home directory so initAgents can read MARVIN.md
+  // Set up a test home directory so loadAgents can read MARVIN.md
   const testHome = '/tmp/marvin-test-' + Date.now();
   (ctx as any).home = testHome;
   (ctx as any).root = testHome;
   mkdirSync(testHome, { recursive: true });
   writeFileSync(testHome + '/MARVIN.md', 'You are Marvin.');
-  // Create subdirectories needed by initAgents
+  // Create subdirectories needed by loadAgents
   mkdirSync(testHome + '/agents', { recursive: true });
 
   // Pre-load some state
   ctx.state = 'running';
 
-  // Stub initAgents to not actually try to load models from disk (which fails in tests).
-  // execReload calls initAgents internally, so we replace it with a no-op that
+  // Stub loadAgents to not actually try to load models from disk (which fails in tests).
+  // execReload calls loadAgents internally, so we replace it with a no-op that
   // preserves the existing mock model.
-  const originalInitAgents = server.initAgents.bind(server);
-  (server as any).initAgents = async () => {
+  const originalInitAgents = server.loadAgents.bind(server);
+  (server as any).loadAgents = async () => {
     // Re-install the mock model so agents can use it
     const mockModelInstance = new MockModel(ctx, {
       id: 'reply-1',

@@ -2,28 +2,28 @@ import { execSync } from "node:child_process";
 import { Command } from "../types";
 
 export default class StatusCommand extends Command {
-  async init() {
-    console.debug('[StatusCommand.init]');
+  async load() {
+    console.debug('[StatusCommand.load]');
 
     const cmds = process.argv.slice(2);
     const cmd = cmds[1];
 
     switch (cmd) {
       case 'help'   : 
-        console.debug('[StatusCommand.init]', 'usage: marvin status [command]', 'check the daemon status');
-        console.debug('[StatusCommand.init]', 'commands:');
-        console.debug('[StatusCommand.init]', '  help    ', 'show this help');
+        console.debug('[StatusCommand.load]', 'usage: marvin status [command]', 'check the daemon status');
+        console.debug('[StatusCommand.load]', 'commands:');
+        console.debug('[StatusCommand.load]', '  help    ', 'show this help');
       break;
       default: {
         // service status
         if (this.ctx.isDry) {
-          console.log('[StatusCommand.init]', '[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
+          console.log('[StatusCommand.load]', '[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
         } else {
           try {
             const status = execSync(['systemctl', '--user', 'status', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
-            console.log('[StatusCommand.init]', 'service status:', status.trim());
+            console.log('[StatusCommand.load]', 'service status:', status.trim());
           } catch {
-            console.log('[StatusCommand.init]', 'service is not running.');
+            console.log('[StatusCommand.load]', 'service is not running.');
           }
         }
 
@@ -33,7 +33,7 @@ export default class StatusCommand extends Command {
         
         // health check
         if (this.ctx.isDry) {
-          console.log('[StatusCommand.init]', '[dry]', 'check health: fetch http://localhost:' + port + '/_health');
+          console.log('[StatusCommand.load]', '[dry]', 'check health: fetch http://localhost:' + port + '/_health');
         } else {
           try {
             const url = new URL(`http://localhost:${port}/_health`);
@@ -45,12 +45,12 @@ export default class StatusCommand extends Command {
               },
             });
             if (response.ok) {
-              console.log('[StatusCommand.init]', `server is healthy (port ${port}).`);
+              console.log('[StatusCommand.load]', `server is healthy (port ${port}).`);
             } else {
-              console.warn('[StatusCommand.init]', `server responded with ${response.status}.`);
+              console.warn('[StatusCommand.load]', `server responded with ${response.status}.`);
             }
           } catch (err) {
-            console.error('[StatusCommand.init]', `cannot reach server at localhost:${port}.`);
+            console.error('[StatusCommand.load]', `cannot reach server at localhost:${port}.`);
           }
         } 
       } break;

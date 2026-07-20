@@ -59,7 +59,7 @@ marvin
 marvin reload
 
 # Bootstrap the system (workspace + service + env)
-marvin init
+marvin load
 
 # Check for and apply updates from GitHub
 marvin update

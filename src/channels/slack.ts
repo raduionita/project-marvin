@@ -35,29 +35,29 @@ export default class SlackChannel extends Channel {
     };
   }
 
-  async init() {
-    console.debug('[SlackChannel.init]', this.ctx.config.channels.slack);
+  async load() {
+    console.debug('[SlackChannel.load]', this.ctx.config.channels.slack);
 
     if (this.ctx.isDry) {
-      console.info('[SlackChannel.init]', '[dry] channel slack attached');
+      console.info('[SlackChannel.load]', '[dry] channel slack attached');
       return;
     }
 
     const config = this.ctx.config.channels.slack as SlackConfig;
     if (!config ) {
-      console.error('[SlackChannel.init]', 'no settings found, skipping');
+      console.error('[SlackChannel.load]', 'no settings found, skipping');
       return;
     }
 
     const appToken = (config?.appToken || process.env.SLACK_APP_TOKEN);
     if (!appToken) {
-      console.error('[SlackChannel.init]', 'no appToken found, skipping');
+      console.error('[SlackChannel.load]', 'no appToken found, skipping');
       return;
     }
 
     const botToken = (config?.botToken || process.env.SLACK_BOT_TOKEN);
     if (!botToken) {
-      console.error('[SlackChannel.init]', 'no botToken found, skipping');
+      console.error('[SlackChannel.load]', 'no botToken found, skipping');
       return;
     }
 
@@ -87,7 +87,7 @@ export default class SlackChannel extends Channel {
 
     await this.sok.start();
 
-    console.log('[SlackChannel.init]','channel slack started');
+    console.log('[SlackChannel.load]','channel slack started');
   }
 
   async drop() {

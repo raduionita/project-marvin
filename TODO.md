@@ -35,4 +35,4 @@
 
 ## Backlog
 - LMM response streaming
-- Move as many of the validations to initiation to avoid constant validations
+- Move as many of the validations to loadiation to avoid constant validations

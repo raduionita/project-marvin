@@ -29,7 +29,7 @@ export default class WebBrowseTool extends Tool {
     }
 
     if (!this.ctx.systems['browser']) {
-      return { title:'', body:'', error: 'webBrowse: Browser is not initialized in the server context' }
+      return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server context' }
     }
 
     const system = this.ctx.systems['browser'] as BrowserSystem;

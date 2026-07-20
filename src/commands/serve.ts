@@ -12,17 +12,17 @@ import { listModels } from '../models/index.js';
 
 // `marvin serve [help] [--dry]`
 export default class ServeCommand extends Command {
-  // initialize the app/server and its internal systems
-  async init() {
-    console.debug('[ServeCommand.init]');
+  // load the app/server and its internal systems
+  async load() {
+    console.debug('[ServeCommand.load]');
 
-          this.initProject();
-          this.initWatch();
-    await this.initSystems();
-    await this.initTools();
-    await this.initChannels();
-    await this.initModels();
-    await this.initAgents();
+          this.loadProject();
+          this.loadWatch();
+    await this.loadSystems();
+    await this.loadTools();
+    await this.loadChannels();
+    await this.loadModels();
+    await this.loadAgents();
   }
 
   // will drop all the resources from the context
@@ -39,19 +39,19 @@ export default class ServeCommand extends Command {
   }
 
   // create ~/.marvin folder and required files
-  initProject() {
-    console.debug('[ServeCommand.initProject]');
+  loadProject() {
+    console.debug('[ServeCommand.loadProject]');
 
     // set root to the app folder (where package.json lives)
     this.ctx.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/commands\/serve\.ts$/, '');
-    console.info('[ServeCommand.initProject]', 'root directory:', this.ctx.root);
+    console.info('[ServeCommand.loadProject]', 'root directory:', this.ctx.root);
 
     // create project/workspace folder (~/.marvin)
     const hpath = join(homedir(), '.marvin');
     if (this.ctx.isDry) {
-      console.info('[ServeCommand.initProject]', '[dry]', hpath);
+      console.info('[ServeCommand.loadProject]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {
-      console.warn('[ServeCommand.initProject]', `missing ${hpath} folder, creating...`);
+      console.warn('[ServeCommand.loadProject]', `missing ${hpath} folder, creating...`);
       mkdirSync(hpath, { recursive: true });
     }
 
@@ -61,34 +61,34 @@ export default class ServeCommand extends Command {
     // agents folder (~/.marvin/agents)
     const apath = join(hpath, 'agents');
     if (this.ctx.isDry) {
-      console.info('[ServeCommand.initProject]', '[dry]', apath);
+      console.info('[ServeCommand.loadProject]', '[dry]', apath);
     } else if (!existsSync(apath)) {
-      console.warn('[ServeCommand.initProject]', `missing ${apath} folder, creating...`);
+      console.warn('[ServeCommand.loadProject]', `missing ${apath} folder, creating...`);
       mkdirSync(apath, { recursive: true });
     }
 
     // create ~/.marvin/MARVIN.md from constants (orchestrator identity)
     const mpath = join(hpath, 'MARVIN.md');
     if (this.ctx.isDry) {
-      console.info('[ServeCommand.initProject]', '[dry]', mpath);
+      console.info('[ServeCommand.loadProject]', '[dry]', mpath);
     } else if (!existsSync(mpath)) {
-      console.warn('[ServeCommand.initProject]', `missing ${mpath} file, creating...`);
+      console.warn('[ServeCommand.loadProject]', `missing ${mpath} file, creating...`);
       writeFileSync(mpath, constants.MARVIN_MD.trim());
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
     const cpath = join(hpath, 'marvin.json');
     if (this.ctx.isDry) {
-      console.info('[ServeCommand.initProject]', '[dry]', cpath);
+      console.info('[ServeCommand.loadProject]', '[dry]', cpath);
     } else if (!existsSync(cpath)) {
-      console.warn('[ServeCommand.initProject]', `missing ${cpath} file, creating...`);
+      console.warn('[ServeCommand.loadProject]', `missing ${cpath} file, creating...`);
       const config = constants.DEFAULT_CONFIG;
       writeFileSync(cpath, JSON.stringify(config, null, 2));
     }
   }
 
-  initWatch() {
-    console.debug('[ServeCommand.initWatch]');
+  loadWatch() {
+    console.debug('[ServeCommand.loadWatch]');
 
     // TODO: watch the whole project folder
 
@@ -96,22 +96,22 @@ export default class ServeCommand extends Command {
 
     // watch config file
     if (this.ctx.isDry) {
-      console.info('[ServeCommand.initWatch]', '[dry] would watch config file:', mpath);
+      console.info('[ServeCommand.loadWatch]', '[dry] would watch config file:', mpath);
     } else {
       try {
         let w = watch(mpath, () => {
-          console.debug('[ServeCommand.initWatch]', 'config file changed, reloading...');
+          console.debug('[ServeCommand.loadWatch]', 'config file changed, reloading...');
           this.execReload();
         });
         w.close();
       } catch (err) {
-        console.error('[ServeCommand.initWatch]', 'config file watcher failed:', (err as Error).message);
+        console.error('[ServeCommand.loadWatch]', 'config file watcher failed:', (err as Error).message);
       }
     }
   }
 
-  async initSystems() {
-    console.debug('[ServeCommand.initSystems]');
+  async loadSystems() {
+    console.debug('[ServeCommand.loadSystems]');
 
     const files = listSystems(this.ctx).map(f => f.replace('.ts', ''));
     for (const name of files) {
@@ -119,22 +119,22 @@ export default class ServeCommand extends Command {
         const Module = await import(`../systems/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof System)) {
-          console.error('[ServeCommand.initSystems]', `${name} does not export a System class, skipping`);
+          console.error('[ServeCommand.loadSystems]', `${name} does not export a System class, skipping`);
           continue;
         }
         // register instance of System
         const instance = new Class(this.ctx);
-        await instance.init();
+        await instance.load();
         this.ctx.systems[name] = instance;
-        console.info('[ServeCommand.initSystems]', `system ${name} loaded`);
+        console.info('[ServeCommand.loadSystems]', `system ${name} loaded`);
       } catch (err) {
-        console.error('[ServeCommand.initSystems]', `failed to load ${name}:`, err);
+        console.error('[ServeCommand.loadSystems]', `failed to load ${name}:`, err);
       }
     }
   }
 
-  async initTools() {
-    console.debug('[ServeCommand.initTools]');
+  async loadTools() {
+    console.debug('[ServeCommand.loadTools]');
 
     const files = listTools(this.ctx).map(f => f.replace('.ts', ''));
     for (const file of files) {
@@ -143,22 +143,22 @@ export default class ServeCommand extends Command {
         const Module = await import(`../tools/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
-          console.error('[ServeCommand.initTools]', `${file} does not export a Tool class, skipping`);
+          console.error('[ServeCommand.loadTools]', `${file} does not export a Tool class, skipping`);
           continue;
         }
         // register instance of Tool
         const instance = new Class(this.ctx);
         const meta = instance.meta();
         this.ctx.tools[meta.name] = instance;
-        console.info('[ServeCommand.initTools]', `tool [${meta.name}] loaded`);
+        console.info('[ServeCommand.loadTools]', `tool [${meta.name}] loaded`);
       } catch (err) {
-        console.error('[ServeCommand.initTools]', `failed to load ${file}:`, err);
+        console.error('[ServeCommand.loadTools]', `failed to load ${file}:`, err);
       }
     }
   }
 
-  async initChannels() {
-    console.log('[ServeCommand.initChannels]');
+  async loadChannels() {
+    console.log('[ServeCommand.loadChannels]');
 
     const files = listChannels(this.ctx).map(f => f.replace('.ts', ''));
     for (const [id, config] of Object.entries(this.ctx.config.channels) as [string, Config['channels'][string]][]) {
@@ -166,7 +166,7 @@ export default class ServeCommand extends Command {
 
       const file = files.find(f => f === id);
       if (!file) {
-        console.error('[ServeCommand.initChannels]', `no file for file "${file}", skipping ${id}`);
+        console.error('[ServeCommand.loadChannels]', `no file for file "${file}", skipping ${id}`);
         continue;
       }
 
@@ -175,22 +175,22 @@ export default class ServeCommand extends Command {
         const Class = Module.default;
         // must be a Channel class
         if (!Class || !(Class.prototype instanceof Channel)) {
-          console.error('[ServeCommand.initChannels]', `${file} does not export a Channel class, skipping ${id}`);
+          console.error('[ServeCommand.loadChannels]', `${file} does not export a Channel class, skipping ${id}`);
           continue;
         }
         // register instance of Channel 
         const instance = new Class(this.ctx);
-        await instance.init();
+        await instance.load();
         this.ctx.channels[id] = instance;
-        console.info('[ServeCommand.initChannels]', `channel [${id}] loaded`);
+        console.info('[ServeCommand.loadChannels]', `channel [${id}] loaded`);
       } catch (err) {
-        console.error('[ServeCommand.initChannels]', `failed to load ${id}:`, err);
+        console.error('[ServeCommand.loadChannels]', `failed to load ${id}:`, err);
       }
     }
   }
 
-  async initModels() {
-    console.log('[ServeCommand.initModels]');
+  async loadModels() {
+    console.log('[ServeCommand.loadModels]');
 
     const ctx = this.ctx;
 
@@ -199,13 +199,13 @@ export default class ServeCommand extends Command {
     for (const [modelId, config] of Object.entries(ctx.config.models)) {
       try {
         if (!config.enabled) {
-          console.warn('[ServeCommand.initModels]', `model ${modelId} is disabled, skipping`);
+          console.warn('[ServeCommand.loadModels]', `model ${modelId} is disabled, skipping`);
           continue;
         }
 
         const file = files.find(f => f === config.provider);
         if (!file) {
-          console.error('[ServeCommand.initModels]', `no file for provider "${config.provider}", skipping ${modelId}`);
+          console.error('[ServeCommand.loadModels]', `no file for provider "${config.provider}", skipping ${modelId}`);
           continue;
         }
 
@@ -215,7 +215,7 @@ export default class ServeCommand extends Command {
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[ServeCommand.initModels]', `${modelId} does not export a Model class, skipping`);
+          console.error('[ServeCommand.loadModels]', `${modelId} does not export a Model class, skipping`);
           continue;
         }
         
@@ -223,9 +223,9 @@ export default class ServeCommand extends Command {
         const instance = new Class(this.ctx, config);
         ctx.models[modelId] = instance;
 
-        console.info('[ServeCommand.initModels]', `model [${modelId}] loaded (${config.provider} ${config.model})`);
+        console.info('[ServeCommand.loadModels]', `model [${modelId}] loaded (${config.provider} ${config.model})`);
       } catch (err) {
-        console.error('[ServeCommand.initModels]', `failed to load ${modelId}:`, err);
+        console.error('[ServeCommand.loadModels]', `failed to load ${modelId}:`, err);
       }
     }
 
@@ -240,7 +240,7 @@ export default class ServeCommand extends Command {
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[ServeCommand.initModels]', `${modelId} does not export a Model class!`);
+          console.error('[ServeCommand.loadModels]', `${modelId} does not export a Model class!`);
           process.exit(1);
         }
 
@@ -248,15 +248,15 @@ export default class ServeCommand extends Command {
         ctx.models[modelId] = instance;
 
         // warn because fallback model is not a good idea, and does NOTHING
-        console.info('[ServeCommand.initModels]', `model [${modelId}] fallback`);
+        console.info('[ServeCommand.loadModels]', `model [${modelId}] fallback`);
       } catch (err) {
-        console.error('[ServeCommand.initModels]', `failed to load ${modelId}:`, err);
+        console.error('[ServeCommand.loadModels]', `failed to load ${modelId}:`, err);
       }
     }
   }
 
-  async initAgents() {
-    console.debug('[ServeCommand.initAgents]');
+  async loadAgents() {
+    console.debug('[ServeCommand.loadAgents]');
 
     const ctx = this.ctx;
 
@@ -269,7 +269,7 @@ export default class ServeCommand extends Command {
     // load agent system prompt (~/.marvin/IDENTITY.md)
     let identity = readFileSync(join(ctx.home, 'MARVIN.md'), 'utf8').trim();
     if (!identity) {
-      console.error('[ServeCommand.initAgents]', `no MARVIN.md found for agent ${marvinId}, using default`);
+      console.error('[ServeCommand.loadAgents]', `no MARVIN.md found for agent ${marvinId}, using default`);
       identity = constants.MARVIN_MD;
     }
     
@@ -293,14 +293,14 @@ export default class ServeCommand extends Command {
         input: 'hello world',
         timeout: setTimeout(this.execTask.bind(this), 0, ctx, marvinId, 'dry'),
       } as Task;
-      console.info('[ServeCommand.initAgents]', '[dry]', `task [dry] scheduled (orchestrator)`);
+      console.info('[ServeCommand.loadAgents]', '[dry]', `task [dry] scheduled (orchestrator)`);
     }
 
     // type: agent
     for (const [agentId, agent] of Object.entries(ctx.config.agents)) {
       const model = ctx.models[agent.model || ''];
       if (!model) {
-        console.error('[ServeCommand.initAgents]', `model not found for agent ${agentId}: ${agent.model}`);
+        console.error('[ServeCommand.loadAgents]', `model not found for agent ${agentId}: ${agent.model}`);
         continue;
       }
 
@@ -319,12 +319,12 @@ export default class ServeCommand extends Command {
         }
 
         if (!input) {
-          console.warn('[ServeCommand.initAgents]', `no input found for task ${taskId}, disabling`);
+          console.warn('[ServeCommand.loadAgents]', `no input found for task ${taskId}, disabling`);
           enabled = false;
         }
 
         if (this.ctx.isDry) {
-          console.info('[ServeCommand.initAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
+          console.info('[ServeCommand.loadAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
           continue;
         }
 
@@ -338,13 +338,13 @@ export default class ServeCommand extends Command {
           timeout: setTimeout(this.execTask.bind(this), task.schedule, ctx, agentId, taskId),
         } as Task;
 
-        console.info('[ServeCommand.initAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
+        console.info('[ServeCommand.loadAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
       }
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
       let identity = readFileSync(join(ctx.home, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
       if (!identity) {
-        console.warn('[ServeCommand.initAgents]', `no IDENTITY.md found for agent ${agentId}, using default`);
+        console.warn('[ServeCommand.loadAgents]', `no IDENTITY.md found for agent ${agentId}, using default`);
         identity = constants.IDENTITY_MD;
       }
 
@@ -357,7 +357,7 @@ export default class ServeCommand extends Command {
         tasks: tasks,
       } as Agent;
 
-      console.info('[ServeCommand.initAgents]',`agent [${agentId}] loaded`);
+      console.info('[ServeCommand.loadAgents]',`agent [${agentId}] loaded`);
     }
   }
 
@@ -509,11 +509,11 @@ export default class ServeCommand extends Command {
     await this.dropChannels();
     await this.dropSystems();
 
-    // re-init in dependency order
-    await this.initSystems();
-    await this.initChannels();
-    await this.initModels();
-    await this.initAgents();
+    // re-load in dependency order
+    await this.loadSystems();
+    await this.loadChannels();
+    await this.loadModels();
+    await this.loadAgents();
 
     this.ctx.state = 'running';
   }

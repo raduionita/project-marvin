@@ -45,7 +45,7 @@ export class Command {
     this.ctx.command = this;
   }
 
-  async init(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.init]`); }
+  async load(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.load]`); }
   async drop(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 
@@ -83,7 +83,7 @@ export abstract class System {
     console.debug(`[${this.constructor.name||'System'}.constructor]`);
   }
 
-  abstract init(): Promise<void>;
+  abstract load(): Promise<void>;
   abstract drop(): Promise<void>;
 }
 
@@ -106,7 +106,7 @@ export abstract class Channel {
   }
 
   abstract args(): {[key: string]: any};
-  abstract init(): Promise<void>;
+  abstract load(): Promise<void>;
   abstract drop(): Promise<void>;
 
   abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;

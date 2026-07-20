@@ -7,8 +7,8 @@ export default class MockChannel extends Channel {
     return {};
   }
 
-  async init(): Promise<void> {
-    console.debug('[MockChannel.init]', 'initialized');
+  async load(): Promise<void> {
+    console.debug('[MockChannel.load]', 'loaded');
   }
 
   async sendMessage(message: Message): Promise<any> {

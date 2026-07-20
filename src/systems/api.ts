@@ -9,8 +9,8 @@ export default class ApiSystem extends System {
   private host: string = '127.0.0.1';
   private server: http.Server | undefined;
 
-  public async init(): Promise<void> {
-    console.debug('[ApiSystem.init]');
+  public async load(): Promise<void> {
+    console.debug('[ApiSystem.load]');
 
     this.port = this.ctx.config.settings.port || 7331;
     this.host = this.ctx.config.settings.host || '127.0.0.1';
@@ -36,7 +36,7 @@ export default class ApiSystem extends System {
         return;
       }
 
-      console.debug('[ApiSystem.init]', `command: ${command}`);
+      console.debug('[ApiSystem.load]', `command: ${command}`);
 
       try {
         switch (command) {
@@ -116,7 +116,7 @@ export default class ApiSystem extends System {
   }
 
   private async handleError(err: Error) {
-    console.error('[ApiSystem.init]', 'error:', err);
+    console.error('[ApiSystem.load]', 'error:', err);
   }
 
   private async handleHealth(req: http.IncomingMessage, res: http.ServerResponse) {

@@ -2,23 +2,23 @@ import { execSync } from "child_process";
 import { Command } from "../types";
 
 export default class ReloadCommand extends Command {
-  async init() {
-    console.debug('[ReloadCommand.init]');
+  async load() {
+    console.debug('[ReloadCommand.load]');
 
     // const url = new URL(`http://localhost:${this.ctx!.config.settings.port}/`);
     // url.pathname = '/reload';
 
     if (this.ctx.isDry) {
-      console.log('[ReloadCommand.init]', '[dry]', 'repload service:', ['systemctl', '--user', 'reload', 'marvin'].join(' '));
+      console.log('[ReloadCommand.load]', '[dry]', 'repload service:', ['systemctl', '--user', 'reload', 'marvin'].join(' '));
     } else {
       // const res = await fetch(url.toString());
       // if (!res.ok) {
-        // throw new Error(`ReloadCommand.init: Error ${res.status} ${res.statusText}`);
+        // throw new Error(`ReloadCommand.load: Error ${res.status} ${res.statusText}`);
       // }
       // return await res.json();
 
       const output = execSync(['systemctl', '--user', 'reload', 'marvin'].join(' '), { stdio: 'inherit' });
-      console.log('[ReloadCommand.init]', 'reloaded service:', output.toString());
+      console.log('[ReloadCommand.load]', 'reloaded service:', output.toString());
     }
   }
 }

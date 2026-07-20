@@ -7,8 +7,8 @@ export default class ExampleChannel extends Channel {
     };
   }
   
-  async init() : Promise<void> {
-    console.debug('[ExampleChannel.init]', 'attached', this.ctx.config.settings);
+  async load() : Promise<void> {
+    console.debug('[ExampleChannel.load]', 'attached', this.ctx.config.settings);
   }
 
   async sendMessage(message: Message) : Promise<any> { 

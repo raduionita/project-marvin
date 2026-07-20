@@ -1,4 +1,4 @@
-// @ts-expect-error - mock is exported at runtime by Bun but not in type definitions
+// @ts-expect-error - mock is exported at runtime by Bun but not in type defloadions
 import { test, expect, mock } from 'bun:test';
 import { Context } from '../types.js';
 import { DEFAULT_CONFIG } from '../constants.js';
@@ -8,13 +8,13 @@ class Client {
   ctx: Context;
   constructor(ctx: Context) { this.ctx = ctx; }
   
-  init() { return Promise.resolve(); }
+  load() { return Promise.resolve(); }
   drop() { return Promise.resolve(); }
 
-  initHandlers() { }
-  initProject() { }
-  initConfig() { }
-  initCommands() { }
+  loadHandlers() { }
+  loadProject() { }
+  loadConfig() { }
+  loadCommands() { }
 }
 
 // Mock process.exit to throw instead of exiting (Bun tests don't throw by default)
@@ -29,7 +29,7 @@ function mockExit() {
 // ── Stub fs and os before importing Client ──────────────────────────────────
 
 // Mock fs: existsSync=false means all "create" branches fire.
-// readFileSync returns valid JSON so initConfig parses it.
+// readFileSync returns valid JSON so loadConfig parses it.
 mock.module('node:fs', () => ({
   existsSync: () => false,
   mkdirSync: () => {},
@@ -61,24 +61,24 @@ function makeContext(isDry = false): Context {
   return ctx;
 }
 
-// ── init() ──────────────────────────────────────────────────────────────────
+// ── load() ──────────────────────────────────────────────────────────────────
 
-test('init() calls initHandlers, initProject, initConfig, initCommands', async () => {
+test('load() calls loadHandlers, loadProject, loadConfig, loadCommands', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
-  await client.init();
-  // init() returns a resolved promise after 1s — that's the "keep alive"
+  await client.load();
+  // load() returns a resolved promise after 1s — that's the "keep alive"
   expect(client.ctx).toBeDefined();
 });
 
-// ── initProject() ───────────────────────────────────────────────────────────
+// ── loadProject() ───────────────────────────────────────────────────────────
 
-test('initProject() sets ctx.root and ctx.home', () => {
+test('loadProject() sets ctx.root and ctx.home', () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
-  // initProject sets this.ctx.root from import.meta.url and this.ctx.home from os.homedir
-  client.initProject();
+  // loadProject sets this.ctx.root from import.meta.url and this.ctx.home from os.homedir
+  client.loadProject();
 
   // root is derived from import.meta.url of client.ts → project root
   expect(ctx.root).toBeDefined();
@@ -86,12 +86,12 @@ test('initProject() sets ctx.root and ctx.home', () => {
   expect(ctx.home).toContain('.marvin');
 });
 
-test('initProject() calls mkdirSync for ~/.marvin, agents/, .config/systemd/user', () => {
+test('loadProject() calls mkdirSync for ~/.marvin, agents/, .config/systemd/user', () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
   // Since existsSync returns false, all mkdirSync/writeFileSync calls fire
-  client.initProject();
+  client.loadProject();
 
   // home should be set (os.homedir returns '/tmp/marvin-test', no leading /)
   expect(ctx.home).toContain('.marvin');
@@ -99,11 +99,11 @@ test('initProject() calls mkdirSync for ~/.marvin, agents/, .config/systemd/user
   expect(ctx.root).toBeDefined();
 });
 
-test('initProject() does not create files when isDry is true', () => {
+test('loadProject() does not create files when isDry is true', () => {
   const ctx = makeContext(true);
   const client = new Client(ctx);
 
-  client.initProject();
+  client.loadProject();
 
   // In dry mode, mkdirSync/writeFileSync are not called — but since our mock
   // fs has them as no-ops, we verify the logic path by checking no error is thrown
@@ -111,36 +111,36 @@ test('initProject() does not create files when isDry is true', () => {
   expect(ctx.root).toBeDefined();
 });
 
-test('initProject() skips creation when paths already exist', () => {
+test('loadProject() skips creation when paths already exist', () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
-  // Pre-set ctx.home so initProject sees it as existing
+  // Pre-set ctx.home so loadProject sees it as existing
   // (existsSync returns true for the home path → no mkdir/write)
-  client.initProject();
+  client.loadProject();
 
   // Should not throw — existsSync returns true, so no mkdir/write calls
   expect(ctx.home).toContain('.marvin');
 });
 
-// ── initConfig() ────────────────────────────────────────────────────────────
+// ── loadConfig() ────────────────────────────────────────────────────────────
 
-test('initConfig() loads from marvin.json when it exists', () => {
+test('loadConfig() loads from marvin.json when it exists', () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
-  // Pre-set home so initConfig finds the config path
+  // Pre-set home so loadConfig finds the config path
   ctx.home = '/tmp/marvin-test-home';
 
   // Our mock readFileSync returns valid JSON, so this should parse fine
-  client.initConfig();
+  client.loadConfig();
 
   expect(ctx.config).toBeDefined();
   expect(ctx.config.settings.name).toBe('marvin');
   expect(ctx.config.settings.port).toBe(7331);
 });
 
-test('initConfig() accepts an external Config object', () => {
+test('loadConfig() accepts an external Config object', () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
@@ -151,13 +151,13 @@ test('initConfig() accepts an external Config object', () => {
     agents: {},
   };
 
-  client.initConfig(customConfig);
+  client.loadConfig(customConfig);
 
   expect(ctx.config.settings.name).toBe('custom');
   expect(ctx.config.settings.port).toBe(9999);
 });
 
-test('initConfig() falls back to DEFAULT_CONFIG when marvin.json is invalid JSON', () => {
+test('loadConfig() falls back to DEFAULT_CONFIG when marvin.json is invalid JSON', () => {
   const ctx = makeContext();
   const _client = new Client(ctx);
 
@@ -166,7 +166,7 @@ test('initConfig() falls back to DEFAULT_CONFIG when marvin.json is invalid JSON
   expect(ctx.config).toEqual(DEFAULT_CONFIG);
 });
 
-test('initConfig() does nothing when config is already set on ctx', () => {
+test('loadConfig() does nothing when config is already set on ctx', () => {
   const ctx = makeContext();
   const preloadedConfig = {
     timestamp: Date.now(),
@@ -178,37 +178,37 @@ test('initConfig() does nothing when config is already set on ctx', () => {
   const client = new Client(ctx);
 
   // Pass the preloaded config explicitly — this is the only way to test
-  // the "early return" path in initConfig
-  client.initConfig(preloadedConfig);
+  // the "early return" path in loadConfig
+  client.loadConfig(preloadedConfig);
 
   expect(ctx.config.settings.name).toBe('preloaded');
   expect(ctx.config.settings.port).toBe(8080);
 });
 
-// ── initCommands() ──────────────────────────────────────────────────────────
+// ── loadCommands() ──────────────────────────────────────────────────────────
 
-test('initCommands() handles "help" command', async () => {
+test('loadCommands() handles "help" command', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
   // Simulate: marvin help
   process.argv = ['node', 'marvin', 'help'];
-  await client.initCommands();
+  await client.loadCommands();
   // Should not throw
   expect(true).toBe(true);
 });
 
-test('initCommands() handles "start" command', async () => {
+test('loadCommands() handles "start" command', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
   // Simulate: marvin start (daemon not running)
   process.argv = ['node', 'marvin', 'start'];
-  await client.initCommands();
+  await client.loadCommands();
   expect(true).toBe(true);
 });
 
-test('initCommands() handles "version" command', async () => {
+test('loadCommands() handles "version" command', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
@@ -216,7 +216,7 @@ test('initCommands() handles "version" command', async () => {
   process.argv = ['node', 'marvin', 'version'];
   mockExit();
   try {
-    await client.initCommands();
+    await client.loadCommands();
     throw new Error('should have called process.exit');
   } catch (err) {
     expect(err).toBeInstanceOf(Error);
@@ -226,7 +226,7 @@ test('initCommands() handles "version" command', async () => {
   }
 });
 
-test('initCommands() handles "status" command', async () => {
+test('loadCommands() handles "status" command', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
@@ -236,7 +236,7 @@ test('initCommands() handles "status" command', async () => {
   expect(true).toBe(true);
 });
 
-test('initCommands() handles "status help" command', async () => {
+test('loadCommands() handles "status help" command', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
@@ -245,12 +245,12 @@ test('initCommands() handles "status help" command', async () => {
   expect(true).toBe(true);
 });
 
-test('initCommands() warns on unknown command', async () => {
+test('loadCommands() warns on unknown command', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
   process.argv = ['node', 'marvin', 'unknown-cmd'];
-  await client.initCommands();
+  await client.loadCommands();
   expect(true).toBe(true);
 });
 
@@ -324,13 +324,13 @@ test('execChannels() handles "list" command', async () => {
   expect(true).toBe(true);
 });
 
-test('execChannels() handles "init" with valid channel', async () => {
+test('execChannels() handles "load" with valid channel', async () => {
   const ctx = makeContext();
   ctx.config = { ...DEFAULT_CONFIG } as Config;
   const client = new Client(ctx);
 
-  // There are no channels registered, so init should error
-  process.argv = ['node', 'marvin', 'channels', 'init', 'slack'];
+  // There are no channels registered, so load should error
+  process.argv = ['node', 'marvin', 'channels', 'load', 'slack'];
   await client.execChannels();
   expect(true).toBe(true);
 });
@@ -375,20 +375,20 @@ test('execChannels() bind with invalid agentId errors', async () => {
   expect(true).toBe(true);
 });
 
-test('execChannels() init with no channelId warns', async () => {
+test('execChannels() load with no channelId warns', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
-  process.argv = ['node', 'marvin', 'channels', 'init'];
+  process.argv = ['node', 'marvin', 'channels', 'load'];
   await client.execChannels();
   expect(true).toBe(true);
 });
 
-test('execChannels() init with unknown channel errors', async () => {
+test('execChannels() load with unknown channel errors', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
-  process.argv = ['node', 'marvin', 'channels', 'init', 'unknown-channel'];
+  process.argv = ['node', 'marvin', 'channels', 'load', 'unknown-channel'];
   await client.execChannels();
   expect(true).toBe(true);
 });

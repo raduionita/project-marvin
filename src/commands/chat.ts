@@ -5,8 +5,8 @@ import { Command } from "../types";
 type Result = { ok: boolean; data: { content: string; steps: number; agentId: string, chatId: string } };
 
 export default class ChatCommand extends Command {
-  async init() {
-    console.debug('[ChatCommand.init]');
+  async load() {
+    console.debug('[ChatCommand.load]');
 
     const cmds = process.argv.slice(2);
     const i = cmds.indexOf('--agentId');
@@ -33,15 +33,15 @@ export default class ChatCommand extends Command {
 
     // if empty answer, exit
     if (!answer.trim()) {
-      console.warn('[ChatCommand.init]', 'empty message');
+      console.warn('[ChatCommand.load]', 'empty message');
       return;
     }
 
     // send chat message to server /chat
     if (this.ctx.isDry) {
-      console.info('[ChatCommand.init]', '[dry]', 'send chat: fetch', url.toString());
-      console.info('[ChatCommand.init]', 'message:', answer);
-      console.info('[ChatCommand.init]', 'agent:', agentId);
+      console.info('[ChatCommand.load]', '[dry]', 'send chat: fetch', url.toString());
+      console.info('[ChatCommand.load]', 'message:', answer);
+      console.info('[ChatCommand.load]', 'agent:', agentId);
     } else {
       // call chat endpoint
       const res = await fetch(url, {
@@ -56,14 +56,14 @@ export default class ChatCommand extends Command {
 
       const json = await res.json();
       if (!res.ok) {
-        console.error('[ChatCommand.init]', 'chat error:', (json as { error?: string }).error || res.statusText);
+        console.error('[ChatCommand.load]', 'chat error:', (json as { error?: string }).error || res.statusText);
         return;
       }
       const result = json as Result;
             chatId = result.data.chatId;
       if (result.ok) {
-        console.info('[ChatCommand.init]', `agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
-        console.info('[ChatCommand.init]', result.data.content);
+        console.info('[ChatCommand.load]', `agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
+        console.info('[ChatCommand.load]', result.data.content);
       }
     }
   }

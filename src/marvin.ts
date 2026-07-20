@@ -13,54 +13,54 @@ await (new class App {
   ctx: Context = new Context();
   cmd: Command = this.ctx.command; // dummy
 
-  async init() {
-    console.debug('[App.init]');
+  async load() {
+    console.debug('[App.load]');
 
-          this.initProcess();
-          this.initConfig();
-          this.initFlags();
-    await this.initCommands();
+          this.loadProcess();
+          this.loadConfig();
+          this.loadFlags();
+    await this.loadCommands();
   }
 
-  initProcess() {
-    console.debug('[App.initProcess]');
-    
+  loadProcess() {
+    console.debug('[App.loadProcess]');
+
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
-      console.log('[App.initProcess]', 'exit', `${code}`);
+      console.log('[App.loadProcess]', 'exit', `${code}`);
       // cleanup
       await this.drop();
     });
 
     // SIGINT (Ctrl+C)
     process.on('SIGINT', () => {
-      console.log('[App.initProcess]', 'SIGINT', 'exiting...');
+      console.log('[App.loadProcess]', 'SIGINT', 'exiting...');
       // goto process.on('exit') instead
       process.exit(0);
     });
 
     // SIGTERM (kill)
     process.on('SIGTERM', () => {
-      console.log('[App.initProcess]', 'SIGTERM', 'exiting...');
+      console.log('[App.loadProcess]', 'SIGTERM', 'exiting...');
       // goto process.on('exit')
       process.exit(0);
     });
 
     // unhandled rejection from promise
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('[App.initProcess]', 'unhandledRejection:', promise, 'reason:', reason);
+      console.error('[App.loadProcess]', 'unhandledRejection:', promise, 'reason:', reason);
       // TODO: decide if the rejection should trigger a shutdown
     });
 
     // uncaught exception
     process.on('uncaughtException', (err) => {
-      console.error('[App.initProcess]', 'uncaughtException:', err);
+      console.error('[App.loadProcess]', 'uncaughtException:', err);
       // TODO: decide if the exception should trigger a shutdown
     });
   }  
 
-  initConfig(config?: Config | undefined) {
-    console.debug('[App.initConfig]', config !== undefined);
+  loadConfig(config?: Config | undefined) {
+    console.debug('[App.loadConfig]', config !== undefined);
     if (config) {
       this.ctx.config = config;
       return;
@@ -74,7 +74,7 @@ await (new class App {
 
     // at this stage marvin.json MUST exist, but just in case
     if (!existsSync(path)) {
-      console.warn('[App.initConfig]', 'Config file not found:', path);
+      console.warn('[App.loadConfig]', 'Config file not found:', path);
       this.ctx.config = constants.DEFAULT_CONFIG as Config;
       return;
     }
@@ -85,20 +85,20 @@ await (new class App {
     this.ctx.config = config!;
   }
 
-  initFlags() {
-    console.debug('[App.initFlags]');
+  loadFlags() {
+    console.debug('[App.loadFlags]');
     // const args = process.argv.slice(2);
   }
 
-  async initCommands() {
-    console.debug('[App.initCommands]');
+  async loadCommands() {
+    console.debug('[App.loadCommands]');
 
     const args = process.argv.slice(2);
     let   arg = args[0] || 'help';
     const cmds = listCommands(this.ctx).map(f => f.replace('.ts', ''));
 
     if (!cmds.includes(arg)) {
-      console.warn('[App.initCommands]', 'unknown command:', arg, 'available commands:', cmds.join(', '));
+      console.warn('[App.loadCommands]', 'unknown command:', arg, 'available commands:', cmds.join(', '));
       arg = 'help';
     }
 
@@ -107,14 +107,14 @@ await (new class App {
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        console.warn('[App.initCommands]', `${arg} does not export a Command class, exiting`);
+        console.warn('[App.loadCommands]', `${arg} does not export a Command class, exiting`);
         return;
       }
-      // create command and init/run it
+      // create command and load/run it
       this.cmd = new Class(this.ctx);
-      this.cmd.init();
+      this.cmd.load();
     } catch (err) {
-      console.error('[App.initCommands]', `failed to load ${arg}:`, err);
+      console.error('[App.loadCommands]', `failed to load ${arg}:`, err);
     }
   }
 
@@ -123,4 +123,4 @@ await (new class App {
 
     await this.cmd.drop();
   }
-}).init();
+}).load();

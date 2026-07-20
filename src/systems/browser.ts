@@ -8,8 +8,8 @@ export default class BrowserSystem extends System {
   private browser: Browser | undefined;
   private bctx: BrowserContext | undefined;
 
-  public async init(): Promise<void> {
-    console.log('[BrowserSystem.init]');
+  public async load(): Promise<void> {
+    console.log('[BrowserSystem.load]');
     
     chromium.use(stealth());
 
@@ -62,20 +62,20 @@ export default class BrowserSystem extends System {
 
   public async newPage() : Promise<Page> {
     if (!this.browser) {
-      console.error('[BrowserSystem.newPage]', 'browser not initialized');
-      throw new Error('[BrowserSystem.newPage] ERROR - browser not initialized');
+      console.error('[BrowserSystem.newPage]', 'browser not loaded');
+      throw new Error('[BrowserSystem.newPage] ERROR - browser not loaded');
     }
     if (!this.bctx) {
-      console.error('[BrowserSystem.newPage]', 'browser context not initialized');
-      throw new Error('[BrowserSystem.newPage] ERROR - browser context not initialized');
+      console.error('[BrowserSystem.newPage]', 'browser context not loaded');
+      throw new Error('[BrowserSystem.newPage] ERROR - browser context not loaded');
     }
     return await this.bctx.newPage();
   }
 
   public async newContext(options?: BrowserContextOptions) : Promise<BrowserContext> {
     if (!this.browser) {
-      console.error('[BrowserSystem.newContext]', 'browser not initialized');
-      throw new Error('[BrowserSystem.newContext] ERROR - browser not initialized');
+      console.error('[BrowserSystem.newContext]', 'browser not loaded');
+      throw new Error('[BrowserSystem.newContext] ERROR - browser not loaded');
     }
     return await this.browser.newContext(options);
   }

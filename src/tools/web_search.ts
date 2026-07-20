@@ -34,7 +34,7 @@ export default class WebSearchTool extends Tool {
     }
 
     if (!this.ctx.systems['browser']) {
-      throw new Error('[WebSearchTool.call] ERROR - Browser is not initialized in the server context');
+      throw new Error('[WebSearchTool.call] ERROR - Browser is not loaded in the server context');
     }
 
     const system = this.ctx.systems['browser'] as BrowserSystem;
