@@ -253,10 +253,12 @@ test('sendMessage returns content and step count from model reply', async () => 
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  expect(result.content).toBe('hello from model');
+  expect(result).not.toBeNull();
+
+  expect(result!.content).toBe('hello from model');
   // The mock model returns stop=false, no tools, no end chat.
   // The loop runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
-  expect(result.steps).toBe(4);
+  expect(result!.steps).toBe(4);
 });
 
 test('sendMessage caches the chat after execution', async () => {
@@ -307,7 +309,9 @@ test('sendMessage stops when reply.stop is true', async () => {
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  expect(result.content).toBe('stopped early');
+  expect(result).not.toBeNull();
+
+  expect(result!.content).toBe('stopped early');
   // With stop=true, the model is called only once
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
 });
@@ -396,9 +400,11 @@ test('sendMessage stops the AI loop when end chat tool call is found', async () 
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
+  expect(result).not.toBeNull();;
+
   // Should only call the model once — the end chat causes an immediate exit
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
-  expect(result.content).toBe(''); // The end chat content is empty in our reply
+  expect(result!.content).toBe(''); // The end chat content is empty in our reply
 });
 
 test('sendMessage returns empty content when reply has no message content', async () => {
@@ -417,7 +423,9 @@ test('sendMessage returns empty content when reply has no message content', asyn
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  expect(result.content).toBe('');
+  expect(result).not.toBeNull();
+
+  expect(result!.content).toBe('');
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
@@ -441,9 +449,11 @@ test('sendMessage returns content and steps from model reply', async () => {
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  expect(result.content).toBe('end chat');
+  expect(result).not.toBeNull();;
+
+  expect(result!.content).toBe('end chat');
   // The model runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
-  expect(result.steps).toBe(4);
+  expect(result!.steps).toBe(4);
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(5);
 });
 
@@ -464,7 +474,9 @@ test('sendMessage respects maxSteps limit (1 step)', async () => {
   // With maxSteps=1, the loop runs 1 time: steps=-1 -> 0, 0 < 0 false -> exit
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 1);
 
-  expect(result.steps).toBe(0);
+  expect(result).not.toBeNull();;
+
+  expect(result!.steps).toBe(0);
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
@@ -488,7 +500,9 @@ test('sendMessage warns when max steps are reached (maxSteps=1 with never-stoppi
   // 0 >= 1 is true -> warning logged
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 1);
 
-  expect(result.steps).toBe(0);
+  expect(result).not.toBeNull();;
+
+  expect(result!.steps).toBe(0);
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
@@ -508,7 +522,9 @@ test('sendMessage returns empty string when reply.message is undefined', async (
 
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
-  expect(result.content).toBe('');
+  expect(result).not.toBeNull();
+
+  expect(result!.content).toBe('');
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
