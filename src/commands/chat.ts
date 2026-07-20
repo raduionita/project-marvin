@@ -33,15 +33,15 @@ export default class ChatCommand extends Command {
 
     // if empty answer, exit
     if (!answer.trim()) {
-      console.warn('empty message');
+      console.warn('[ChatCommand.init]', 'empty message');
       return;
     }
 
     // send chat message to server /chat
     if (this.ctx.isDry) {
-      console.info('[dry] send chat: fetch', url.toString());
-      console.info('message:', answer);
-      console.info('agent:', agentId);
+      console.info('[ChatCommand.init]', '[dry]', 'send chat: fetch', url.toString());
+      console.info('[ChatCommand.init]', 'message:', answer);
+      console.info('[ChatCommand.init]', 'agent:', agentId);
     } else {
       // call chat endpoint
       const res = await fetch(url, {
@@ -56,14 +56,14 @@ export default class ChatCommand extends Command {
 
       const json = await res.json();
       if (!res.ok) {
-        console.error('chat error:', (json as { error?: string }).error || res.statusText);
+        console.error('[ChatCommand.init]', 'chat error:', (json as { error?: string }).error || res.statusText);
         return;
       }
       const result = json as Result;
             chatId = result.data.chatId;
       if (result.ok) {
-        console.info(`agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
-        console.info(result.data.content);
+        console.info('[ChatCommand.init]', `agent=${result.data.agentId} steps=${result.data.steps} chat=${result.data.chatId}`);
+        console.info('[ChatCommand.init]', result.data.content);
       }
     }
   }

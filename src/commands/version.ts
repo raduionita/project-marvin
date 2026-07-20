@@ -12,12 +12,12 @@ export default class VersionCommand extends Command {
     const pkgPath = join(root, 'package.json');
 
     if (!existsSync(pkgPath)) {
-      console.error('package.json not found.');
+      console.error('[VersionCommand.init]', 'package.json not found.');
       return;
     }
 
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     const version = pkg.version || 'unknown';
-    console.log('v' + version);
+    console.log('[VersionCommand.init]', 'v' + version);
   }
 }

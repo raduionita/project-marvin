@@ -16,9 +16,9 @@ MARVIN_DIR="$HOME/.marvin"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-info()  { echo "[marvin] $*"; }
-warn()  { echo "[marvin] WARNING: $*" >&2; }
-error() { echo "[marvin] ERROR: $*" >&2; exit 1; }
+info()  { echo "$*"; }
+warn()  { echo "WARNING: $*" >&2; }
+error() { echo "ERROR: $*" >&2; exit 1; }
 
 # ── Git clone helper (used as fallback) ────────────────────────────────────
 _git_clone() {

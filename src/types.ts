@@ -40,11 +40,8 @@ export interface Config {
 }
 
 export class Command {
-  public ctx: Context;
-
-  constructor(ctx: Context) {
+  constructor(public readonly ctx: Context) {
     console.debug(`[${this.constructor.name||'Command'}.constructor]`);
-    this.ctx = ctx;
     this.ctx.command = this;
   }
 
@@ -82,11 +79,8 @@ export class Context {
 }
 
 export abstract class System {
-  public ctx: Context;
-
-  constructor(ctx: Context) {
-    console.log('[System.constructor]', this.constructor.name);
-    this.ctx = ctx;
+  constructor(public readonly ctx: Context) {
+    console.debug(`[${this.constructor.name||'System'}.constructor]`);
   }
 
   abstract init(): Promise<void>;
@@ -97,7 +91,7 @@ export type ToolMeta = { type: string, function: {name:string, description:strin
 
 export abstract class Tool {
   constructor(public readonly ctx: Context) {
-    console.log(`${this.constructor.name||'Tool'}.constructor`);
+    console.debug(`[${this.constructor.name||'Tool'}.constructor]`);
   }
 
   public abstract readonly meta: ToolMeta;
@@ -108,7 +102,7 @@ export abstract class Tool {
 // channel interface
 export abstract class Channel {
   constructor(public readonly ctx: Context) {
-    console.log(`${this.constructor.name||'Channel'}.constructor`);
+    console.debug(`[${this.constructor.name||'Channel'}.constructor]`);
   }
 
   abstract args(): {[key: string]: any};

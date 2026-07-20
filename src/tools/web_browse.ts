@@ -24,7 +24,7 @@ export default class WebBrowseTool extends Tool {
     console.debug('[WebBrowseTool.call]', args);
 
     if (this.ctx.isDry) {
-      console.info('[dry] browse:', args.url);
+      console.info('[WebBrowseTool.call]', '[dry] browse:', args.url);
       return { title: '', body: '', error: '' };
     }
 

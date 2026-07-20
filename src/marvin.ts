@@ -23,6 +23,8 @@ await (new class App {
   }
 
   initProcess() {
+    console.debug('[App.initProcess]');
+    
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
       console.log('[App.initProcess]', 'exit', `${code}`);
@@ -96,7 +98,7 @@ await (new class App {
     const cmds = listCommands(this.ctx).map(f => f.replace('.ts', ''));
 
     if (!cmds.includes(arg)) {
-      console.warn('unknown command:', arg, 'available commands:', cmds.join(', '));
+      console.warn('[App.initCommands]', 'unknown command:', arg, 'available commands:', cmds.join(', '));
       arg = 'help';
     }
 

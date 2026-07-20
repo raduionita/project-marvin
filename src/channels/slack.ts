@@ -36,10 +36,10 @@ export default class SlackChannel extends Channel {
   }
 
   async init() {
-    console.log('[SlackChannel.init]', this.ctx.config.channels.slack);
+    console.debug('[SlackChannel.init]', this.ctx.config.channels.slack);
 
     if (this.ctx.isDry) {
-      console.info('[dry]', 'channel slack attached');
+      console.info('[SlackChannel.init]', '[dry] channel slack attached');
       return;
     }
 
@@ -102,19 +102,19 @@ export default class SlackChannel extends Channel {
     console.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
 
     if (this.ctx.isDry) {
-      console.info('[dry] send message to:', message.channel);
+      console.info('[SlackChannel.sendMessage]', '[dry] send message to:', message.channel);
       return { ts: '0000000000.000000', ok: true, error: '', message: '(dry)', channel: message.channel };
     }
 
     // need web client
     if (!this.web) {
       console.error('[SlackChannel.sendMessage]', 'not attached, skipping submit');
-      throw new Error('SlackChannel.sendMessage: web client not attached');
+      throw new Error('[SlackChannel.sendMessage] web client not attached');
     }
 
     if (!message.channel) {
       console.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
-      throw new Error('SlackChannel.sendMessage: no channel provided');
+      throw new Error('[SlackChannel.sendMessage] no channel provided');
     }
 
     // send the message
@@ -197,7 +197,7 @@ export default class SlackChannel extends Channel {
     try {
       const thread = event.thread_ts || event.ts || event.event_ts;
 
-      console.info('[SlackChannel.onDirectMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      console.debug('[SlackChannel.onDirectMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
       
       await ack({text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]});
 
@@ -284,7 +284,7 @@ export default class SlackChannel extends Channel {
 
   // find agent using event.channel or fallback to default "marvin"
   protected findAgent(channel?: string): Agent {
-    console.log('[SlackChannel.findAgent]', channel ? `channel=${channel}` : 'marvin');
+    console.debug('[SlackChannel.findAgent]', channel ? `channel=${channel}` : 'marvin');
 
     // diretly use marvin/orchestrator agent
     if (!channel) {

@@ -4,7 +4,7 @@ export function tryJsonParse<T>(str: string): T {
   try {
     return JSON.parse(str) as T;
   } catch (error) {
-    console.warn('tryJsonParse', error);
+    console.warn('[tryJsonParse]', error);
     return {} as T;
   }
 }

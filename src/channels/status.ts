@@ -10,20 +10,20 @@ export default class StatusCommand extends Command {
 
     switch (cmd) {
       case 'help'   : 
-        console.debug('usage: marvin status [command]', 'check the daemon status');
-        console.debug('commands:');
-        console.debug('  help    ', 'show this help');
+        console.debug('[StatusCommand.init]', 'usage: marvin status [command]', 'check the daemon status');
+        console.debug('[StatusCommand.init]', 'commands:');
+        console.debug('[StatusCommand.init]', '  help    ', 'show this help');
       break;
       default: {
         // service status
         if (this.ctx.isDry) {
-          console.log('[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
+          console.log('[StatusCommand.init]', '[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
         } else {
           try {
             const status = execSync(['systemctl', '--user', 'status', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
-            console.log('service status:', status.trim());
+            console.log('[StatusCommand.init]', 'service status:', status.trim());
           } catch {
-            console.log('service is not running.');
+            console.log('[StatusCommand.init]', 'service is not running.');
           }
         }
 
@@ -33,7 +33,7 @@ export default class StatusCommand extends Command {
         
         // health check
         if (this.ctx.isDry) {
-          console.log('[dry] check health: fetch http://localhost:' + port + '/_health');
+          console.log('[StatusCommand.init]', '[dry]', 'check health: fetch http://localhost:' + port + '/_health');
         } else {
           try {
             const url = new URL(`http://localhost:${port}/_health`);
@@ -45,12 +45,12 @@ export default class StatusCommand extends Command {
               },
             });
             if (response.ok) {
-              console.log(`server is healthy (port ${port}).`);
+              console.log('[StatusCommand.init]', `server is healthy (port ${port}).`);
             } else {
-              console.warn(`server responded with ${response.status}.`);
+              console.warn('[StatusCommand.init]', `server responded with ${response.status}.`);
             }
           } catch (err) {
-            console.error(`[StatusCommand.init]`,`cannot reach server at localhost:${port}.`);
+            console.error('[StatusCommand.init]', `cannot reach server at localhost:${port}.`);
           }
         } 
       } break;

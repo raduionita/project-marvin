@@ -78,7 +78,7 @@ class TestChannel extends Channel {
   async init(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
-    console.log('[TestChannel.send]', JSON.stringify(message));
+    console.debug('[TestChannel.sendMessage]', JSON.stringify(message));
     return message;
   }
 }

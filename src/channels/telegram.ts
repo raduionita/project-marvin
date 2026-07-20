@@ -9,16 +9,14 @@ export default class TelegramChannel extends Channel {
   }
 
   async init() : Promise<void> {
-    console.log('[TelegramChannel.init]', 'attaching...', this.ctx.config.settings);
-    console.log('[TelegramChannel.init]', 'attached!');
+    console.debug('[TelegramChannel.init]', 'attached', this.ctx.config.settings);
   }
 
-  async sendMessage(message: Message) {
-    console.log('telegram', 'submit:', JSON.stringify(message));
+  async sendMessage(message: Message) : Promise<any> {
+    console.debug('[TelegramChannel.sendMessage]', 'submit:', JSON.stringify(message));
   }
 
   async drop() {
-    console.log('telegram', 'detaching...');
-    console.log('telegram', 'detached');
+    console.debug('[TelegramChannel.drop]', 'detached');
   }
 }

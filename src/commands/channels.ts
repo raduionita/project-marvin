@@ -15,33 +15,33 @@ export default class ChannelsCommand extends Command {
 
     switch (cmd) {
       default: 
-        console.warn('unknown command: channels', cmd); 
+        console.warn('[ChannelsCommand.init]', 'unknown command: channels', cmd); 
       case ''       :  
       case 'help'   : // default = empty = help 
-        console.log('usage: marvin channels [command]');
-        console.log('commands:');
-        console.log('  help    ', 'show this help');
-        console.log('  list    ', 'list available channels, for each one, it\'s connected agents');
-        console.log('  init    ', 'initialize a channel');
-        console.log('  bind    ', 'bind a channel to an agent');
-        console.log('  bind <agentId> <channelId> <groupId>');
-        console.log('  drop    ', 'drop a channel');
-        console.log('  drop <channelId>');
+        console.log('[ChannelsCommand.init]', 'usage: marvin channels [command]');
+        console.log('[ChannelsCommand.init]', 'commands:');
+        console.log('[ChannelsCommand.init]', '  help    ', 'show this help');
+        console.log('[ChannelsCommand.init]', '  list    ', 'list available channels, for each one, it\'s connected agents');
+        console.log('[ChannelsCommand.init]', '  init    ', 'initialize a channel');
+        console.log('[ChannelsCommand.init]', '  bind    ', 'bind a channel to an agent');
+        console.log('[ChannelsCommand.init]', '  bind <agentId> <channelId> <groupId>');
+        console.log('[ChannelsCommand.init]', '  drop    ', 'drop a channel');
+        console.log('[ChannelsCommand.init]', '  drop <channelId>');
       break;
       case 'list' : { // list available channels, for each one, it's connected agents
-        console.log('list channels');
+        console.log('[ChannelsCommand.init]', 'list channels');
         // for each channel, list enabled agents
         listChannels(this.ctx!).forEach(channel => {
-          console.debug(channel);
+          console.debug('[ChannelsCommand.init]', channel);
           const channelConfig = this.ctx!.config.channels[channel];
           if (channelConfig) {
-            console.log('- enabled:', channelConfig.enabled);
+            console.log('[ChannelsCommand.init]', '- enabled:', channelConfig.enabled);
           }
-          console.debug('[- agents:]');
+          console.debug('[ChannelsCommand.init]', '[- agents:]');
           for (const [agentId, agent] of Object.entries(this.ctx!.config.agents)) {
             if (!agent.enabled) continue;
             if (!agent.channels[channel]) continue;
-            console.log('  -', agentId, ':', `@${agent.channels[channel]}`);
+            console.log('[ChannelsCommand.init]', '  -', agentId, ':', `@${agent.channels[channel]}`);
           }
         });
       } break;
@@ -50,22 +50,22 @@ export default class ChannelsCommand extends Command {
 
         // warn and stop if no name (channelId) provided
         if (!channelId) {
-          console.warn('usage: marvin channels init <name>');
-          console.warn('available channels:', listChannels(this.ctx!).join(', '));
+          console.warn('[ChannelsCommand.init]', 'usage: marvin channels init <name>');
+          console.warn('[ChannelsCommand.init]', 'available channels:', listChannels(this.ctx!).join(', '));
           break;
         }
 
         // check if channel is already initialized
         if (this.ctx!.config.channels[channelId]) {
-          console.warn(`channel "${channelId}" is already initialized`);
+          console.warn('[ChannelsCommand.init]', `channel "${channelId}" is already initialized`);
           break;
         }
 
         // channel MUST exist in listChannels
         const available = listChannels(this.ctx!);
         if (!available.includes(channelId)) {
-          console.error(`unknown channel "${channelId}"`);
-          console.error('available channels:', available.join(', '));
+          console.error('[ChannelsCommand.init]', `unknown channel "${channelId}"`);
+          console.error('[ChannelsCommand.init]', 'available channels:', available.join(', '));
           return;
         }
 
@@ -73,7 +73,7 @@ export default class ChannelsCommand extends Command {
         const Module = await import(`./channels/${channelId}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Channel)) {
-          console.error(`${channelId} does not export a Channel class`);
+          console.error('[ChannelsCommand.init]', `${channelId} does not export a Channel class`);
           return;
         }
 
@@ -107,40 +107,40 @@ export default class ChannelsCommand extends Command {
 
         // write to config file
         if (this.ctx.isDry) {
-          console.info(`[dry] would configure channel ${channelId}, config persisted to ${cpath}`);
+          console.info('[ChannelsCommand.init]', '[dry]',`would configure channel ${channelId}, config persisted to ${cpath}`);
         } else {
           writeFileSync(cpath, JSON.stringify(this.ctx.config, null, 2));
         }
         
-        console.info(`channel "${channelId}" configured, config persisted to ${cpath}`);
+        console.info('[ChannelsCommand.init]', `channel "${channelId}" configured, config persisted to ${cpath}`);
     } break;
       case 'bind' : {
-        console.info('binding a channel:group to an agent...');
+        console.info('[ChannelsCommand.init]', 'binding a channel:group to an agent...');
         const agentId = cmds[2];
         const channelId = cmds[3];
         const groupId = cmds[4] || cmd[3] || ''; // optional
 
         if (!channelId || !agentId) {
-          console.warn('invalid arguments');
-          console.warn('usage: marvin channels bind <agentId> <channelId> <groupId>');
+          console.warn('[ChannelsCommand.init]', 'invalid arguments');
+          console.warn('[ChannelsCommand.init]', 'usage: marvin channels bind <agentId> <channelId> <groupId>');
           break;
         }
 
         // validate channel exists
         if (!this.ctx!.config.channels[channelId]) {
-          console.error(`channel "${channelId}" not found in config`);
+          console.error('[ChannelsCommand.init]', `channel "${channelId}" not found in config`);
           return;
         }
 
         // validate agent exists
         if (!this.ctx!.config.agents[agentId]) {
-          console.error(`agent "${agentId}" not found in config`);
-          console.error('available agents:', Object.keys(this.ctx!.config.agents).join(', '));
+          console.error('[ChannelsCommand.init]', `agent "${agentId}" not found in config`);
+          console.error('[ChannelsCommand.init]', 'available agents:', Object.keys(this.ctx!.config.agents).join(', '));
           return;
         }
 
         if (this.ctx.isDry) {
-          console.info(`[dry] would bind channel ${channelId}:${groupId} to agent ${agentId}`);
+          console.info('[ChannelsCommand.init]', '[dry]', `would bind channel ${channelId}:${groupId} to agent ${agentId}`);
         } else {
           // add the binding (overwrites if already bound to this channel)
           this.ctx!.config.agents[agentId].channels = this.ctx!.config.agents[agentId].channels || {};
@@ -150,7 +150,7 @@ export default class ChannelsCommand extends Command {
           const cpath = join(this.ctx!.home, 'marvin.json');
           writeFileSync(cpath, JSON.stringify(this.ctx!.config, null, 2));
 
-          console.info(`agent "${agentId}" bound to channel "${channelId}:${groupId}", config persisted to ${cpath}`);
+          console.info('[ChannelsCommand.init]', `agent "${agentId}" bound to channel "${channelId}:${groupId}", config persisted to ${cpath}`);
         }
       } break;
       // case 'drop' : await this.execChannelsDelete(); break;

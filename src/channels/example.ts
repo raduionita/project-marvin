@@ -8,17 +8,14 @@ export default class ExampleChannel extends Channel {
   }
   
   async init() : Promise<void> {
-    console.log('[ExampleChannel.init]', 'attaching...', this.ctx.config.settings);
-    // done
-    console.log('[ExampleChannel.init]', 'attached!');
+    console.debug('[ExampleChannel.init]', 'attached', this.ctx.config.settings);
   }
 
-  async sendMessage(message: Message) {
-    console.log('[ExampleChannel.submit]', JSON.stringify(message));
+  async sendMessage(message: Message) : Promise<any> { 
+    console.debug('[ExampleChannel.submit]', JSON.stringify(message));
   }
 
   async drop() {
-    console.log('[ExampleChannel.detach]', 'detaching...');
-    console.log('[ExampleChannel.detach]', 'detached');
+    console.debug('[ExampleChannel.detach]', 'detached');
   }
 };

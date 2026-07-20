@@ -87,10 +87,10 @@ class MockSlackChannel extends SlackChannel {
   }
 
   // Override sendMessage to use the mock web client (parent's expects real WebClient).
-  async sendMessage(message: Message): Promise<SlackResponse | undefined> {
+  async sendMessage(message: Message): Promise<SlackResponse> {
     if (!this.web) {
-      console.warn('[SlackChannel.sendMessage]', 'not attached, skipping submit');
-      return undefined;
+      console.error('[SlackChannel.sendMessage]', 'not attached, skipping submit');
+      throw new Error('[SlackChannel.sendMessage] not attached, skipping submit');
     }
 
     const response = await this.web.chat.postMessage({

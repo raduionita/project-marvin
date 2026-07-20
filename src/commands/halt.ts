@@ -7,10 +7,10 @@ export default class HaltCommand extends Command {
 
     // stop service
     if (this.ctx.isDry) {
-      console.log('[dry] stop service: systemctl --user stop marvin');
-      console.log('[dry] disable service: systemctl --user disable marvin');
+      console.log('[HaltCommand.init]', '[dry]', 'stop service: systemctl --user stop marvin');
+      console.log('[HaltCommand.init]', '[dry]', 'disable service: systemctl --user disable marvin');
     } else {
-      console.log('stopping service...');
+      console.log('[HaltCommand.init]', 'stopping service...');
       // stop and disable
       execSync(['systemctl', '--user', 'stop', 'marvin'].join(' '), { stdio: 'inherit' });
       execSync(['systemctl', '--user', 'disable', 'marvin'].join(' '), { stdio: 'inherit' });

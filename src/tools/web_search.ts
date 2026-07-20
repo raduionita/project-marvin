@@ -29,7 +29,7 @@ export default class WebSearchTool extends Tool {
     console.debug('[WebSearchTool.call]', args);
 
     if (this.ctx.isDry) {
-      console.info('[dry] search:', args.query);
+      console.info('[WebSearchTool.call]', '[dry] search:', args.query);
       return { results: [] };
     }
 

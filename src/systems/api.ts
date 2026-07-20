@@ -10,7 +10,7 @@ export default class ApiSystem extends System {
   private server: http.Server | undefined;
 
   public async init(): Promise<void> {
-    console.log('[ApiSystem.init]');
+    console.debug('[ApiSystem.init]');
 
     this.port = this.ctx.config.settings.port || 7331;
     this.host = this.ctx.config.settings.host || '127.0.0.1';
@@ -65,7 +65,8 @@ export default class ApiSystem extends System {
   }
 
   public drop(): Promise<void> {
-    console.log('[ApiSystem.drop]');
+    console.debug('[ApiSystem.drop]');
+
     return new Promise<void>((resolve) => {
       if (this.server) {
         this.server.close(function (error?: Error|undefined) {
@@ -85,7 +86,8 @@ export default class ApiSystem extends System {
   }
 
   private async listen() {
-    console.log('[ApiSystem.listen]');
+    console.debug('[ApiSystem.listen]');
+
     return new Promise<void>((resolve) => {
       this.server!.listen(this.port, this.host, () => {
         console.log(`[marvin] API server listening on port ${this.port}`);

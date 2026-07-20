@@ -44,7 +44,7 @@ export default class ServeCommand extends Command {
 
     // set root to the app folder (where package.json lives)
     this.ctx.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/commands\/serve\.ts$/, '');
-    console.info('root directory:', this.ctx.root);
+    console.info('[ServeCommand.initProject]', 'root directory:', this.ctx.root);
 
     // create project/workspace folder (~/.marvin)
     const hpath = join(homedir(), '.marvin');
@@ -96,11 +96,11 @@ export default class ServeCommand extends Command {
 
     // watch config file
     if (this.ctx.isDry) {
-      console.info('[dry]', 'would watch config file:', mpath);
+      console.info('[ServeCommand.initWatch]', '[dry] would watch config file:', mpath);
     } else {
       try {
         let w = watch(mpath, () => {
-          console.debug('config file changed, reloading...');
+          console.debug('[ServeCommand.initWatch]', 'config file changed, reloading...');
           this.execReload();
         });
         w.close();
@@ -126,7 +126,7 @@ export default class ServeCommand extends Command {
         const instance = new Class(this.ctx);
         await instance.init();
         this.ctx.systems[name] = instance;
-        console.info(`system ${name} loaded`);
+        console.info('[ServeCommand.initSystems]', `system ${name} loaded`);
       } catch (err) {
         console.error('[ServeCommand.initSystems]', `failed to load ${name}:`, err);
       }
@@ -150,7 +150,7 @@ export default class ServeCommand extends Command {
         const instance = new Class(this.ctx);
         const meta = instance.meta();
         this.ctx.tools[meta.name] = instance;
-        console.info(`tool [${meta.name}] loaded`);
+        console.info('[ServeCommand.initTools]', `tool [${meta.name}] loaded`);
       } catch (err) {
         console.error('[ServeCommand.initTools]', `failed to load ${file}:`, err);
       }
@@ -182,7 +182,7 @@ export default class ServeCommand extends Command {
         const instance = new Class(this.ctx);
         await instance.init();
         this.ctx.channels[id] = instance;
-        console.info(`channel [${id}] loaded`);
+        console.info('[ServeCommand.initChannels]', `channel [${id}] loaded`);
       } catch (err) {
         console.error('[ServeCommand.initChannels]', `failed to load ${id}:`, err);
       }
@@ -223,7 +223,7 @@ export default class ServeCommand extends Command {
         const instance = new Class(this.ctx, config);
         ctx.models[modelId] = instance;
 
-        console.info(`model [${modelId}] loaded (${config.provider} ${config.model})`);
+        console.info('[ServeCommand.initModels]', `model [${modelId}] loaded (${config.provider} ${config.model})`);
       } catch (err) {
         console.error('[ServeCommand.initModels]', `failed to load ${modelId}:`, err);
       }
@@ -248,7 +248,7 @@ export default class ServeCommand extends Command {
         ctx.models[modelId] = instance;
 
         // warn because fallback model is not a good idea, and does NOTHING
-        console.info(`model [${modelId}] fallback`);
+        console.info('[ServeCommand.initModels]', `model [${modelId}] fallback`);
       } catch (err) {
         console.error('[ServeCommand.initModels]', `failed to load ${modelId}:`, err);
       }
@@ -256,7 +256,7 @@ export default class ServeCommand extends Command {
   }
 
   async initAgents() {
-    console.log('[ServeCommand.initAgents]');
+    console.debug('[ServeCommand.initAgents]');
 
     const ctx = this.ctx;
 
@@ -293,7 +293,7 @@ export default class ServeCommand extends Command {
         input: 'hello world',
         timeout: setTimeout(this.execTask.bind(this), 0, ctx, marvinId, 'dry'),
       } as Task;
-      console.info('[dry]', `task [dry] scheduled (orchestrator)`);
+      console.info('[ServeCommand.initAgents]', '[dry]', `task [dry] scheduled (orchestrator)`);
     }
 
     // type: agent
@@ -324,7 +324,7 @@ export default class ServeCommand extends Command {
         }
 
         if (this.ctx.isDry) {
-          console.info(`[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
+          console.info('[ServeCommand.initAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
           continue;
         }
 
@@ -338,7 +338,7 @@ export default class ServeCommand extends Command {
           timeout: setTimeout(this.execTask.bind(this), task.schedule, ctx, agentId, taskId),
         } as Task;
 
-        console.info(`task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
+        console.info('[ServeCommand.initAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
       }
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
@@ -357,7 +357,7 @@ export default class ServeCommand extends Command {
         tasks: tasks,
       } as Agent;
 
-      console.info(`agent [${agentId}] loaded`);
+      console.info('[ServeCommand.initAgents]',`agent [${agentId}] loaded`);
     }
   }
 
@@ -491,7 +491,7 @@ export default class ServeCommand extends Command {
     }
 
     if (this.ctx.isDry) {
-      console.info('[dry]', 'task executed (once)');
+      console.info('[ServeCommand.execTask]', '[dry]', 'task executed (once)');
       return;
     }
 
@@ -547,7 +547,7 @@ export default class ServeCommand extends Command {
 
       // return early
       if (this.ctx.isDry) {
-        console.info('[dry] send messages to:', agent.model.model);
+        console.info('[ServeCommand.sendMessage]', '[dry]', 'send messages to:', agent.model.model);
         return { content: '(dry)', steps: 0 };
       }
 
