@@ -2,35 +2,22 @@
 #
 # install.sh — Install Marvin application.
 #
-# Usage: bash install.sh
+# Usage: curl -fsSL https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/install.sh | bash
 #
 
 set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────────────────────
 GITHUB_OWNER="raduionita"
-GITHUB_REPO="marvin"
+GITHUB_REPO="project-marvin"
 INSTALL_DIR="$HOME/.local/share/marvin"
 SYMLINK_PATH="/usr/local/bin/marvin"
 MARVIN_DIR="$HOME/.marvin"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 info()  { echo "$*"; }
 warn()  { echo "WARNING: $*" >&2; }
 error() { echo "ERROR: $*" >&2; exit 1; }
-
-# ── Git clone helper (used as fallback) ────────────────────────────────────
-_git_clone() {
-  if ! command -v git &>/dev/null; then
-    error "git not found. Install git and retry, or provide a release archive."
-  fi
-  rm -rf "$INSTALL_DIR"
-  mkdir -p "$INSTALL_DIR"
-  info "  Cloning from https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git ..."
-  git clone --depth 1 "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git" "$INSTALL_DIR" 2>&1
-  info "  Repository cloned to $INSTALL_DIR"
-}
 
 # ── Step 1: Check prerequisites ────────────────────────────────────────────
 info "Checking prerequisites..."
@@ -75,33 +62,31 @@ info "Fetching latest release from GitHub..."
 RELEASE_URL="https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest"
 RELEASE_JSON=$(curl -fsSL "$RELEASE_URL" 2>/dev/null || echo "")
 
-if [ -n "$RELEASE_JSON" ] && echo "$RELEASE_JSON" | grep -q '"tag_name"'; then
+if [ -n "$RELEASE_JSON" ] && echo "$RELEASE_JSON" | grep -q '"tarball_url"'; then
   LATEST_TAG=$(echo "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "\(.*\)".*/\1/')
   info "  Latest release: $LATEST_TAG"
 
-  ASSET_URL=$(echo "$RELEASE_JSON" | grep '"browser_download_url"' | grep '\.tar\.gz' | head -1 | sed 's/.*"browser_download_url": "\(.*\)".*/\1/')
+  # GitHub's tarball_url points to a URL like:
+  #   https://api.github.com/repos/{owner}/{repo}/tarball/{tag}
+  # — the URL itself does not end with .tar.gz, but the HTTP response is a valid .tar.gz.
+  # We append .tar.gz to the URL so the downloaded file has the expected extension.
+  TARBALL_URL=$(echo "$RELEASE_JSON" | grep '"tarball_url"' | head -1 | sed 's/.*"tarball_url": "\(.*\)".*/\1/')".tar.gz"
 
-  if [ -n "$ASSET_URL" ]; then
-    info "  Downloading release archive..."
-    TMPFILE=$(mktemp /tmp/marvin-XXXXXX.tar.gz)
-    if [ "$CURLORWGET" = "curl" ]; then
-      curl -fsSL "$ASSET_URL" -o "$TMPFILE"
-    else
-      wget -q "$ASSET_URL" -O "$TMPFILE"
-    fi
-
-    rm -rf "$INSTALL_DIR"
-    mkdir -p "$INSTALL_DIR"
-    tar -xzf "$TMPFILE" -C "$INSTALL_DIR" --strip-components=1
-    rm -f "$TMPFILE"
-    info "  Archive extracted to $INSTALL_DIR"
+  info "  Downloading release archive..."
+  TMPFILE=$(mktemp /tmp/marvin-XXXXXX.tar.gz)
+  if [ "$CURLORWGET" = "curl" ]; then
+    curl -fsSL "$TARBALL_URL" -o "$TMPFILE"
   else
-    warn "No .tar.gz asset found in release. Falling back to git clone."
-    _git_clone
+    wget -q "$TARBALL_URL" -O "$TMPFILE"
   fi
+
+  rm -rf "$INSTALL_DIR"
+  mkdir -p "$INSTALL_DIR"
+  tar -xzf "$TMPFILE" -C "$INSTALL_DIR" --strip-components=1
+  rm -f "$TMPFILE"
+  info "  Archive extracted to $INSTALL_DIR"
 else
-  info "No release found. Cloning from main branch..."
-  _git_clone
+  error "No release found. This script requires a published release."
 fi
 
 # ── Step 3: Install dependencies ───────────────────────────────────────────

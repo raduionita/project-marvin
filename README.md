@@ -15,10 +15,7 @@ Marvin runs as a persistent background service on your server. The installer han
 
 ```bash
 # One-line install (from a released version)
-bash <(curl -fsSL https://raw.githubusercontent.com/raduionita/marvin/main/install.sh)
-
-# Or from source
-bash install.sh
+curl -fsSL https://raw.githubusercontent.com/raduionita/project-marvin/refs/heads/main/install.sh | bash
 ```
 
 **What the installer does:**
