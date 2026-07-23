@@ -66,22 +66,23 @@ RELEASE_JSON=$(curl -fsSL "$RELEASE_URL" 2>/dev/null || echo "")
 
 if [ -n "$RELEASE_JSON" ] && echo "$RELEASE_JSON" | grep -q '"tarball_url"'; then
   LATEST_TAG=$(echo "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "\(.*\)".*/\1/')
+  info "  Release source: $RELEASE_URL"
   info "  Latest release: $LATEST_TAG"
 
-  # GitHub's tarball_url points to a URL like:
-  #   https://api.github.com/repos/{owner}/{repo}/tarball/{tag}
-  # — the URL itself does not end with .tar.gz, but the HTTP response is a valid .tar.gz.
-  # We append .tar.gz to the URL so the downloaded file has the expected extension.
-  TARBALL_URL=$(echo "$RELEASE_JSON" | grep '"tarball_url"' | head -1 | sed 's/.*"tarball_url": "\(.*\)".*/\1/')".tar.gz"
+  # https://api.github.com/repos/{owner}/{repo}/tarball/{tag}
+  TARBALL_URL=$(echo "$RELEASE_JSON" | grep '"tarball_url"' | head -1 | sed 's/.*"tarball_url": "\(.*\)".*/\1/')""
 
   info "  Downloading $TARBALL_URL..."
-  TMPFILE=$(mktemp /tmp/marvin-XXXXXX.tar.gz)
+  TMPFILE=$(mktemp /tmp/marvin-latest.tar.gz)
   if [ "$CURLORWGET" = "curl" ]; then
+    info "  curl -fsSL $TARBALL_URL -o $TMPFILE"
     curl -fsSL "$TARBALL_URL" -o "$TMPFILE"
   else
+    info "  wget -q $TARBALL_URL -O $TMPFILE"
     wget -q "$TARBALL_URL" -O "$TMPFILE"
   fi
 
+  info "  Extracting archive..."
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR"
   tar -xzf "$TMPFILE" -C "$INSTALL_DIR" --strip-components=1
@@ -122,11 +123,11 @@ info "  Agents directory:    $MARVIN_DIR/agents"
 echo ""
 info "Marvin installed successfully!"
 echo ""
-echo "  Install directory: $INSTALL_DIR"
-echo "  Symlink:         $SYMLINK_PATH"
-echo "  Workspace:       $MARVIN_DIR"
+info "  Install directory: $INSTALL_DIR"
+info "  Symlink:         $SYMLINK_PATH"
+info "  Workspace:       $MARVIN_DIR"
 echo ""
-echo "Next steps:"
-echo "  1. Configure ~/.marvin/marvin.json with your models and channels"
-echo "  2. Run: marvin serve"
+info "Next steps:"
+info "  1. Configure ~/.marvin/marvin.json with your models and channels"
+info "  2. Run: marvin serve"
 echo ""
