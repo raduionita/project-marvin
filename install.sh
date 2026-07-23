@@ -102,15 +102,36 @@ else
 fi
 info "  Dependencies installed."
 
-# ── Step 4: Create symlink (shell wrapper) ─────────────────────────────────
-info "Creating symlink at $SYMLINK_PATH..."
+# ── Step 4: Create shell wrapper ────────────────────────────────────────────
+# Try /usr/local/bin first (may need sudo). Fall back to ~/.local/bin
+# (already on PATH for most shells) if the system directory is unwritable.
 
 WRAPPER="#!/bin/sh
-exec bun $INSTALL_DIR/src/marvin.ts \"\$@\""
-mkdir -p "$(dirname "$SYMLINK_PATH")"
-printf '%s\n' "$WRAPPER" > "$SYMLINK_PATH"
-chmod +x "$SYMLINK_PATH"
-info "  Symlink created."
+exec bun \"$INSTALL_DIR/src/marvin.ts\" \"\$@\""
+
+install_wrapper() {
+  local target="$1"
+  mkdir -p "$(dirname "$target")"
+  rm -f "$target"
+  if ! printf '%s\n' "$WRAPPER" > "$target"; then
+    return 1
+  fi
+  chmod +x "$target"
+  SYMLINK_PATH="$target"
+}
+
+if install_wrapper "$SYMLINK_PATH"; then
+  info "  Created at $SYMLINK_PATH"
+else
+  FALLBACK="$HOME/.local/bin/marvin"
+  if install_wrapper "$FALLBACK"; then
+    warn "  Could not write to $SYMLINK_PATH (permission denied)."
+    info "  Created at $FALLBACK instead."
+  else
+    error "  Could not write to $SYMLINK_PATH or $FALLBACK. Check permissions."
+  fi
+fi
+info "  Wrapper created."
 
 # ── Step 5: Ensure workspace directories ───────────────────────────────────
 info "Ensuring workspace directories..."
