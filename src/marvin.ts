@@ -19,7 +19,7 @@ await (new class App {
           this.loadProcess();
           this.loadConfig();
           this.loadFlags();
-    await this.loadCommands();
+    await this.loadCommand();
   }
 
   loadProcess() {
@@ -90,31 +90,31 @@ await (new class App {
     // const args = process.argv.slice(2);
   }
 
-  async loadCommands() {
-    console.debug('[App.loadCommands]');
+  async loadCommand() {
+    console.debug('[App.loadCommand]');
 
     const args = process.argv.slice(2);
     let   arg = args[0] || 'help';
     const cmds = listCommands(this.ctx).map(f => f.replace('.ts', ''));
 
     if (!cmds.includes(arg)) {
-      console.warn('[App.loadCommands]', 'unknown command:', arg, 'available commands:', cmds.join(', '));
+      console.warn('[App.loadCommand]', 'unknown command:', arg, 'available commands:', cmds.join(', '));
       arg = 'help';
     }
 
     try {
-      const Module = await import('./commands/help.js');
+      const Module = await import(`./commands/${arg}.ts`);
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        console.warn('[App.loadCommands]', `${arg} does not export a Command class, exiting`);
+        console.warn('[App.loadCommand]', `${arg} does not export a Command class, exiting`);
         return;
       }
       // create command and load/run it
       this.cmd = new Class(this.ctx);
       this.cmd.load();
     } catch (err) {
-      console.error('[App.loadCommands]', `failed to load ${arg}:`, err);
+      console.error('[App.loadCommand]', `failed to load ${arg}:`, err);
     }
   }
 
