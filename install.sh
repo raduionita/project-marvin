@@ -15,17 +15,19 @@ SYMLINK_PATH="/usr/local/bin/marvin"
 MARVIN_DIR="$HOME/.marvin"
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-info()  { echo "$*"; }
-warn()  { echo "WARNING: $*" >&2; }
-error() { echo "ERROR: $*" >&2; exit 1; }
+info()  { echo "[INFO] $*"; }
+warn()  { echo "[WARN] $*" >&2; }
+error() { echo "[ERR ] $*" >&2; exit 1; }
 
 # ── Step 1: Check prerequisites ────────────────────────────────────────────
 info "Checking prerequisites..."
 
 if command -v curl &>/dev/null; then
   CURLORWGET="curl"
+  info "Using curl"
 elif command -v wget &>/dev/null; then
   CURLORWGET="wget"
+  info "Using wget"
 else
   error "Neither curl nor wget found. Install one and retry."
 fi
@@ -72,7 +74,7 @@ if [ -n "$RELEASE_JSON" ] && echo "$RELEASE_JSON" | grep -q '"tarball_url"'; the
   # We append .tar.gz to the URL so the downloaded file has the expected extension.
   TARBALL_URL=$(echo "$RELEASE_JSON" | grep '"tarball_url"' | head -1 | sed 's/.*"tarball_url": "\(.*\)".*/\1/')".tar.gz"
 
-  info "  Downloading release archive..."
+  info "  Downloading $TARBALL_URL..."
   TMPFILE=$(mktemp /tmp/marvin-XXXXXX.tar.gz)
   if [ "$CURLORWGET" = "curl" ]; then
     curl -fsSL "$TARBALL_URL" -o "$TMPFILE"
