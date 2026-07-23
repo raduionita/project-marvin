@@ -73,7 +73,7 @@ if [ -n "$RELEASE_JSON" ] && echo "$RELEASE_JSON" | grep -q '"tarball_url"'; the
   TARBALL_URL=$(echo "$RELEASE_JSON" | grep '"tarball_url"' | head -1 | sed 's/.*"tarball_url": "\(.*\)".*/\1/')""
 
   info "  Downloading $TARBALL_URL..."
-  TMPFILE=$(mktemp /tmp/marvin-latest.tar.gz)
+  TMPFILE=$(mktemp /tmp/marvin-XXXXXXX.tar.gz)
   if [ "$CURLORWGET" = "curl" ]; then
     info "  curl -fsSL $TARBALL_URL -o $TMPFILE"
     curl -fsSL "$TARBALL_URL" -o "$TMPFILE"
