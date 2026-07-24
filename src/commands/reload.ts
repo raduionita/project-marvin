@@ -17,8 +17,7 @@ export default class ReloadCommand extends Command {
       // }
       // return await res.json();
 
-      const output = execSync(['systemctl', '--user', 'reload', 'marvin'].join(' '), { stdio: 'inherit' });
-      console.log('[ReloadCommand.load]', 'reloaded service:', output.toString());
+      execSync(['systemctl', '--user', 'reload', 'marvin'].join(' '), { stdio: 'inherit' });
     }
   }
 }

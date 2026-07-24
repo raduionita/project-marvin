@@ -290,10 +290,19 @@ export default class ServeCommand extends Command {
         enabled: true,
         schedule: 0,
         maxSteps: 0,
-        input: 'hello world',
+        input: '[dry] hello world',
         timeout: setTimeout(this.execTask.bind(this), 0, ctx, marvinId, 'dry'),
       } as Task;
       console.info('[ServeCommand.loadAgents]', '[dry]', `task [dry] scheduled (orchestrator)`);
+    } else {
+      ctx.agents[marvinId].tasks['status'] = {
+        id: 'dry',
+        enabled: true,
+        schedule: 60*60*1000,
+        maxSteps: 0,
+        input: 'status',
+        timeout: setTimeout(this.execOrchestrator.bind(this), 60*60*1000, ctx, marvinId, 'status'),
+      } as Task;
     }
 
     // type: agent
@@ -306,15 +315,20 @@ export default class ServeCommand extends Command {
 
       const tasks: Record<string, Task> = {};
       for (const [taskId, task] of Object.entries(agent.tasks || {})) {
+        let schedule = 1000 < task.schedule ? task.schedule : task.schedule * 1000;
         let enabled = task.enabled;
 
         // default input to task.input as string/prompt
         let input = task.input;
 
-        // first try to load task input from file
-        if (existsSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId.toUpperCase()}.md`))) {
+        // if ends with .md
+        if (input && !input.endsWith('.md')) {
+          // continue as is, input is a string
+        } else if (existsSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId.toUpperCase()}.md`))) {
+          // TAASK-ID-UPPERCASE.md
           input = readFileSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId.toUpperCase()}.md`), 'utf8').trim();
         } else if (existsSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId}.md`))) {
+          // task-ID-as-is.md
           input = readFileSync(join(ctx.home, 'agents', agentId, 'tasks', `${taskId}.md`), 'utf8').trim();
         }
 
@@ -324,7 +338,7 @@ export default class ServeCommand extends Command {
         }
 
         if (this.ctx.isDry) {
-          console.info('[ServeCommand.loadAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
+          console.info('[ServeCommand.loadAgents]', `[dry] task ${taskId} scheduled (${schedule}ms) (agent ${agentId})`);
           continue;
         }
 
@@ -332,13 +346,13 @@ export default class ServeCommand extends Command {
         tasks[taskId] = {
           id: taskId,
           enabled: enabled,
-          schedule: task.schedule,
+          schedule: schedule,
           maxSteps: task.maxSteps,
           input: input,
-          timeout: setTimeout(this.execTask.bind(this), task.schedule, ctx, agentId, taskId),
+          timeout: setTimeout(this.execTask.bind(this), schedule, ctx, agentId, taskId),
         } as Task;
 
-        console.info('[ServeCommand.loadAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
+        console.info('[ServeCommand.loadAgents]', `task [${taskId}] scheduled (${schedule}ms) (agent ${agentId})`);
       }
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
@@ -419,6 +433,48 @@ export default class ServeCommand extends Command {
       }
     }
     ctx.systems = {};
+  }
+
+  async execOrchestrator(ctx: Context, agentId: string, taskId: string) {
+    console.debug('[ServeCommand.execOrchestrator]', agentId, taskId);
+
+    // check assistant state
+    if (this.ctx.state  !== 'running') {
+      console.info('[ServeCommand.execOrchestrator]', `task ${taskId} skipped (assistant NOT running)`);
+      return;
+    }
+
+    // check if agent exists
+    const agent = ctx.agents[agentId];
+    if (!agent) {
+      console.error('[ServeCommand.execOrchestrator]', `agent ${agentId} NOT found`);
+      return;
+    }
+    // check if task exists
+    const task = agent.tasks[taskId]!;
+    if (!task) {
+      console.error('[ServeCommand.execOrchestrator]', `task ${taskId} NOT found`);
+      return;
+    }
+    
+    // log agents and their tasks
+    console.info('[ServeCommand.execOrchestrator]', `marvin agents:`);
+    for (const [agentId, agent] of Object.entries(ctx.agents)) {
+      console.info('[ServeCommand.execOrchestrator]', `  agent ${agentId}:`);
+      console.info('[ServeCommand.execOrchestrator]', `    enabled: ${agent.enabled?'yes':'no'}`);
+      console.info('[ServeCommand.execOrchestrator]', `    model: ${agent.model.model}`);
+      console.info('[ServeCommand.execOrchestrator]', `    channels:`);
+      for (const [channelId, channel] of Object.entries(agent.channels)) {
+        console.info('[ServeCommand.execOrchestrator]', `      channel: ${channelId} ${channel}`);
+      }
+      console.info('[ServeCommand.execOrchestrator]', `    tasks:`);
+      for (const [taskId, task] of Object.entries(agent.tasks)) {
+        console.info('[ServeCommand.execOrchestrator]', `      task ${taskId}: ${task.schedule}ms ${task.enabled?'enabled':'disabled'}`);
+      }
+    }
+    
+    // re-schedule next execution
+    task.timeout = setTimeout(this.execOrchestrator.bind(this), task.schedule, ctx, agentId, taskId);
   }
 
   async execTask(ctx: Context, agentId: string, taskId: string) {

@@ -9,13 +9,11 @@ import * as constants from './constants.js';
 import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
 
-await (new class App {
-  ctx: Context = new Context();
+await (new class App extends Command {
   cmd: Command = this.ctx.command; // dummy
 
   async load() {
     console.debug('[App.load]');
-
           this.loadProcess();
           this.loadConfig();
           this.loadFlags();
@@ -94,27 +92,27 @@ await (new class App {
     console.debug('[App.loadCommand]');
 
     const args = process.argv.slice(2);
-    let   arg = args[0] || 'help';
+    let   cmd  = args[0] || 'help';
     const cmds = listCommands(this.ctx).map(f => f.replace('.ts', ''));
 
-    if (!cmds.includes(arg)) {
-      console.warn('[App.loadCommand]', 'unknown command:', arg, 'available commands:', cmds.join(', '));
-      arg = 'help';
+    if (!cmds.includes(cmd)) {
+      console.warn('[App.loadCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
+      cmd = 'help';
     }
 
     try {
-      const Module = await import(`./commands/${arg}.ts`);
+      const Module = await import(`./commands/${cmd}.ts`);
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        console.warn('[App.loadCommand]', `${arg} does not export a Command class, exiting`);
+        console.warn('[App.loadCommand]', `${cmd} does not export a Command class, exiting`);
         return;
       }
       // create command and load/run it
       this.cmd = new Class(this.ctx);
       this.cmd.load();
     } catch (err) {
-      console.error('[App.loadCommand]', `failed to load ${arg}:`, err);
+      console.error('[App.loadCommand]', `failed to load ${cmd}:`, err);
     }
   }
 
@@ -123,4 +121,4 @@ await (new class App {
 
     await this.cmd.drop();
   }
-}).load();
+}(new Context())).load();

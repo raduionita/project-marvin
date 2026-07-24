@@ -40,8 +40,8 @@ export default class ChatCommand extends Command {
     // send chat message to server /chat
     if (this.ctx.isDry) {
       console.info('[ChatCommand.load]', '[dry]', 'send chat: fetch', url.toString());
-      console.info('[ChatCommand.load]', 'message:', answer);
-      console.info('[ChatCommand.load]', 'agent:', agentId);
+      console.info('[ChatCommand.load]', '[dry]', 'message:', answer);
+      console.info('[ChatCommand.load]', '[dry]', 'agent:', agentId);
     } else {
       // call chat endpoint
       const res = await fetch(url, {

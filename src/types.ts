@@ -34,7 +34,7 @@ export interface Config {
       enabled: boolean;
       schedule: number;
       maxSteps: number;
-      input: string;
+      input?: string;
     }>;
   }>;
 }

@@ -4,9 +4,10 @@ export default class HelpCommand extends Command {
   async load() {
     console.debug('[HelpCommand.load]');
 
-    console.info('[HelpCommand.load]', 'usage: marvin [command] [options]');
+    console.info('[HelpCommand.load]', 'usage: marvin [command] [options] [--flags]');
     console.info('[HelpCommand.load]', 'commands:');
     console.info('[HelpCommand.load]', '  help    ', 'show this help');
+    console.info('[HelpCommand.load]', '  install ', 'install the project');
     console.info('[HelpCommand.load]', '  enable  ', 'load the project and service');
     console.info('[HelpCommand.load]', '  disable ', 'stop the app service');
     console.info('[HelpCommand.load]', '  serve   ', 'start the app service');
