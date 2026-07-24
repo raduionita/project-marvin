@@ -8,6 +8,7 @@ import { Context, Command, Config } from './types.js';
 import * as constants from './constants.js';
 import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
+import { homedir } from 'os';
 
 await (new class App extends Command {
   cmd: Command = this.ctx.command; // dummy
@@ -64,23 +65,25 @@ await (new class App extends Command {
       return;
     }
 
+    this.ctx.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/marvin\.ts$/, '');
+
     configDotenv({ encoding: 'utf8', quiet: true, path: ['.env', '.env.local'] });
 
-    const path = join(this.ctx.home, 'marvin.json');
+    this.ctx.home = join(homedir(), '.marvin');
 
     config = {} as Config;
 
     // at this stage marvin.json MUST exist, but just in case
-    if (!existsSync(path)) {
-      console.warn('[App.loadConfig]', 'Config file not found:', path);
+    const cpath = join(this.ctx.home, 'marvin.json');
+    if (!existsSync(cpath)) {
+      console.warn('[App.loadConfig]', 'Config file not found:', cpath, 'using default config');
       this.ctx.config = constants.DEFAULT_CONFIG as Config;
       return;
     }
 
-    const data = readFileSync(path, 'utf8');
-    config = tryJsonParse(data);
+    const data = readFileSync(cpath, 'utf8');
 
-    this.ctx.config = config!;
+    this.ctx.config = tryJsonParse(data)!;
   }
 
   loadFlags() {
