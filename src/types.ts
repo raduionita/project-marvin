@@ -68,9 +68,9 @@ export class Context {
   public agents  : Record<string, Agent> = {};
 
   // home (~/.marvin) data folder
-  public home: string = '';
+  public home: string = process.env.HOME + '/.marvin';
   // root (~/) app folder
-  public root: string = '';
+  public root: string = import.meta.dirname.replace(/\/src.*/, '');
 
   public isDry: boolean = process.argv.includes('--dry') || process.argv.includes('-dry');
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';

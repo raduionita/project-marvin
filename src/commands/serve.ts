@@ -17,7 +17,6 @@ export default class ServeCommand extends Command {
     console.debug('[ServeCommand.load]');
 
           this.loadProject();
-          this.loadWatch();
     await this.loadSystems();
     await this.loadTools();
     await this.loadChannels();
@@ -40,19 +39,15 @@ export default class ServeCommand extends Command {
 
   // create ~/.marvin folder and required files
   loadProject() {
-    console.debug('[ServeCommand.loadProject]');
-
-    // set root to the app folder (where package.json lives)
-    this.ctx.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/commands\/serve\.ts$/, '');
-    console.info('[ServeCommand.loadProject]', 'root directory:', this.ctx.root);
+    console.debug('[ServeCommand.loadProject]', this.ctx.root);
 
     // create project/workspace folder (~/.marvin)
-    const hpath = join(homedir(), '.marvin');
+    const hpath = this.ctx.home;
     if (this.ctx.isDry) {
       console.info('[ServeCommand.loadProject]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {
-      console.warn('[ServeCommand.loadProject]', `missing ${hpath} folder, creating...`);
-      mkdirSync(hpath, { recursive: true });
+      console.error('[ServeCommand.loadProject]', `missing ${hpath} folder`, 'please run "marvin install" again');
+      return;
     }
 
     // set home (~/.marvin)
@@ -63,8 +58,8 @@ export default class ServeCommand extends Command {
     if (this.ctx.isDry) {
       console.info('[ServeCommand.loadProject]', '[dry]', apath);
     } else if (!existsSync(apath)) {
-      console.warn('[ServeCommand.loadProject]', `missing ${apath} folder, creating...`);
-      mkdirSync(apath, { recursive: true });
+      console.error('[ServeCommand.loadProject]', `missing ${apath} folder`, 'please run "marvin install" again');
+      return;
     }
 
     // create ~/.marvin/MARVIN.md from constants (orchestrator identity)
@@ -72,8 +67,8 @@ export default class ServeCommand extends Command {
     if (this.ctx.isDry) {
       console.info('[ServeCommand.loadProject]', '[dry]', mpath);
     } else if (!existsSync(mpath)) {
-      console.warn('[ServeCommand.loadProject]', `missing ${mpath} file, creating...`);
-      writeFileSync(mpath, constants.MARVIN_MD.trim());
+      console.error('[ServeCommand.loadProject]', `missing ${mpath} file`, 'please run "marvin install" again');
+      return;
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
@@ -81,32 +76,8 @@ export default class ServeCommand extends Command {
     if (this.ctx.isDry) {
       console.info('[ServeCommand.loadProject]', '[dry]', cpath);
     } else if (!existsSync(cpath)) {
-      console.warn('[ServeCommand.loadProject]', `missing ${cpath} file, creating...`);
-      const config = constants.DEFAULT_CONFIG;
-      writeFileSync(cpath, JSON.stringify(config, null, 2));
-    }
-  }
-
-  loadWatch() {
-    console.debug('[ServeCommand.loadWatch]');
-
-    // TODO: watch the whole project folder
-
-    const mpath = join(this.ctx.home, 'marvin.json');
-
-    // watch config file
-    if (this.ctx.isDry) {
-      console.info('[ServeCommand.loadWatch]', '[dry] would watch config file:', mpath);
-    } else {
-      try {
-        let w = watch(mpath, () => {
-          console.debug('[ServeCommand.loadWatch]', 'config file changed, reloading...');
-          this.execReload();
-        });
-        w.close();
-      } catch (err) {
-        console.error('[ServeCommand.loadWatch]', 'config file watcher failed:', (err as Error).message);
-      }
+      console.error('[ServeCommand.loadProject]', `missing ${cpath} file`, 'please run "marvin install" again');
+      return;
     }
   }
 

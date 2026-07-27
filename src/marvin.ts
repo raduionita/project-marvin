@@ -10,6 +10,8 @@ import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
 import { homedir } from 'os';
 
+console.log(process.env.HOME);
+
 await (new class App extends Command {
   cmd: Command = this.ctx.command; // dummy
 
@@ -59,17 +61,13 @@ await (new class App extends Command {
   }  
 
   loadConfig(config?: Config | undefined) {
-    console.debug('[App.loadConfig]', config !== undefined);
+    console.debug('[App.loadConfig]');
     if (config) {
       this.ctx.config = config;
       return;
     }
 
-    this.ctx.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/marvin\.ts$/, '');
-
     configDotenv({ encoding: 'utf8', quiet: true, path: ['.env', '.env.local'] });
-
-    this.ctx.home = join(homedir(), '.marvin');
 
     config = {} as Config;
 
@@ -124,4 +122,4 @@ await (new class App extends Command {
 
     await this.cmd.drop();
   }
-}(new Context())).load();
+}(new Context())); //.load();

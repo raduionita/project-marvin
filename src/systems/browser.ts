@@ -10,6 +10,11 @@ export default class BrowserSystem extends System {
 
   public async load(): Promise<void> {
     console.log('[BrowserSystem.load]');
+
+    if (this.ctx.isDry) {
+      console.log('[BrowserSystem.load]', '[dry] loading chromium');
+      return;
+    }
     
     chromium.use(stealth());
 
@@ -47,6 +52,7 @@ export default class BrowserSystem extends System {
   }
 
   public async drop(): Promise<void> {
+    console.debug('[BrowserSystem.drop]');
     if (this.browser) {
       try {
         await this.browser.close();

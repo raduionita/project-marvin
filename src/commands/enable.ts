@@ -16,21 +16,14 @@ export default class EnableCommand extends Command {
   async loadProject() {
     console.debug('[EnableCommand.loadProject]', 'checking if project is already installed and install it if not');
 
-    // set root to the app folder (where package.json lives)
-    this.ctx!.root = import.meta.url.replace('file://', '').replace(/\\/g, '/').replace(/\/src\/commands\/setup\.ts$/, '');
-    console.info('[EnableCommand.loadProject]', 'root directory:', this.ctx.root);
-
     // ~/.marvin
-    const hpath = join(homedir(), '.marvin');
+    const hpath = this.ctx.home;
     if (this.ctx.isDry) {
       console.info('[EnableCommand.loadProject]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
       console.info('[EnableCommand.loadProject]', 'created workspace directory:', hpath);
     }
-
-    // set home (~/.marvin)
-    this.ctx!.home = hpath;
 
     // ~/.marvin/agents
     const apath = join(hpath, 'agents');
