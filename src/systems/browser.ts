@@ -1,6 +1,6 @@
-import { chromium } from 'playwright-extra';
+import puppeteer from 'puppeteer-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
-import { Browser, BrowserContext, BrowserContextOptions, Page } from 'playwright';
+import { Browser, BrowserContext, BrowserContextOptions, Page } from 'puppeteer';
 
 import { System } from '../types.js';
 
@@ -16,12 +16,13 @@ export default class BrowserSystem extends System {
       return;
     }
     
-    chromium.use(stealth());
+    puppeteer.use(stealth());
 
-    this.browser = await chromium.launch({
+    this.browser = await puppeteer.launch({
       headless: true,
       args: [
         '--no-sandbox',
+        '--disable-setuid-sandbox',
         '--disable-gpu',
         '--disable-dev-shm-usage',
         '--disable-extensions',
@@ -30,24 +31,6 @@ export default class BrowserSystem extends System {
         '--disable-renderer-backgrounding'
       ],
       // todo: proxies
-    });
-
-    this.bctx = await this.browser.newContext({
-      viewport: { width: 1200, height: 800 },
-      javaScriptEnabled: true,
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36',
-      extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
-      bypassCSP: true,
-    });
-
-    await this.bctx.route('**/*', (route) => {
-      const request = route.request();
-      // request.url().includes('links.duckduckgo.com/d.js') || 
-      if (request.isNavigationRequest()) {
-        return route.continue();
-      } else {
-        return route.abort();
-      }
     });
   }
 
@@ -75,7 +58,27 @@ export default class BrowserSystem extends System {
       console.error('[BrowserSystem.newPage]', 'browser context not loaded');
       throw new Error('[BrowserSystem.newPage] ERROR - browser context not loaded');
     }
-    return await this.bctx.newPage();
+
+    const page = await this.bctx.newPage();
+
+    page.setViewport({ width: 1200, height: 800 });
+    page.setJavaScriptEnabled(true);
+    page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36');
+    page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+    page.setBypassCSP(true);
+
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.isInterceptResolutionHandled()) return;
+      // request.url().includes('links.duckduckgo.com/d.js') || 
+      if (request.isNavigationRequest()) {
+        return request.continue();
+      } else {
+        return request.abort();
+      }
+    });
+
+    return page;
   }
 
   public async newContext(options?: BrowserContextOptions) : Promise<BrowserContext> {
@@ -83,6 +86,6 @@ export default class BrowserSystem extends System {
       console.error('[BrowserSystem.newContext]', 'browser not loaded');
       throw new Error('[BrowserSystem.newContext] ERROR - browser not loaded');
     }
-    return await this.browser.newContext(options);
+    return await this.browser.createBrowserContext(options);
   }
 }

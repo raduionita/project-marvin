@@ -232,48 +232,54 @@ export default class ServeCommand extends Command {
     const ctx = this.ctx;
 
     // type: orchestrator/supervisor
-    const marvinId = ctx.config.settings.name;
-    
-    // model: default or first
-    const model = Object.values(ctx.models).find(m => m.enabled && m.default) || ctx.models[Object.keys(ctx.models)[0] as string]!;
+    {
+      const marvinId = ctx.config.settings.name;
+      
+      // model: default or first
+      const model = Object.values(ctx.models).find(m => m.enabled && m.default) || ctx.models[Object.keys(ctx.models)[0] as string]!;
 
-    // load agent system prompt (~/.marvin/IDENTITY.md)
-    let identity = readFileSync(join(ctx.home, 'MARVIN.md'), 'utf8').trim();
-    if (!identity) {
-      console.error('[ServeCommand.loadAgents]', `no MARVIN.md found for agent ${marvinId}, using default`);
-      identity = constants.MARVIN_MD;
-    }
-    
-    // add ochestrator agent
-    ctx.agents[marvinId] = {
-      id: marvinId,
-      enabled: true,
-      identity: identity,
-      channels: {},
-      model: model,
-      tasks: {},
-    } as Agent;
+      // load agent system prompt (~/.marvin/IDENTITY.md)
+      let identity = readFileSync(join(ctx.home, 'MARVIN.md'), 'utf8').trim();
+      if (!identity) {
+        console.error('[ServeCommand.loadAgents]', `no MARVIN.md found for agent ${marvinId}, using default`);
+        identity = constants.MARVIN_MD;
+      }
+      
+      // add ochestrator agent
+      ctx.agents[marvinId] = {
+        id: marvinId,
+        enabled: true,
+        identity: identity,
+        channels: {},
+        model: model,
+        tasks: {},
+      } as Agent;
 
-    // add dry taks to orchestrator agent
-    if (this.ctx.isDry) {
-      ctx.agents[marvinId].tasks['dry'] = {
-        id: 'dry',
-        enabled: true,
-        schedule: 0,
-        maxSteps: 0,
-        input: '[dry] hello world',
-        timeout: setTimeout(this.execTask.bind(this), 0, ctx, marvinId, 'dry'),
-      } as Task;
-      console.info('[ServeCommand.loadAgents]', '[dry]', `task [dry] scheduled (orchestrator)`);
-    } else {
-      ctx.agents[marvinId].tasks['status'] = {
-        id: 'dry',
-        enabled: true,
-        schedule: 60*60*1000,
-        maxSteps: 0,
-        input: 'status',
-        timeout: setTimeout(this.execOrchestrator.bind(this), 60*60*1000, ctx, marvinId, 'status'),
-      } as Task;
+      // add dry taks to orchestrator agent
+      if (this.ctx.isDry) {
+        ctx.agents[marvinId].tasks['dry'] = {
+          id: 'dry',
+          enabled: true,
+          schedule: 0,
+          maxSteps: 0,
+          input: '[dry] hello world',
+          timeout: setTimeout(this.execTask.bind(this), 0, ctx, marvinId, 'dry'),
+        } as Task;
+        console.info('[ServeCommand.loadAgents]', '[dry]', `task [dry] scheduled (orchestrator)`);
+      } else {
+        ctx.agents[marvinId].tasks['status'] = {
+          id: 'status',
+          enabled: true,
+          schedule: 60*60*1000,
+          maxSteps: 0,
+          input: 'status',
+          timeout: setTimeout(this.execOrchestrator.bind(this), 60*60*1000, ctx, marvinId, 'status'),
+        } as Task;
+
+        console.info('[ServeCommand.loadAgents]', `task [status] scheduled (${60*60*1000}ms) (agent ${marvinId})`);
+      }
+
+      console.info('[ServeCommand.loadAgents]',`agent [${marvinId}] loaded`);
     }
 
     // type: agent

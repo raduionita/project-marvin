@@ -41,11 +41,8 @@ export default class WebBrowseTool extends Tool {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5_000 });
       const title = await page.title();
-      const body = page.locator('body');
-      await body.locator('header, footer, script, iframe').evaluateAll((nodes: HTMLElement[]) => {
-        for (const n of nodes) n.remove();
-      });
-      const text = await body.innerText();
+      await page.$eval('header, footer, script, iframe', el => el.remove());
+      const text = await page.$eval('body', el => el.innerText);
       return { title, body: text.split('\n').map((line: string) => line.trim()).filter((line: string) => line.length > 0).join('\n') };
     } catch (error) {
       console.error('[WebBrowseTool.call]', 'error:', error);
