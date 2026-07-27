@@ -1,6 +1,6 @@
 {
   "name": "marvin",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "mArvIn - your AI sidekick",
   "keywords": [
     "marvin",
@@ -19,8 +19,8 @@
     "build": "npx tsc --noEmit",
     "watch": "npx tsc --watch",
     "nuke": "rm -rf out node_modules",
-    "start": "bun run src/marvin.ts",
-    "start:server": "bun run src/marvin.ts --server",
+    "start": "bun run src/marvin.ts serve",
+    "start:dry": "bun run src/marvin.ts serve --dry",
     "compile:linux": "bun build --compile --minify ./src/marvin.ts --outfile ./marvin",
     "test": "bun test"
   },
