@@ -1,10 +1,8 @@
 import { Channel, Message } from '../types.js';
 
 export default class ExampleChannel extends Channel {
-  args(): {[key: string]: any} {
-    return {
-      token: '',
-    };
+  public args = {
+    token: '',
   }
   
   async load() : Promise<void> {

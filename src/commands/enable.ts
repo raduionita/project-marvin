@@ -23,6 +23,8 @@ export default class EnableCommand extends Command {
     } else if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
       console.info('[EnableCommand.loadProject]', 'created workspace directory:', hpath);
+    } else {
+      console.info('[EnableCommand.loadProject]', '~/.marvin exists');
     }
 
     // ~/.marvin/agents
@@ -32,6 +34,8 @@ export default class EnableCommand extends Command {
     } else if (!existsSync(apath)) {
       mkdirSync(apath, { recursive: true });
       console.info('[EnableCommand.loadProject]', 'created agents directory:', apath);
+    } else {
+      console.info('[EnableCommand.loadProject]', '~/.marvin/agents exists');
     }
 
     //  ~/.marvin/MARVIN.md
@@ -41,6 +45,8 @@ export default class EnableCommand extends Command {
     } else if (!existsSync(mpath)) {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
       console.info('[EnableCommand.loadProject]', 'created MARVIN.md:', mpath);
+    } else {
+      console.info('[EnableCommand.loadProject]', '~/.marvin/MARVIN.md exists');  
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
@@ -51,7 +57,11 @@ export default class EnableCommand extends Command {
       const config = constants.DEFAULT_CONFIG;
       writeFileSync(cpath, JSON.stringify(config, null, 2));
       console.info('[EnableCommand.loadProject]', 'created config file:', cpath);
+    } else {
+      console.info('[EnableCommand.loadProject]', '~/.marvin/marvin.json exists');
     }
+
+    console.info('[EnableCommand.loadProject]', 'project installed');
   }
 
   async loadService() {

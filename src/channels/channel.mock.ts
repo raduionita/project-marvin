@@ -3,9 +3,7 @@ import { Context } from '../types.js';
 
 // Intentionally does NOT extend Channel - used to test validation in execChannels
 export default class MockChannel extends Channel {
-  args() {
-    return {};
-  }
+  public args = {}
 
   async load(): Promise<void> {
     console.debug('[MockChannel.load]', 'loaded');

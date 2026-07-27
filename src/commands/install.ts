@@ -16,6 +16,8 @@ export default class InstallCommand extends Command {
     } else if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
       console.info('[InstallCommand.load]', 'created workspace directory:', hpath);
+    } else {
+      console.info('[InstallCommand.load]', '~/.marvin exists');
     }
 
     // ~/.marvin/agents
@@ -25,6 +27,8 @@ export default class InstallCommand extends Command {
     } else if (!existsSync(apath)) {
       mkdirSync(apath, { recursive: true });
       console.info('[InstallCommand.load]', 'created agents directory:', apath);
+    } else {
+      console.info('[InstallCommand.load]', '~/.marvin/agents exists');
     }
 
     //  ~/.marvin/MARVIN.md
@@ -34,6 +38,8 @@ export default class InstallCommand extends Command {
     } else if (!existsSync(mpath)) {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
       console.info('[InstallCommand.load]', 'created MARVIN.md:', mpath);
+    } else {
+      console.info('[InstallCommand.load]', '~/.marvin/MARVIN.md exists');
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
@@ -44,6 +50,10 @@ export default class InstallCommand extends Command {
       const config = constants.DEFAULT_CONFIG;
       writeFileSync(cpath, JSON.stringify(config, null, 2));
       console.info('[InstallCommand.load]', 'created config file:', cpath);
-    }    
+    } else {
+      console.info('[InstallCommand.load]', '~/.marvin/marvin.json exists');
+    }
+
+    console.info('[InstallCommand.load]', 'installation complete');
   }
 }

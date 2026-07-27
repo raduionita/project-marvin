@@ -38,6 +38,7 @@ export default class WatchSystem extends System {
     }
 
   }
+  
   async drop(): Promise<void> {
     console.debug('[WatchSystem.drop]');
     for (const watcher of this.watchers) {

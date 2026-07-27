@@ -25,15 +25,13 @@ export interface IWebClient {
 }
 
 export default class SlackChannel extends Channel {
+  public args = {
+    appToken: 'xapp-1-yout-app-token-here',
+    botToken: 'xbot-1-your-bot-token-here',
+  }
+
   protected sok!: ISocketModeClient;
   protected web!: IWebClient;
-
-  args() {
-    return {
-      appToken: 'xapp-1-yout-app-token-here',
-      botToken: 'xbot-1-your-bot-token-here',
-    };
-  }
 
   async load() {
     console.debug('[SlackChannel.load]', this.ctx.config.channels.slack);

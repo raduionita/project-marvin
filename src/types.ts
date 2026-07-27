@@ -101,11 +101,12 @@ export abstract class Tool {
 
 // channel interface
 export abstract class Channel {
+  abstract args: {[key: string]: any};
+
   constructor(public readonly ctx: Context) {
     console.debug(`[${this.constructor.name||'Channel'}.constructor]`);
   }
 
-  abstract args(): {[key: string]: any};
   abstract load(): Promise<void>;
   abstract drop(): Promise<void>;
 

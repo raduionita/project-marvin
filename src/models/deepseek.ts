@@ -7,11 +7,12 @@ export default class DeepseekModel extends Model {
   async sendMessage(chat: Chat) : Promise<Reply> {
     console.debug('[DeepseekModel.sendMessage]', 'chat:', JSON.stringify(chat));
     // call the model api
+    const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: this.model,

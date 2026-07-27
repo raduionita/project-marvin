@@ -119,7 +119,7 @@ export default class ServeCommand extends Command {
         }
         // register instance of Tool
         const instance = new Class(this.ctx);
-        const meta = instance.meta();
+        const meta = instance.meta;
         this.ctx.tools[meta.name] = instance;
         console.info('[ServeCommand.loadTools]', `tool [${meta.name}] loaded`);
       } catch (err) {

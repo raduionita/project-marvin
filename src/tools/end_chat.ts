@@ -1,8 +1,8 @@
-import { Tool } from "../types";
+import { Tool, ToolMeta } from "../types";
 import * as constants from '../constants';
 
 export default class EndChatTool extends Tool {
-  meta = {
+  public meta: ToolMeta = {
     type: 'function',
     function: {
       name: constants.END_CHAT_NAME,
