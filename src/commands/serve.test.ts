@@ -366,7 +366,7 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
 
   (ctx.models['mock.model'] as MockModel).setReply(badToolReply);
 
-  // Should not throw — it should catch the JSON parse error and push an error result
+  // Should not throw - it should catch the JSON parse error and push an error result
   const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).toBeDefined();
@@ -402,7 +402,7 @@ test('sendMessage stops the AI loop when end chat tool call is found', async () 
 
   expect(result).not.toBeNull();;
 
-  // Should only call the model once — the end chat causes an immediate exit
+  // Should only call the model once - the end chat causes an immediate exit
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
   expect(result!.content).toBe(''); // The end chat content is empty in our reply
 });

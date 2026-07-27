@@ -102,7 +102,7 @@ export default class ChannelsCommand extends Command {
         await channel.load();
         await channel.drop();
 
-        // channel works — persist to marvin.json
+        // channel works - persist to marvin.json
         const cpath = join(this.ctx!.home, 'marvin.json');
 
         // write to config file

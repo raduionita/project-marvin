@@ -1,6 +1,6 @@
-# AGENTS.md — Marvin Project
+# AGENTS.md - Marvin Project
 
-You are a Principal TypeScript Engineer working on **Marvin** — a multi-agent AI assistant with a client-server architecture. The server is a persistent background process that manages agents executing autonomous scheduled tasks. The client is a standalone app communicating with the server via HTTP API.
+You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI assistant with a client-server architecture. The server is a persistent background process that manages agents executing autonomous scheduled tasks. The client is a standalone app communicating with the server via HTTP API.
 
 **Tech stack:** Node.js + TypeScript
 
@@ -58,7 +58,7 @@ Loaded from `~/.marvin/` at runtime (created on first run):
     - `agent-1/`
       - `IDENTITY.md`   # agent identity file
       - `tasks/`
-        - `TASK-1.md`   # task prompt — seeds the AI loop
+        - `TASK-1.md`   # task prompt - seeds the AI loop
   - `tools/`            # user-defined tools (mirrors src/tools/)
     - `index.ts`
     - `doSomething.ts`
@@ -67,14 +67,14 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 
 ## Core Concepts
 
-- `Model` — `MyModel extends Model`; provider logic + LLM config
-- `Chat` — conversation history (messages, thinking, …)
-- `Message` — single entry in the chat history
-- `Channel` — user-facing output: Slack, Discord, Telegram, email, …
-- `Tool` — executable action: `webSearch`, `webBrowse`, `getDate`, …
-- `Agent` — runs scheduled tasks; communicates via configured channels
-- `Task` — periodic prompt or `.md` file that starts the AI loop
-- `execTask` — engine: runs the AI loop, then reschedules itself
+- `Model` - `MyModel extends Model`; provider logic + LLM config
+- `Chat` - conversation history (messages, thinking, …)
+- `Message` - single entry in the chat history
+- `Channel` - user-facing output: Slack, Discord, Telegram, email, …
+- `Tool` - executable action: `webSearch`, `webBrowse`, `getDate`, …
+- `Agent` - runs scheduled tasks; communicates via configured channels
+- `Task` - periodic prompt or `.md` file that starts the AI loop
+- `execTask` - engine: runs the AI loop, then reschedules itself
 
 Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-contained entry points for their respective modes.
 Do not confuse Marvin channels with Slack channels, they are different things. In Marvin they are communication channels between the client and the server.
@@ -93,7 +93,7 @@ Do not confuse Marvin channels with Slack channels, they are different things. I
 
 ## Rules
 
-- Prefer small, focused edits — avoid unrelated cleanup
+- Prefer small, focused edits - avoid unrelated cleanup
 - Preserve existing style, conventions, and formatting unless asked
 - No new dependencies unless necessary; explain any non-obvious tradeoffs
 - All changes must stay compatible with the current codebase

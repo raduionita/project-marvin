@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# install.sh — Install Marvin application.
+# install.sh - Install Marvin application.
 #
 # Usage: curl -fsSL https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/install.sh | bash
 #
@@ -145,7 +145,7 @@ info "Running `marvin install` to initialise workspace files..."
 if "$SYMLINK_PATH" install 2>&1; then
   info "  Workspace files created."
 else
-  warn "  `marvin install` failed — you can re-run it manually."
+  warn "  `marvin install` failed - you can re-run it manually."
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────

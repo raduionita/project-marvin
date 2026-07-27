@@ -67,7 +67,7 @@ test('load() calls loadHandlers, loadProject, loadConfig, loadCommands', async (
   const ctx = makeContext();
   const client = new Client(ctx);
   await client.load();
-  // load() returns a resolved promise after 1s — that's the "keep alive"
+  // load() returns a resolved promise after 1s - that's the "keep alive"
   expect(client.ctx).toBeDefined();
 });
 
@@ -105,7 +105,7 @@ test('loadProject() does not create files when isDry is true', () => {
 
   client.loadProject();
 
-  // In dry mode, mkdirSync/writeFileSync are not called — but since our mock
+  // In dry mode, mkdirSync/writeFileSync are not called - but since our mock
   // fs has them as no-ops, we verify the logic path by checking no error is thrown
   expect(ctx.home).toBeDefined();
   expect(ctx.root).toBeDefined();
@@ -119,7 +119,7 @@ test('loadProject() skips creation when paths already exist', () => {
   // (existsSync returns true for the home path → no mkdir/write)
   client.loadProject();
 
-  // Should not throw — existsSync returns true, so no mkdir/write calls
+  // Should not throw - existsSync returns true, so no mkdir/write calls
   expect(ctx.home).toContain('.marvin');
 });
 
@@ -177,7 +177,7 @@ test('loadConfig() does nothing when config is already set on ctx', () => {
   };
   const client = new Client(ctx);
 
-  // Pass the preloaded config explicitly — this is the only way to test
+  // Pass the preloaded config explicitly - this is the only way to test
   // the "early return" path in loadConfig
   client.loadConfig(preloadedConfig);
 
@@ -297,7 +297,7 @@ test('execReload() sends HTTP request to reload endpoint', async () => {
   const ctx = makeContext();
   const client = new Client(ctx);
 
-  // No server is running, so this should throw — that's expected
+  // No server is running, so this should throw - that's expected
   try {
     await client.execReload();
     throw new Error('should have thrown');

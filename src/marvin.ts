@@ -10,8 +10,6 @@ import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
 import { homedir } from 'os';
 
-console.log(process.env.HOME);
-
 await (new class App extends Command {
   cmd: Command = this.ctx.command; // dummy
 
@@ -122,4 +120,4 @@ await (new class App extends Command {
 
     await this.cmd.drop();
   }
-}(new Context())); //.load();
+}(new Context())).load();

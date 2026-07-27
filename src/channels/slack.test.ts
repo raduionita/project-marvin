@@ -113,7 +113,7 @@ class MockSlackChannel extends SlackChannel {
     } as SlackResponse;
   }
 
-  // Override event handlers — implement directly to avoid super chain issues.
+  // Override event handlers - implement directly to avoid super chain issues.
   async onMention({ event, body, ack }: HandlerParams) {
     await ack();
 
@@ -205,7 +205,7 @@ class MockSlackChannel extends SlackChannel {
 }
 
 // ============================================================================
-// Helpers — reused across all test sections
+// Helpers - reused across all test sections
 // ============================================================================
 
 function mockConfig(options: {
@@ -667,7 +667,7 @@ test('sendMessage() logs warning on channel mismatch', async () => {
 
 test('sendMessage() returns undefined when web is not attached', async () => {
   const ch = new MockSlackChannel(mockContext());
-  // Don't call load — web is null.
+  // Don't call load - web is null.
 
   const result = await ch.sendMessage({ role: 'assistant', content: 'hello' });
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# uninstall.sh — Remove Marvin application.
+# uninstall.sh - Remove Marvin application.
 #
 # Usage: bash uninstall.sh [--keep-config]
 #

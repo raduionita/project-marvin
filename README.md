@@ -5,7 +5,7 @@ mArvIn - your AI sidekick
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/install) (v0.5.0 or higher) — installed automatically by the installer
+- [Bun](https://bun.sh/install) (v0.5.0 or higher) - installed automatically by the installer
 - [systemd](https://systemd.io/) with user-session support (standard on modern Linux)
 - [curl](https://curl.se/) or [wget](https://www.gnu.org/wget/)
 
