@@ -142,7 +142,7 @@ class MockSlackChannel extends SlackChannel {
 
     console.log('[SlackChannel.onMention]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
-    const result = await server.sendMessage(this.ctx, text, chatId, agentId);
+    const result = await server.execChat(this.ctx, text, chatId, agentId);
     if (!result) {
       console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
       await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
@@ -171,7 +171,7 @@ class MockSlackChannel extends SlackChannel {
 
       console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${(text as string).slice(0, 100)}`);
 
-      const result = await server.sendMessage(this.ctx, text, chatId, agentId);
+      const result = await server.execChat(this.ctx, text, chatId, agentId);
 
       if (!result) {
         console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
@@ -689,7 +689,7 @@ test('onMention() happy path: extracts text, finds agent, calls sendMessage, sen
   } as Agent;
 
   (ctx as { command: Command }).command = {
-    sendMessage: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
+    execChat: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
       sendMessageCalled = true;
       expect(chatId).toBe('slack-C123-1700000000.999');
       expect(agentId).toBe('agent-1');
@@ -836,7 +836,7 @@ test('onDirectMessage() happy path: finds agent by channel, calls sendMessage, s
   } as Agent;
 
   (ctx as { command: Command }).command = {
-    sendMessage: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
+    execChat: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
       sendMessageCalled = true;
       expect(agentId).toBe('agent-1'); // DM should resolve agent by channel (bug fix)
       return { content: 'DM reply', steps: 1 };
@@ -868,7 +868,7 @@ test('onDirectMessage() with no text content sends (no text content)', async () 
   } as Agent;
 
   (ctx as { command: Command }).command = {
-    sendMessage: async (ctx: Context, input: string, chatId: string, agentId: string) => {
+    execChat: async (ctx: Context, input: string, chatId: string, agentId: string) => {
       return { content: 'should not reach here', steps: 0 };
     }
   } as ServeCommand;

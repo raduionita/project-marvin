@@ -141,11 +141,11 @@ info "  Workspace directory: $MARVIN_DIR"
 info "  Agents directory:    $MARVIN_DIR/agents"
 
 # ── Step 6: Run 'marvin install' to create config & MARVIN.md ──────────────
-info "Running 'marvin install' to initialise workspace files..."
+info "Running [marvin install] to initialise workspace files..."
 if "$SYMLINK_PATH" install 2>&1; then
   info "  Workspace files created."
 else
-  warn "  'marvin install' failed - you can re-run it manually."
+  warn "  [marvin install] failed - you can re-run it manually."
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────

@@ -188,7 +188,7 @@ export default class ApiSystem extends System {
       }
 
       // send message to the LLM
-      const result = await serve.sendMessage(ctx, message, chatId, agentId, maxSteps);
+      const result = await serve.execChat(ctx, message, chatId, agentId, maxSteps);
       if (!result) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: '(ServeCommand.sendMessage ERROR - no LLM result)' }));

@@ -3,7 +3,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'fs';
 
-import { Context, Command, Config, System, Model, Agent, Task, Tool, Channel, Message, Reply  } from '../types.js';
+import { Context, Command, Config, System, Model, Agent, Task, Tool, Channel, Message, Reply, ToolMeta  } from '../types.js';
 import * as constants from '../constants.js';
 import { listSystems } from '../systems/index.js';
 import { listTools } from '../tools/index.js';
@@ -119,9 +119,9 @@ export default class ServeCommand extends Command {
         }
         // register instance of Tool
         const instance = new Class(this.ctx);
-        const meta = instance.meta;
-        this.ctx.tools[meta.name] = instance;
-        console.info('[ServeCommand.loadTools]', `tool [${meta.name}] loaded`);
+        const meta = instance.meta as ToolMeta;
+        this.ctx.tools[meta.function.name] = instance;
+        console.info('[ServeCommand.loadTools]', `tool [${meta.function.name}] loaded`);
       } catch (err) {
         console.error('[ServeCommand.loadTools]', `failed to load ${file}:`, err);
       }
@@ -487,7 +487,7 @@ export default class ServeCommand extends Command {
     const chatId = undefined; // stateless, design choice, for not
 
     // set task input as user message to LLM
-    const result = await this.sendMessage(ctx, task.input, chatId, agentId, maxSteps);
+    const result = await this.execChat(ctx, task.input, chatId, agentId, maxSteps);
     if (!result) {
       console.error('[ServeCommand.execTask]', `no result from sendMessage for agent ${agentId}`);
       return;
@@ -557,9 +557,9 @@ export default class ServeCommand extends Command {
     return await instance.call(args);
   }
 
-  async sendMessage(ctx: Context, message: string, chatId: string | undefined, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
+  async execChat(ctx: Context, message: string, chatId: string | undefined, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
     try {
-      console.debug('[ServeCommand.sendMessage]', chatId, agentId, message.slice(0, 100));
+      console.debug('[ServeCommand.execChat]', chatId, agentId, message.slice(0, 100));
 
       // get chat from cache/store using sessionId
       const chat = this.ctx.cache.findChat(chatId);
@@ -574,7 +574,7 @@ export default class ServeCommand extends Command {
 
       // return early
       if (this.ctx.isDry) {
-        console.info('[ServeCommand.sendMessage]', '[dry]', 'send messages to:', agent.model.model);
+        console.info('[ServeCommand.execChat]', '[dry]', 'send messages to:', agent.model.model);
         return { content: '(dry)', steps: 0 };
       }
 
@@ -594,18 +594,18 @@ export default class ServeCommand extends Command {
         chat.messages.push({ role: 'assistant', content: reply.message.content || '' });
 
         // trim result, this can be really big
-        console.info('[ServeCommand.sendMessage]', `step=${steps}`, JSON.stringify(reply));
+        console.info('[ServeCommand.execChat]', `step=${steps}`, JSON.stringify(reply));
 
         // force stop
         if (reply.stop) {
-          console.info('[ServeCommand.sendMessage]', `response force stop at step ${steps}`);
+          console.info('[ServeCommand.execChat]', `response force stop at step ${steps}`);
           break;
         }
 
         // execute any tool calls
         if (reply.message.tools && reply.message.tools.length > 0) {
           for (const tool of reply.message.tools) {
-            console.log('[ServeCommand.sendMessage]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+            console.log('[ServeCommand.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
             if (tool.name === constants.END_CHAT_NAME) {
               ender = true;
@@ -617,7 +617,7 @@ export default class ServeCommand extends Command {
               const args = JSON.parse(tool.arguments);
               result = await this.execTool(tool.name, args);
             } catch (err) {
-              console.error('[ServeCommand.sendMessage]', `tool ${tool.name} failed:`, err);
+              console.error('[ServeCommand.execChat]', `tool ${tool.name} failed:`, err);
               result = {error: (err as Error).message};
             }
 
@@ -628,20 +628,20 @@ export default class ServeCommand extends Command {
 
         // if model produced content without pending tool calls, we're done
         // if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
-        //   console.info('[ServeCommand.sendMessage]', `response without tool calls, stopping the AI loop`);
+        //   console.info('[ServeCommand.execChat]', `response without tool calls, stopping the AI loop`);
         //   break;
         // }
 
         // if end_chat tool call is found, we're done
         if (ender) {
-          console.info('[ServeCommand.sendMessage]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
+          console.info('[ServeCommand.execChat]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
           break;
         }
       } while (steps < maxSteps - 1);
 
       // warn if max steps reached
       if (steps >= maxSteps) {
-        console.warn('[ServeCommand.sendMessage]', `max steps (${maxSteps}) reached for ${agentId}`);
+        console.warn('[ServeCommand.execChat]', `max steps (${maxSteps}) reached for ${agentId}`);
       }
 
       // save chat to cache
@@ -650,7 +650,7 @@ export default class ServeCommand extends Command {
       // TODO: more info here
       return { content: reply?.message?.content || '', steps: steps };
     } catch (error) {
-      console.error('[ServeCommand.sendMessage]', error);
+      console.error('[ServeCommand.execChat]', error);
       return null;
     } 
   }

@@ -74,7 +74,7 @@ class MockTool extends Tool {
 
 /** A mock channel that records sent messages. */
 class TestChannel extends Channel {
-  args() { return {}; }
+  public args = {};
   async load(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
@@ -219,7 +219,7 @@ test('sendMessage returns dry result when ctx.isDry is true', async () => {
   const ctx = buildTestContext({ isDry: true });
   const server = mockServer(ctx);
 
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   // Dry mode returns early without calling the model
   expect(result).toEqual({ content: '(dry)', steps: 0 });
@@ -233,7 +233,7 @@ test('sendMessage pushes system and user messages to chat', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
-  await server.sendMessage(ctx, 'hello world', 'chat-1', 'marvin', 5);
+  await server.execChat(ctx, 'hello world', 'chat-1', 'marvin', 5);
 
   const chat = ctx.cache.findChat('chat-1');
   // 2 system/user messages + 5 assistant replies from the AI loop
@@ -251,7 +251,7 @@ test('sendMessage returns content and step count from model reply', async () => 
   const ctx = buildTestContext({ replyContent: 'hello from model' });
   const server = mockServer(ctx);
 
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
@@ -265,7 +265,7 @@ test('sendMessage caches the chat after execution', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
-  await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   const cached = ctx.cache.findChat('chat-1');
   expect(cached).toBeDefined();
@@ -278,10 +278,10 @@ test('sendMessage reuses existing chat when chatId already exists', async () => 
   const server = mockServer(ctx);
 
   // First call
-  await server.sendMessage(ctx, 'first', 'chat-1', 'marvin', 5);
+  await server.execChat(ctx, 'first', 'chat-1', 'marvin', 5);
 
   // Second call with same chatId
-  await server.sendMessage(ctx, 'second', 'chat-1', 'marvin', 5);
+  await server.execChat(ctx, 'second', 'chat-1', 'marvin', 5);
 
   const chat = ctx.cache.findChat('chat-1');
   // Each call adds 2 messages (system + user) + 5 assistant replies (one per loop iteration)
@@ -296,7 +296,7 @@ test('sendMessage calls agent.model.sendMessage maxSteps times when never stoppi
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
-  await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   const model = ctx.models['mock.model'] as MockModel;
   // The model is called exactly maxSteps times (5) when it never stops
@@ -307,7 +307,7 @@ test('sendMessage stops when reply.stop is true', async () => {
   const ctx = buildTestContext({ replyStop: true, replyContent: 'stopped early' });
   const server = mockServer(ctx);
 
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
@@ -335,7 +335,7 @@ test('sendMessage executes tool calls from model reply', async () => {
 
   (ctx.models['mock.model'] as MockModel).setReply(toolCallReply);
 
-  await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   // After tool execution, the loop continues (no end chat, no stop).
   // The model is called: 1 (tool call) + 4 (remaining iterations) = 5 total
@@ -367,7 +367,7 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
   (ctx.models['mock.model'] as MockModel).setReply(badToolReply);
 
   // Should not throw - it should catch the JSON parse error and push an error result
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).toBeDefined();
   // Verify tool error was pushed to chat
@@ -398,7 +398,7 @@ test('sendMessage stops the AI loop when end chat tool call is found', async () 
 
   (ctx.models['mock.model'] as MockModel).setReply(finalAnswerReply);
 
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();;
 
@@ -421,7 +421,7 @@ test('sendMessage returns empty content when reply has no message content', asyn
     message: { role: 'assistant', content: '' },
   } as Reply);
 
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
@@ -436,7 +436,7 @@ test('sendMessage throws when agentId does not exist', async () => {
   // Should throw when agentId doesn't exist
   let threw = false;
   try {
-    await server.sendMessage(ctx, 'hello', 'chat-1', 'nonexistent', 5);
+    await server.execChat(ctx, 'hello', 'chat-1', 'nonexistent', 5);
   } catch {
     threw = true;
   }
@@ -447,7 +447,7 @@ test('sendMessage returns content and steps from model reply', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();;
 
@@ -461,7 +461,7 @@ test('sendMessage passes correct agentId and chatId to cache', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
-  await server.sendMessage(ctx, 'hello', 'unique-chat-id', 'marvin', 5);
+  await server.execChat(ctx, 'hello', 'unique-chat-id', 'marvin', 5);
 
   const chat = ctx.cache.findChat('unique-chat-id');
   expect(chat.id).toBe('unique-chat-id');
@@ -472,7 +472,7 @@ test('sendMessage respects maxSteps limit (1 step)', async () => {
   const server = mockServer(ctx);
 
   // With maxSteps=1, the loop runs 1 time: steps=-1 -> 0, 0 < 0 false -> exit
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 1);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 1);
 
   expect(result).not.toBeNull();;
 
@@ -498,7 +498,7 @@ test('sendMessage warns when max steps are reached (maxSteps=1 with never-stoppi
 
   // maxSteps=1: steps=-1 -> steps=0 (0 < 0 false) -> exit, steps=0
   // 0 >= 1 is true -> warning logged
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 1);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 1);
 
   expect(result).not.toBeNull();;
 
@@ -506,7 +506,7 @@ test('sendMessage warns when max steps are reached (maxSteps=1 with never-stoppi
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
-test('sendMessage returns empty string when reply.message is undefined', async () => {
+test('execChat returns empty string when reply.message is undefined', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
@@ -520,7 +520,7 @@ test('sendMessage returns empty string when reply.message is undefined', async (
     message: {} as Message,
   } as Reply);
 
-  const result = await server.sendMessage(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
@@ -528,18 +528,18 @@ test('sendMessage returns empty string when reply.message is undefined', async (
   expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
-// ==================== execTask tests (integration with sendMessage) ====================
+// ==================== execTask tests (integration with execChat) ====================
 
-// Note: In serve.ts, execTask calls sendMessage as:
-//   this.sendMessage(ctx, task.input, agentId, chatId, maxSteps)
-// But sendMessage's signature is:
-//   async sendMessage(ctx, message, chatId, agentId, maxSteps)
+// Note: In serve.ts, execTask calls execChat as:
+//   this.execChat(ctx, task.input, agentId, chatId, maxSteps)
+// But execChat's signature is:
+//   async execChat(ctx, message, chatId, agentId, maxSteps)
 // So the 3rd and 4th params are swapped: agentId goes to chatId slot,
 // and chatId goes to agentId slot. This means sendMessage looks up
 // ctx.agents[chatId] which won't exist unless we set up the agent
 // with the chatId as its key.
 
-test('execTask calls sendMessage and sends result through agent channels', async () => {
+test('execTask calls execChat and sends result through agent channels', async () => {
   const ctx = buildTestContext();
   const server = mockServer(ctx);
 
@@ -560,7 +560,7 @@ test('execTask calls sendMessage and sends result through agent channels', async
 
   // The mock channel was loaded, so the result should have been sent through it
   expect(ctx.channels['test.channel']).toBeDefined();
-  // sendMessage was called by execTask
+  // execChat was called by execTask
   expect((ctx.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
