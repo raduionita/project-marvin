@@ -102,6 +102,7 @@ export default class ToolCommand extends Command {
         console.debug('[ToolCommand.loadSystems]', `system [${name}] loaded`);
       } catch (err) {
         console.error('[ToolCommand.loadSystems]', `failed to load ${name}:`, err);
+        process.exit(1);
       }
     }
   }

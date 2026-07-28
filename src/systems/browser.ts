@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
-import { Browser, BrowserContext, BrowserContextOptions, HTTPRequest, Page } from 'puppeteer';
+import { Browser, HTTPRequest, Page } from 'puppeteer';
 
 import { System } from '../types.js';
 
@@ -18,6 +18,8 @@ export default class BrowserSystem extends System {
     puppeteer.use(stealth());
 
     this.browser = await puppeteer.launch({
+      // TODO: adapt to different OSs
+      executablePath: '/usr/bin/chromium-browser',
       headless: true,
       args: [
         // for ducker/ci/root env, chrome won't start sandbox w/o these
@@ -50,6 +52,8 @@ export default class BrowserSystem extends System {
       defaultViewport: { width: 800, height: 600 },
       // todo: proxies
     });
+
+    console.debug('[BrowserSystem.load]', 'browser:', await puppeteer.executablePath());
   }
 
   public async drop(): Promise<void> {
