@@ -26,7 +26,7 @@ export default class WebSearchTool extends Tool {
   }
 
   public async call(args: { query: string }) {
-    console.debug('[WebSearchTool.call]', args);
+    console.debug('[WebSearchTool.call]', JSON.stringify(args));
 
     if (this.ctx.isDry) {
       console.info('[WebSearchTool.call]', '[dry] search:', args.query);
@@ -39,18 +39,33 @@ export default class WebSearchTool extends Tool {
 
     const system = this.ctx.systems['browser'] as BrowserSystem;
     const query = args.query;
-    const url = `https://duckduckgo.com?q=${query}&df=d`;
+    const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
 
-
-    const page = await system.newPage();
+    const page = await system.newPage((request) => {
+      // exlude everything except links.duckduckgo.com/d.js and document
+      const type = request.resourceType();
+      const url = request.url();
+      if (type === 'script' && !url.includes('links.duckduckgo.com/d.js')) {
+        // console.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+        return request.abort();
+      } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest'].includes(type)) {
+        // console.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+        return request.abort();
+      } else {
+        console.debug('[WebSearchTool.newPage]', 'allowing', type, url);
+        return request.continue();
+      }
+    });
     page.setDefaultNavigationTimeout(15_000);
 
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5_000 });
-      await delay(rand(500, 1000));
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10_000 });
 
-      const script = await page.waitForResponse((response) => response.url().includes('links.duckduckgo.com/d.js'), { timeout: 5_000 });
+      const script = await page.waitForResponse((response) => response.url().includes('links.duckduckgo.com/d.js'), { timeout: 10_000 });
       const text = await script.text();
+      
+      // done with the page
+      await page.close();
 
       const start = text.indexOf(SEARCH_START_TAG);
       const end = text.indexOf(SEARCH_END_TAG, start);
@@ -66,8 +81,12 @@ export default class WebSearchTool extends Tool {
     } catch (error) {
       console.error('[WebSearchTool.call]', 'error:', error);
     } finally {
-      await page.close();
+      if (!page.isClosed()) {
+        console.debug('[WebSearchTool.call]', 'closing page');
+        await page.close();
+      }
     }
+    // return nothing
     return { results: [] };
   }
 }

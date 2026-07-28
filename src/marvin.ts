@@ -19,6 +19,7 @@ await (new class App extends Command {
           this.loadConfig();
           this.loadFlags();
     await this.loadCommand();
+    process.exit(0);
   }
 
   loadProcess() {
@@ -109,7 +110,12 @@ await (new class App extends Command {
       }
       // create command and load/run it
       this.cmd = new Class(this.ctx);
-      this.cmd.load();
+      await this.cmd.load();
+
+      // if !deamon, exit
+      if (!this.cmd.deamon) {
+        process.exit(0);
+      }
     } catch (err) {
       console.error('[App.loadCommand]', `failed to load ${cmd}:`, err);
     }

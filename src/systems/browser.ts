@@ -1,12 +1,11 @@
 import puppeteer from 'puppeteer-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
-import { Browser, BrowserContext, BrowserContextOptions, Page } from 'puppeteer';
+import { Browser, BrowserContext, BrowserContextOptions, HTTPRequest, Page } from 'puppeteer';
 
 import { System } from '../types.js';
 
 export default class BrowserSystem extends System {
   private browser: Browser | undefined;
-  private bctx: BrowserContext | undefined;
 
   public async load(): Promise<void> {
     console.log('[BrowserSystem.load]');
@@ -21,15 +20,34 @@ export default class BrowserSystem extends System {
     this.browser = await puppeteer.launch({
       headless: true,
       args: [
+        // for ducker/ci/root env, chrome won't start sandbox w/o these
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-gpu',
+        // /dev/shm (tiny 64MB in containers), chrome uses it for cache, can cause crashes
         '--disable-dev-shm-usage',
+        // no rendering
+        '--disable-gpu',
+        '--disable-accelerated-2d-canvas',
+        // disable chrome features/subsystems
         '--disable-extensions',
+        '--disable-component-update',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate',
         '--disable-background-networking',
-        '--disable-background-timer-throttling',
-        '--disable-renderer-backgrounding'
+        '--disable-breakpad',
+        '--no-first-run',
+        // disable process forking
+        '--no-zygote',
+        // os-level window size
+        '--window-size=800,600',
+        // mute audio
+        '--mute-audio',
+
+        // '--disable-background-timer-throttling',
+        // '--disable-renderer-backgrounding'
       ],
+      defaultViewport: { width: 800, height: 600 },
       // todo: proxies
     });
   }
@@ -49,43 +67,37 @@ export default class BrowserSystem extends System {
     }
   }
 
-  public async newPage() : Promise<Page> {
+  public async newPage(onRequest?: (request: HTTPRequest) => void) : Promise<Page> {
+    console.debug('[BrowserSystem.newPage]');
+
     if (!this.browser) {
       console.error('[BrowserSystem.newPage]', 'browser not loaded');
       throw new Error('[BrowserSystem.newPage] ERROR - browser not loaded');
     }
-    if (!this.bctx) {
-      console.error('[BrowserSystem.newPage]', 'browser context not loaded');
-      throw new Error('[BrowserSystem.newPage] ERROR - browser context not loaded');
-    }
 
-    const page = await this.bctx.newPage();
+    const page = await this.browser.newPage();
 
-    page.setViewport({ width: 1200, height: 800 });
+    page.setViewport({ width: 800, height: 600 });
     page.setJavaScriptEnabled(true);
     page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.56 Safari/537.36');
     page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
     page.setBypassCSP(true);
 
+    if (!onRequest) {
+      onRequest = (request: HTTPRequest) => {
+        if (['image', 'stylesheet', 'font', 'media', 'other'].includes(request.resourceType())) {
+          console.debug('[BrowserSystem.newPage]', 'blocking', request.resourceType(), request.url());
+          return request.abort();
+        } else {
+          console.debug('[BrowserSystem.newPage]', 'allowing', request.resourceType(), request.url());
+          return request.continue();
+        }
+      };
+    }
+
     await page.setRequestInterception(true);
-    page.on('request', (request) => {
-      if (request.isInterceptResolutionHandled()) return;
-      // request.url().includes('links.duckduckgo.com/d.js') || 
-      if (request.isNavigationRequest()) {
-        return request.continue();
-      } else {
-        return request.abort();
-      }
-    });
+    page.on('request', onRequest);
 
     return page;
-  }
-
-  public async newContext(options?: BrowserContextOptions) : Promise<BrowserContext> {
-    if (!this.browser) {
-      console.error('[BrowserSystem.newContext]', 'browser not loaded');
-      throw new Error('[BrowserSystem.newContext] ERROR - browser not loaded');
-    }
-    return await this.browser.createBrowserContext(options);
   }
 }

@@ -11,6 +11,7 @@ export default class HelpCommand extends Command {
     console.info('[HelpCommand.load]', '  enable  ', 'load the project and service');
     console.info('[HelpCommand.load]', '  disable ', 'stop the app service');
     console.info('[HelpCommand.load]', '  serve   ', 'start the app service');
+    console.info('[HelpCommand.load]', '  tool    ', 'call a tool');
     console.info('[HelpCommand.load]', '  update  ', 'update Marvin to the latest version');
     console.info('[HelpCommand.load]', '  version ', 'show the current version');
     console.info('[HelpCommand.load]', '  reload  ', 'reload the daemon');

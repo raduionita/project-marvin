@@ -9,15 +9,20 @@ import { listSystems } from '../systems/index.js';
 import { listTools } from '../tools/index.js';
 import { listChannels } from '../channels/index.js';
 import { listModels } from '../models/index.js';
+import WatchSystem from '../systems/watch.js';
 
 // `marvin serve [help] [--dry]`
 export default class ServeCommand extends Command {
+  constructor(ctx: Context, deamon: boolean = true) {
+    super(ctx, deamon);
+  }
+
   // load the app/server and its internal systems
   async load() {
     console.debug('[ServeCommand.load]');
 
-          this.loadProject();
     await this.loadSystems();
+          this.loadProject();
     await this.loadTools();
     await this.loadChannels();
     await this.loadModels();
@@ -79,6 +84,17 @@ export default class ServeCommand extends Command {
       console.error('[ServeCommand.loadProject]', `missing ${cpath} file`, 'please run "marvin install" again');
       return;
     }
+
+    if (!this.ctx.systems['watch']) {
+      console.error('[ServeCommand.loadProject]', 'watch system not loaded, please run "marvin install" again');
+      return;
+    }
+
+    // watch marvin.json
+    const system = this.ctx.systems['watch'] as WatchSystem;
+    system.addFile(cpath);
+
+    // TODO: watch MARVIN.md
   }
 
   async loadSystems() {
@@ -97,7 +113,7 @@ export default class ServeCommand extends Command {
         const instance = new Class(this.ctx);
         await instance.load();
         this.ctx.systems[name] = instance;
-        console.info('[ServeCommand.loadSystems]', `system ${name} loaded`);
+        console.info('[ServeCommand.loadSystems]', `system [${name}] loaded`);
       } catch (err) {
         console.error('[ServeCommand.loadSystems]', `failed to load ${name}:`, err);
       }

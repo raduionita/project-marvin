@@ -40,7 +40,7 @@ export interface Config {
 }
 
 export class Command {
-  constructor(public readonly ctx: Context) {
+  constructor(public readonly ctx: Context, public readonly deamon: boolean = false) {
     console.debug(`[${this.constructor.name||'Command'}.constructor]`);
     this.ctx.command = this;
   }
