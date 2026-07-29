@@ -5,19 +5,19 @@ import { existsSync, readFileSync, } from 'fs';
 import { Command } from '../types';
 
 export default class VersionCommand extends Command {
-  async load() {
-    console.debug('[VersionCommand.load]');
+  async exec() {
+    console.debug('[VersionCommand.exec]');
 
     const root = join(homedir(), '.local', 'share', 'marvin');
     const pkgPath = join(root, 'package.json');
 
     if (!existsSync(pkgPath)) {
-      console.error('[VersionCommand.load]', 'package.json not found.');
+      console.error('[VersionCommand.exec]', 'package.json not found.');
       return;
     }
 
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     const version = pkg.version || 'unknown';
-    console.log('[VersionCommand.load]', 'v' + version);
+    console.log('[VersionCommand.exec]', 'v' + version);
   }
 }

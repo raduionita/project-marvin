@@ -8,59 +8,59 @@ import { Context, Command, Config } from './types.js';
 import * as constants from './constants.js';
 import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
-import { homedir } from 'os';
 
-await (new class App extends Command {
+await (new class Marvin {
+  ctx: Context = new Context();
   cmd: Command = this.ctx.command; // dummy
 
-  async load() {
-    console.debug('[App.load]');
+  async exec() {
+    console.debug('[Marvin.exec]');
+
           this.loadProcess();
           this.loadConfig();
           this.loadFlags();
     await this.loadCommand();
-    process.exit(0);
   }
 
   loadProcess() {
-    console.debug('[App.loadProcess]');
+    console.debug('[Marvin.loadProcess]');
 
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
-      console.log('[App.loadProcess]', 'exit', `${code}`);
+      console.log('[Marvin.loadProcess]', 'exit', `${code}`);
       // cleanup
       await this.drop();
     });
 
     // SIGINT (Ctrl+C)
     process.on('SIGINT', () => {
-      console.log('[App.loadProcess]', 'SIGINT', 'exiting...');
+      console.log('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
       // goto process.on('exit') instead
       process.exit(0);
     });
 
     // SIGTERM (kill)
     process.on('SIGTERM', () => {
-      console.log('[App.loadProcess]', 'SIGTERM', 'exiting...');
+      console.log('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
       // goto process.on('exit')
       process.exit(0);
     });
 
     // unhandled rejection from promise
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('[App.loadProcess]', 'unhandledRejection:', promise, 'reason:', reason);
+      console.error('[Marvin.loadProcess]', 'unhandledRejection:', promise, 'reason:', reason);
       // TODO: decide if the rejection should trigger a shutdown
     });
 
     // uncaught exception
     process.on('uncaughtException', (err) => {
-      console.error('[App.loadProcess]', 'uncaughtException:', err);
+      console.error('[Marvin.loadProcess]', 'uncaughtException:', err);
       // TODO: decide if the exception should trigger a shutdown
     });
   }  
 
   loadConfig(config?: Config | undefined) {
-    console.debug('[App.loadConfig]');
+    console.debug('[Marvin.loadConfig]');
     if (config) {
       this.ctx.config = config;
       return;
@@ -73,7 +73,7 @@ await (new class App extends Command {
     // at this stage marvin.json MUST exist, but just in case
     const cpath = join(this.ctx.home, 'marvin.json');
     if (!existsSync(cpath)) {
-      console.warn('[App.loadConfig]', 'Config file not found:', cpath, 'using default config');
+      console.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
       this.ctx.config = constants.DEFAULT_CONFIG as Config;
       return;
     }
@@ -84,19 +84,19 @@ await (new class App extends Command {
   }
 
   loadFlags() {
-    console.debug('[App.loadFlags]');
+    console.debug('[Marvin.loadFlags]');
     // const args = process.argv.slice(2);
   }
 
   async loadCommand() {
-    console.debug('[App.loadCommand]');
+    console.debug('[Marvin.loadCommand]');
 
     const args = process.argv.slice(2);
     let   cmd  = args[0] || 'help';
     const cmds = listCommands(this.ctx).map(f => f.replace('.ts', ''));
 
     if (!cmds.includes(cmd)) {
-      console.warn('[App.loadCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
+      console.warn('[Marvin.loadCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
       cmd = 'help';
     }
 
@@ -105,25 +105,25 @@ await (new class App extends Command {
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        console.warn('[App.loadCommand]', `${cmd} does not export a Command class, exiting`);
+        console.warn('[Marvin.loadCommand]', `${cmd} does not export a Command class, exiting`);
         return;
       }
       // create command and load/run it
       this.cmd = new Class(this.ctx);
-      await this.cmd.load();
+      await this.cmd.exec();
 
       // if !deamon, exit
       if (!this.cmd.deamon) {
         process.exit(0);
       }
     } catch (err) {
-      console.error('[App.loadCommand]', `failed to load ${cmd}:`, err);
+      console.error('[Marvin.loadCommand]', `failed to load ${cmd}:`, err);
     }
   }
 
   async drop() {
-    console.debug('[App.drop]');
+    console.debug('[Marvin.drop]');
 
     await this.cmd.drop();
   }
-}(new Context())).load();
+}).exec();

@@ -21,8 +21,8 @@ export interface Config {
     enabled: boolean;
     provider: Provider;
     model: string;
-    baseUrl: string;
-    apiKey: string;
+    baseUrl?: string;
+    apiKey?: string;
   }>;
   agents: Record<string, {
     enabled: boolean;
@@ -45,7 +45,7 @@ export class Command {
     this.ctx.command = this;
   }
 
-  async load(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.load]`); }
+  async exec(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.load]`); }
   async drop(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 

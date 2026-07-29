@@ -6,42 +6,42 @@ import { execSync } from 'child_process';
 import { Command } from '../types';
 
 export default class UpdateCommand extends Command {
-  async load() {
-    console.debug('[UpdateCommand.load]');
+  async exec() {
+    console.debug('[UpdateCommand.exec]');
 
     const root = join(homedir(), '.local', 'share', 'marvin');
 
     if (!existsSync(root)) {
-      console.error('[UpdateCommand.load]', 'marvin is not installed. run the installer first:');
-      console.error('[UpdateCommand.load]', '  bash install.sh');
+      console.error('[UpdateCommand.exec]', 'marvin is not installed. run the installer first:');
+      console.error('[UpdateCommand.exec]', '  bash install.sh');
       return;
     }
 
     // pull project, install dependencies, restart service
     if (this.ctx.isDry) {
-      console.log('[UpdateCommand.load]', '[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
-      console.log('[UpdateCommand.load]', '[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
-      console.log('[UpdateCommand.load]', '[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
+      console.log('[UpdateCommand.exec]', '[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
+      console.log('[UpdateCommand.exec]', '[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
+      console.log('[UpdateCommand.exec]', '[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
     } else {
       // git pull from main
-      console.info('[UpdateCommand.load]', 'pulling project...');
+      console.info('[UpdateCommand.exec]', 'pulling project...');
       execSync(['git', '-C', root, 'pull', 'origin', 'main'].join(' '), { stdio: 'inherit' });
 
       // Reinstall dependencies
-      console.info('[UpdateCommand.load]', 'reinstalling dependencies...');
+      console.info('[UpdateCommand.exec]', 'reinstalling dependencies...');
       execSync(['bun', 'install'].join(' '), { cwd: root, stdio: 'inherit' });
 
       // update service file by copy
-      console.info('[UpdateCommand.load]', 'updating service file...');
+      console.info('[UpdateCommand.exec]', 'updating service file...');
       const src = join(root, 'marvin.service');
       const dst = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
       copyFileSync(src, dst);
 
       // Restart service
-      console.info('[UpdateCommand.load]', 'restarting service...');
+      console.info('[UpdateCommand.exec]', 'restarting service...');
       execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
     }
 
-    console.info('[UpdateCommand.load]', 'update complete');
+    console.info('[UpdateCommand.exec]', 'update complete');
   }
 }

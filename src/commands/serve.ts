@@ -18,8 +18,8 @@ export default class ServeCommand extends Command {
   }
 
   // load the app/server and its internal systems
-  async load() {
-    console.debug('[ServeCommand.load]');
+  async exec() {
+    console.debug('[ServeCommand.exec]');
 
     await this.loadSystems();
           this.loadProject();
@@ -27,6 +27,8 @@ export default class ServeCommand extends Command {
     await this.loadChannels();
     await this.loadModels();
     await this.loadAgents();
+
+    await this.execAgents();
   }
 
   // will drop all the resources from the context
@@ -249,6 +251,9 @@ export default class ServeCommand extends Command {
 
     // type: orchestrator/supervisor
     {
+      console.debug('[ServeCommand.loadAgents]');
+
+      const ctx = this.ctx;
       const marvinId = ctx.config.settings.name;
       
       // model: default or first
@@ -272,28 +277,15 @@ export default class ServeCommand extends Command {
       } as Agent;
 
       // add dry taks to orchestrator agent
-      if (this.ctx.isDry) {
-        ctx.agents[marvinId].tasks['dry'] = {
-          id: 'dry',
-          enabled: true,
-          schedule: 0,
-          maxSteps: 0,
-          input: '[dry] hello world',
-          timeout: setTimeout(this.execTask.bind(this), 0, ctx, marvinId, 'dry'),
-        } as Task;
-        console.info('[ServeCommand.loadAgents]', '[dry]', `task [dry] scheduled (orchestrator)`);
-      } else {
-        ctx.agents[marvinId].tasks['status'] = {
-          id: 'status',
-          enabled: true,
-          schedule: 60*60*1000,
-          maxSteps: 0,
-          input: 'status',
-          timeout: setTimeout(this.execOrchestrator.bind(this), 60*60*1000, ctx, marvinId, 'status'),
-        } as Task;
+      ctx.agents[marvinId].tasks['status'] = {
+        id: 'status',
+        enabled: true,
+        schedule: 60*60*1000,
+        maxSteps: 0,
+        input: 'status',
+      } as Task;
 
-        console.info('[ServeCommand.loadAgents]', `task [status] scheduled (${60*60*1000}ms) (agent ${marvinId})`);
-      }
+      console.info('[ServeCommand.loadAgents]', `task [status] created (orchestrator ${marvinId})`);
 
       console.info('[ServeCommand.loadAgents]',`agent [${marvinId}] loaded`);
     }
@@ -331,7 +323,7 @@ export default class ServeCommand extends Command {
         }
 
         if (this.ctx.isDry) {
-          console.info('[ServeCommand.loadAgents]', `[dry] task ${taskId} scheduled (${schedule}ms) (agent ${agentId})`);
+          console.info('[ServeCommand.loadAgents]', `[dry] task ${taskId} created (agent ${agentId})`);
           continue;
         }
 
@@ -342,10 +334,9 @@ export default class ServeCommand extends Command {
           schedule: schedule,
           maxSteps: task.maxSteps,
           input: input,
-          timeout: setTimeout(this.execTask.bind(this), schedule, ctx, agentId, taskId),
         } as Task;
 
-        console.info('[ServeCommand.loadAgents]', `task [${taskId}] scheduled (${schedule}ms) (agent ${agentId})`);
+        console.info('[ServeCommand.loadAgents]', `task [${taskId}] created (agent ${agentId})`);
       }
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
@@ -426,6 +417,27 @@ export default class ServeCommand extends Command {
       }
     }
     ctx.systems = {};
+  }
+
+  // for each agent, for each task, start setTimeout
+  async execAgents() {
+    console.debug('[ServeCommand.execAgents]');
+
+    for (const [agentId, agent] of Object.entries(this.ctx.agents)) {
+      for (const [taskId, task] of Object.entries(agent.tasks)) {
+        if (this.ctx.isDry) {
+          console.info('[ServeCommand.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
+          continue;
+        }
+        if (agentId === this.ctx.config.settings.name) {
+          task.timeout = setTimeout(this.execOrchestrator.bind(this), task.schedule, this.ctx, agentId, taskId);
+          console.info('[ServeCommand.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (orchestrator ${agentId})`);
+        } else {
+          task.timeout = setTimeout(this.execTask.bind(this), task.schedule, this.ctx, agentId, taskId);
+          console.info('[ServeCommand.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
+        }
+      }
+    }
   }
 
   async execOrchestrator(ctx: Context, agentId: string, taskId: string) {

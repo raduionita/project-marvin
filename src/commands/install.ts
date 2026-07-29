@@ -6,54 +6,54 @@ import { Command } from '../types';
 import * as constants from '../constants';
 
 export default class InstallCommand extends Command {
-  async load() {
-    console.debug('[InstallCommand.load]');
+  async exec() {
+    console.debug('[InstallCommand.exec]');
     
     // ~/.marvin
     const hpath = this.ctx.home;
     if (this.ctx.isDry) {
-      console.info('[InstallCommand.load]', '[dry]', hpath);
+      console.info('[InstallCommand.exec]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
-      console.info('[InstallCommand.load]', 'created workspace directory:', hpath);
+      console.info('[InstallCommand.exec]', 'created workspace directory:', hpath);
     } else {
-      console.info('[InstallCommand.load]', '~/.marvin exists');
+      console.info('[InstallCommand.exec]', '~/.marvin exists');
     }
 
     // ~/.marvin/agents
     const apath = join(hpath, 'agents');
     if (this.ctx.isDry) {
-      console.info('[InstallCommand.load]', '[dry]', apath);
+      console.info('[InstallCommand.exec]', '[dry]', apath);
     } else if (!existsSync(apath)) {
       mkdirSync(apath, { recursive: true });
-      console.info('[InstallCommand.load]', 'created agents directory:', apath);
+      console.info('[InstallCommand.exec]', 'created agents directory:', apath);
     } else {
-      console.info('[InstallCommand.load]', '~/.marvin/agents exists');
+      console.info('[InstallCommand.exec]', '~/.marvin/agents exists');
     }
 
     //  ~/.marvin/MARVIN.md
     const mpath = join(hpath, 'MARVIN.md');
     if (this.ctx.isDry) {
-      console.info('[InstallCommand.load]', '[dry]', mpath);
+      console.info('[InstallCommand.exec]', '[dry]', mpath);
     } else if (!existsSync(mpath)) {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
-      console.info('[InstallCommand.load]', 'created MARVIN.md:', mpath);
+      console.info('[InstallCommand.exec]', 'created MARVIN.md:', mpath);
     } else {
-      console.info('[InstallCommand.load]', '~/.marvin/MARVIN.md exists');
+      console.info('[InstallCommand.exec]', '~/.marvin/MARVIN.md exists');
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
     const cpath = join(hpath, 'marvin.json');
     if (this.ctx.isDry) {
-      console.info('[InstallCommand.load]', '[dry]', cpath);
+      console.info('[InstallCommand.exec]', '[dry]', cpath);
     } else if (!existsSync(cpath)) {
       const config = constants.DEFAULT_CONFIG;
       writeFileSync(cpath, JSON.stringify(config, null, 2));
-      console.info('[InstallCommand.load]', 'created config file:', cpath);
+      console.info('[InstallCommand.exec]', 'created config file:', cpath);
     } else {
-      console.info('[InstallCommand.load]', '~/.marvin/marvin.json exists');
+      console.info('[InstallCommand.exec]', '~/.marvin/marvin.json exists');
     }
 
-    console.info('[InstallCommand.load]', 'installation complete');
+    console.info('[InstallCommand.exec]', 'installation complete');
   }
 }

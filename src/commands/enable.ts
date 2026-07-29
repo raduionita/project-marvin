@@ -7,8 +7,8 @@ import { Command } from '../types';
 import * as constants from '../constants';
 
 export default class EnableCommand extends Command {
-  async load() {
-    console.debug('[EnableCommand.load]');
+  async exec() {
+    console.debug('[EnableCommand.exec]');
     await this.loadProject();
     await this.loadService();
   }

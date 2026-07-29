@@ -1,7 +1,7 @@
 import { Command } from "../types";
 
 export default class HelpCommand extends Command {
-  async load() {
+  async exec() {
     console.debug('[HelpCommand.load]');
 
     console.info('[HelpCommand.load]', 'usage: marvin [command] [options] [--flags]');
@@ -17,6 +17,6 @@ export default class HelpCommand extends Command {
     console.info('[HelpCommand.load]', '  reload  ', 'reload the daemon');
     console.info('[HelpCommand.load]', '  status  ', 'check the daemon status');
     console.info('[HelpCommand.load]', '  chat    ', 'send a chat message');
-    console.info('[HelpCommand.load]', '  channels', 'list, load, bind, drop channels');
+    console.info('[HelpCommand.load]', '  channels', 'list, add, bind, remove channels');
   }
 }
