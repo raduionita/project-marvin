@@ -80,7 +80,7 @@ export default class Engine {
     const files = listSystems(this).map(f => f.replace('.ts', ''));
     for (const name of files) {
       try {
-        const Module = await import(`../systems/${name}.js`);
+        const Module = await import(`./systems/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof System)) {
           console.error('[Engine.loadSystems]', `${name} does not export a System class, skipping`);
@@ -104,7 +104,7 @@ export default class Engine {
     for (const file of files) {
       const name = file;
       try {
-        const Module = await import(`../tools/${name}.js`);
+        const Module = await import(`./tools/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
           console.error('[Engine.loadTools]', `${file} does not export a Tool class, skipping`);
@@ -135,7 +135,7 @@ export default class Engine {
       }
 
       try {
-        const Module = await import(`../channels/${file}.js`);
+        const Module = await import(`./channels/${file}.js`);
         const Class = Module.default;
         // must be a Channel class
         if (!Class || !(Class.prototype instanceof Channel)) {
@@ -172,7 +172,7 @@ export default class Engine {
         }
 
         // import the model provider
-        const Module = await import(`../models/${config.provider}.js`);
+        const Module = await import(`./models/${config.provider}.js`);
         const Class = Module.default;
 
         // must be a Model class
