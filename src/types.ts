@@ -1,3 +1,5 @@
+import type Engine from "./engine";
+
 export type Mode = 'client' | 'server';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -40,46 +42,17 @@ export interface Config {
 }
 
 export class Command {
-  constructor(public readonly ctx: Context, public args: string[], public readonly deamon: boolean = false) {
+  constructor(public readonly engine: Engine, public args: string[], public readonly deamon: boolean = false) {
     console.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
-    this.ctx.command = this;
+    this.engine.command = this;
   }
 
   async exec(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.exec]`); }
   async drop(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 
-export class Context {
-  public state: 'running' | 'reloading' | 'stopped' = 'running';
-
-  public command: Command = {} as Command;
-
-  public config: Config = {} as Config;
-
-  public cache: Cache = new Cache();
-
-  // TODO: later consider moving browser, http, watch (file watcher) to a separate group "systems"
-  public systems: Record<string, System> = {};
-
-  // channels, models, agents
-  public channels: Record<string, Channel> = {};
-  public tools   : Record<string, Tool> = {};
-  public models  : Record<string, Model> = {};
-  public agents  : Record<string, Agent> = {};
-
-  // home (~/.marvin) data folder
-  public home: string = process.env.HOME + '/.marvin';
-  // root (~/) app folder
-  public root: string = import.meta.dirname.replace(/\/src.*/, '');
-
-  public isDry: boolean = process.argv.includes('--dry') || process.argv.includes('-dry');
-  public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
-
-  public get isDebug() { return this.config.settings.logLevel === 'debug'; }
-}
-
 export abstract class System {
-  constructor(public readonly ctx: Context) {
+  constructor(public readonly engine: Engine) {
     console.debug(`[${this.constructor.name||'System'}.constructor]`);
   }
 
@@ -90,7 +63,7 @@ export abstract class System {
 export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string}}, required:string[]}} };
 
 export abstract class Tool {
-  constructor(public readonly ctx: Context) {
+  constructor(public readonly engine: Engine) {
     console.debug(`[${this.constructor.name||'Tool'}.constructor]`);
   }
 
@@ -103,7 +76,7 @@ export abstract class Tool {
 export abstract class Channel {
   abstract args: {[key: string]: any};
 
-  constructor(public readonly ctx: Context) {
+  constructor(public readonly engine: Engine) {
     console.debug(`[${this.constructor.name||'Channel'}.constructor]`);
   }
 
@@ -149,9 +122,9 @@ export abstract class Model {
   public format: 'text' | 'json' = 'text';
   public tools: ToolMeta[]; // 
 
-  constructor(public readonly ctx: Context, config: { [key: string]: any }) {
+  constructor(public readonly engine: Engine, config: { [key: string]: any }) {
     Object.assign(this, config);
-    this.tools = Object.values(this.ctx.tools).map(tool => tool.meta);
+    this.tools = Object.values(this.engine.tools).map(tool => tool.meta);
   }
 
   // sends messages to LLM model

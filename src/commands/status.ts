@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { Command } from "../types";
 
+// `marvin status [help] [--dry]`
 export default class StatusCommand extends Command {
   async exec() {
     console.debug('[StatusCommand.exec]');
@@ -8,29 +9,29 @@ export default class StatusCommand extends Command {
     const cmd = this.args[1];
     switch (cmd) {
       case 'help'   : 
-        console.debug('[StatusCommand.exec]', 'usage: marvin status [command]', 'check the daemon status');
-        console.debug('[StatusCommand.exec]', 'commands:');
-        console.debug('[StatusCommand.exec]', '  help    ', 'show this help');
+        console.info('usage: marvin status [command]', 'check the daemon status');
+        console.info('commands:');
+        console.info('  help    ', 'show this help');
       break;
       default: {
         // service status
-        if (this.ctx.isDry) {
-          console.log('[StatusCommand.exec]', '[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
+        if (this.engine.isDry) {
+          console.info('[StatusCommand.exec]', '[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
         } else {
           try {
             const status = execSync(['systemctl', '--user', 'status', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
-            console.log('[StatusCommand.exec]', 'service status:', status.trim());
+            console.info('[StatusCommand.exec]', 'service status:', status.trim());
           } catch {
-            console.log('[StatusCommand.exec]', 'service is not running.');
+            console.info('[StatusCommand.exec]', 'service is not running.');
           }
         }
 
         // TODO: replace health w/ GET status
 
-        const port = this.ctx!.config?.settings?.port || 7331;
+        const port = this.engine!.config?.settings?.port || 7331;
         
         // health check
-        if (this.ctx.isDry) {
+        if (this.engine.isDry) {
           console.log('[StatusCommand.exec]', '[dry]', 'check health: fetch http://localhost:' + port + '/_health');
         } else {
           try {
@@ -39,11 +40,11 @@ export default class StatusCommand extends Command {
               method: 'GET',
               headers: { 
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.ctx!.config.settings.apiToken}`,
+                'Authorization': `Bearer ${this.engine!.config.settings.apiToken}`,
               },
             });
             if (response.ok) {
-              console.log('[StatusCommand.exec]', `server is healthy (port ${port}).`);
+              console.info('[StatusCommand.exec]', `server is healthy (port ${port}).`);
             } else {
               console.warn('[StatusCommand.exec]', `server responded with ${response.status}.`);
             }

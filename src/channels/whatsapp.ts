@@ -6,7 +6,7 @@ export default class WhatsAppChannel extends Channel {
   }
 
   async load() : Promise<void> {
-    console.debug('[WhatsAppChannel.load]', 'attached', this.ctx.config.settings);
+    console.debug('[WhatsAppChannel.load]', 'attached', this.engine.config.settings);
   }
 
   async sendMessage(message: Message) : Promise<any> {

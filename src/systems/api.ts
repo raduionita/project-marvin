@@ -12,10 +12,10 @@ export default class ApiSystem extends System {
   public async load(): Promise<void> {
     console.debug('[ApiSystem.load]');
 
-    this.port = this.ctx.config.settings.port || 7331;
-    this.host = this.ctx.config.settings.host || '127.0.0.1';
+    this.port = this.engine.config.settings.port || 7331;
+    this.host = this.engine.config.settings.host || '127.0.0.1';
 
-    if (this.ctx.isDry) {
+    if (this.engine.isDry) {
       console.info('[ApiSystem.load]', '[dry] loading server', this.host, this.port);
       return;
     }
@@ -103,7 +103,7 @@ export default class ApiSystem extends System {
   }
 
   private isAuth(url: URL, headers: http.IncomingMessage['headers']) {
-    const token = this.ctx.config.settings.apiToken;
+    const token = this.engine.config.settings.apiToken;
     if (token && token !== 'changeme') {
       const authHeader = headers['authorization'] || '';
       const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -137,13 +137,12 @@ export default class ApiSystem extends System {
 
     // TODO: add more info: models, channels, agents, tools
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, data: { state: this.ctx.state } }));
+    res.end(JSON.stringify({ ok: true, data: { state: this.engine.state } }));
   }
 
   private async handleReload(req: http.IncomingMessage, res: http.ServerResponse) {
     console.debug('[ApiSystem.handleReload]');
-    const cmd = this.ctx.command as ServeCommand;
-    cmd.execReload();
+    this.engine.execReload();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, data: {} }));
   }
@@ -151,8 +150,6 @@ export default class ApiSystem extends System {
   private async handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
     console.debug('[ApiSystem.handleChat]', 'body:', req.url);
     
-    const ctx = this.ctx;
-
     try {
       // read body as JSON
       const body = await new Promise<{[key: string]: any}>((resolve, reject) => {
@@ -177,18 +174,11 @@ export default class ApiSystem extends System {
       
       const message = body.message as string;
       const chatId = body.chatId || `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const agentId = (body.agentId as string) || ctx.config.settings.name; // default to marvin (orchestrator)
+      const agentId = (body.agentId as string) || this.engine.config.settings.name; // default to marvin (orchestrator)
       const maxSteps = (body.maxSteps as number) ?? constants.DEFAULT_MAX_STEPS;
 
-      const serve = this.ctx.command as ServeCommand;
-      if (!serve) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: '(ServeCommand.sendMessage ERROR - server not available)' }));
-        return;
-      }
-
       // send message to the LLM
-      const result = await serve.execChat(ctx, message, chatId, agentId, maxSteps);
+      const result = await this.engine.execChat(message, chatId, agentId, maxSteps);
       if (!result) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: '(ServeCommand.sendMessage ERROR - no LLM result)' }));

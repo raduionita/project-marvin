@@ -10,14 +10,14 @@ export default class ChatCommand extends ServeCommand {
   async exec() {
     console.debug('[ChatCommand.exec]');
 
-    await this.loadSystems();
-    await this.loadProject();
-    await this.loadTools();
-    await this.loadModels();
-    await this.loadAgents();
+    await this.engine.scanProject();
+    await this.engine.loadSystems();
+    await this.engine.loadTools();
+    await this.engine.loadModels();
+    await this.engine.loadAgents();
 
     // default to orchestrator
-    const agentId = this.args[0] || this.ctx!.config.settings?.name;
+    const agentId = this.args[0] || this.engine!.config.settings?.name;
     let   chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     // TODO: start interactive prompt mode here...loop until /exit/quit/stop
@@ -34,11 +34,11 @@ export default class ChatCommand extends ServeCommand {
     }
 
     // send chat message to server /chat
-    if (this.ctx.isDry) {
+    if (this.engine.isDry) {
       console.debug('[ChatCommand.exec]', '[dry]', 'message:', answer);
       console.debug('[ChatCommand.exec]', '[dry]', 'agent:', agentId);
     } else {
-      const result = await this.execChat(this.ctx, answer, chatId, agentId);
+      const result = await this.engine.execChat(answer, chatId, agentId);
       if (!result) {
         console.error('[ChatCommand.exec]', 'no result from sendMessage for agent', agentId);
         return;

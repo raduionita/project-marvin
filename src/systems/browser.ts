@@ -10,7 +10,7 @@ export default class BrowserSystem extends System {
   public async load(): Promise<void> {
     console.log('[BrowserSystem.load]');
 
-    if (this.ctx.isDry) {
+    if (this.engine.isDry) {
       console.log('[BrowserSystem.load]', '[dry] loading chromium');
       return;
     }

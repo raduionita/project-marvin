@@ -1,8 +1,8 @@
 import { test, expect } from 'bun:test';
-import { Context, Channel, Config, Model, Cache, Chat, Reply, Message, Tool } from '../types.js';
-import ServeCommand from './serve.js';
+import { Channel, Config, Model, Cache, Chat, Reply, Message, Tool } from '../types.js';
 import { writeFileSync, mkdirSync } from 'fs';
 import * as constants from '../constants.js';
+import Engine from '../engine.js';
 
 // --- helpers ---
 
@@ -16,15 +16,10 @@ function mockConfig(channels: Config['channels'] = {}, models: Config['models'] 
   } as Config;
 }
 
-function mockContext(isDry = false): Context {
-  const ctx = new Context();
-  (ctx as any).isDry = isDry;
-  return ctx;
-}
-
-function mockServer(ctx?: Context): ServeCommand {
-  const context = ctx || mockContext();
-  return new ServeCommand(context);
+function mockEngine(isDry = false): Engine {
+  const engine = new Engine();
+  engine.isDry = isDry;
+  return engine;
 }
 
 /** A real Model subclass instance that returns a controllable reply. */
@@ -49,8 +44,8 @@ class MockModel extends Model {
 
   private _reply: Reply;
 
-  constructor(ctx: Context, reply: Reply) {
-    super(ctx, {});
+  constructor(engine: Engine, reply: Reply) {
+    super(engine, {});
     this._reply = reply;
   }
 
@@ -84,7 +79,7 @@ class TestChannel extends Channel {
 }
 
 /** Build a fully wired context with an agent, mock model, and mock channel. */
-function buildTestContext(opts?: {
+function buildTestEngine(opts?: {
   channelEnabled?: boolean;
   channelName?: string;
   agentId?: string;
@@ -97,7 +92,7 @@ function buildTestContext(opts?: {
   maxSteps?: number;
   customReply?: Reply;
   configAgents?: Record<string, any>;
-}): Context {
+}): Engine {
   const {
     channelEnabled = true,
     channelName = 'test.channel',
@@ -112,8 +107,9 @@ function buildTestContext(opts?: {
     configAgents,
   } = opts || {};
 
-  const ctx = mockContext(isDry);
-  ctx.config = mockConfig(
+  const engine = mockEngine(isDry);
+
+  engine.config = mockConfig(
     channelEnabled ? { [channelName]: { enabled: true } } : {},
     { [agentModel]: { enabled: true, provider: 'openai', model: 'mock', baseUrl: '', apiKey: '' } },
     configAgents || {
@@ -133,12 +129,12 @@ function buildTestContext(opts?: {
     : ({ id: 'reply-1', stop: false, finish: undefined, usage: { completion: 10, prompt: 20 }, message: { role: 'assistant', content: replyContent || '' } } as Reply));
 
   // Create and install a real mock model instance
-  const mockModelInstance = new MockModel(ctx, reply);
-  ctx.models[agentModel] = mockModelInstance;
+  const mockModelInstance = new MockModel(engine, reply);
+  engine.models[agentModel] = mockModelInstance;
 
   // Install a mock agent with proper identity
   const identity = 'You are Marvin.';
-  ctx.agents[agentId] = {
+  engine.agents[agentId] = {
     id: agentId,
     enabled: true,
     identity,
@@ -149,93 +145,91 @@ function buildTestContext(opts?: {
 
   // Install a mock channel
   if (channelEnabled) {
-    const ch = new TestChannel(ctx);
-    ctx.channels[channelName] = ch;
+    const ch = new TestChannel(engine);
+    engine.channels[channelName] = ch;
   }
 
   // Install a mock tool (needed if tool calls are sent)
-  ctx.tools['mock_tool'] = new MockTool(ctx);
+  engine.tools['mock_tool'] = new MockTool(engine);
 
-  return ctx;
+  return engine;
 }
 
 // ==================== loadChannels tests (existing, kept) ====================
 
 test('execChannels loads enabled channels with valid provider', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
-  const server = mockServer();
-  server.ctx.config = config;
+  const engine = mockEngine();
+  engine.config = config;
 
-  await server.loadChannels();
+  await engine.loadChannels();
 
-  expect(server.ctx!.channels['channel.mock']).toBeDefined();
-  expect(server.ctx!.channels['channel.mock'] instanceof Channel).toBe(true);
+  expect(engine.channels['channel.mock']).toBeDefined();
+  expect(engine.channels['channel.mock'] instanceof Channel).toBe(true);
 });
 
 test('execChannels skips disabled channels', async () => {
   const config = mockConfig({ disabledChannel: { enabled: false } });
-  const server = mockServer();
-  server.ctx.config = config;
+  const engine = mockEngine();
+  engine.config = config;
 
-  await server.loadChannels();
+  await engine.loadChannels();
 
-  expect(server.ctx!.channels['disabledChannel']).toBeUndefined();
+  expect(engine.channels['disabledChannel']).toBeUndefined();
 });
 
 test('execChannels warns on missing provider', async () => {
   const config = mockConfig({ unknownProvider: { enabled: true } });
-  const server = mockServer();
-  server.ctx.config = config;
+  const engine = mockEngine();
+  engine.config = config;
 
-  await server.loadChannels();
+  await engine.loadChannels();
 
-  expect(server.ctx!.channels['unknownProvider']).toBeUndefined();
+  expect(engine.channels['unknownProvider']).toBeUndefined();
 });
 
 test('execChannels skips non-Channel classes', async () => {
   const config = mockConfig({ badChannel: { enabled: true } });
-  const server = mockServer();
-  server.ctx.config = config;
+  const engine = mockEngine();
+  engine.config = config;
 
-  await server.loadChannels();
+  await engine.loadChannels();
 
-  expect(server.ctx!.channels['badChannel']).toBeUndefined();
+  expect(engine.channels['badChannel']).toBeUndefined();
 });
 
-test('execChannels stores channels in ctx.channels', async () => {
+test('execChannels stores channels in engine.channels', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
-  const server = mockServer();
-  server.ctx.config = config;
+  const engine = mockEngine();
+  engine.config = config;
 
-  await server.loadChannels();
+  await engine.loadChannels();
 
-  expect(Object.keys(server.ctx!.channels).length).toBeGreaterThan(0);
-  expect(Object.keys(server.ctx!.channels)).toContain('channel.mock');
+  expect(Object.keys(engine.channels).length).toBeGreaterThan(0);
+  expect(Object.keys(engine.channels)).toContain('channel.mock');
 });
 
 // ==================== sendMessage tests ====================
 
-test('sendMessage returns dry result when ctx.isDry is true', async () => {
-  const ctx = buildTestContext({ isDry: true });
-  const server = mockServer(ctx);
+test('sendMessage returns dry result when engine.isDry is true', async () => {
+  const engine = buildTestEngine({ isDry: true });
 
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   // Dry mode returns early without calling the model
   expect(result).toEqual({ content: '(dry)', steps: 0 });
   // Verify the model was never invoked by checking the chat has no assistant messages
-  const chat = ctx.cache.findChat('chat-1');
+  const chat = engine.cache.findChat('chat-1');
   const assistantMessages = chat.messages.filter((m: Message) => m.role === 'assistant');
   expect(assistantMessages.length).toBe(0);
 });
 
 test('sendMessage pushes system and user messages to chat', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  await server.execChat(ctx, 'hello world', 'chat-1', 'marvin', 5);
+  await engine.execChat('hello world', 'chat-1', 'marvin', 5);
 
-  const chat = ctx.cache.findChat('chat-1');
+  const chat = engine.cache.findChat('chat-1');
   // 2 system/user messages + 5 assistant replies from the AI loop
   expect(chat.messages.length).toBe(7);
   expect(chat.messages[0]!.role).toBe('system');
@@ -248,10 +242,9 @@ test('sendMessage pushes system and user messages to chat', async () => {
 });
 
 test('sendMessage returns content and step count from model reply', async () => {
-  const ctx = buildTestContext({ replyContent: 'hello from model' });
-  const server = mockServer(ctx);
+  const engine = buildTestEngine({ replyContent: 'hello from model' });
 
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
@@ -262,28 +255,26 @@ test('sendMessage returns content and step count from model reply', async () => 
 });
 
 test('sendMessage caches the chat after execution', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
-  const cached = ctx.cache.findChat('chat-1');
+  const cached = engine.cache.findChat('chat-1');
   expect(cached).toBeDefined();
   expect(cached.id).toBe('chat-1');
   expect(cached.messages.length).toBeGreaterThan(0);
 });
 
 test('sendMessage reuses existing chat when chatId already exists', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // First call
-  await server.execChat(ctx, 'first', 'chat-1', 'marvin', 5);
+  await engine.execChat('first', 'chat-1', 'marvin', 5);
 
   // Second call with same chatId
-  await server.execChat(ctx, 'second', 'chat-1', 'marvin', 5);
+  await engine.execChat('second', 'chat-1', 'marvin', 5);
 
-  const chat = ctx.cache.findChat('chat-1');
+  const chat = engine.cache.findChat('chat-1');
   // Each call adds 2 messages (system + user) + 5 assistant replies (one per loop iteration)
   // But the model always returns the same reply, so we get 2 calls * (2 + 5) = 14 messages
   // Actually: first call: system + user + 5 assistant = 7
@@ -293,32 +284,29 @@ test('sendMessage reuses existing chat when chatId already exists', async () => 
 });
 
 test('sendMessage calls agent.model.sendMessage maxSteps times when never stopping', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
-  const model = ctx.models['mock.model'] as MockModel;
+  const model = engine.models['mock.model'] as MockModel;
   // The model is called exactly maxSteps times (5) when it never stops
   expect(model.callCount).toBe(5);
 });
 
 test('sendMessage stops when reply.stop is true', async () => {
-  const ctx = buildTestContext({ replyStop: true, replyContent: 'stopped early' });
-  const server = mockServer(ctx);
+  const engine = buildTestEngine({ replyStop: true, replyContent: 'stopped early' });
 
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
   expect(result!.content).toBe('stopped early');
   // With stop=true, the model is called only once
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
 test('sendMessage executes tool calls from model reply', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Replace the model's reply (not the instance) so the agent's reference stays valid
   const toolCallReply: Reply = {
@@ -333,23 +321,22 @@ test('sendMessage executes tool calls from model reply', async () => {
     },
   } as Reply;
 
-  (ctx.models['mock.model'] as MockModel).setReply(toolCallReply);
+  (engine.models['mock.model'] as MockModel).setReply(toolCallReply);
 
-  await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   // After tool execution, the loop continues (no end chat, no stop).
   // The model is called: 1 (tool call) + 4 (remaining iterations) = 5 total
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(5);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(5);
 
   // Check that tool result was pushed to chat
-  const chat = ctx.cache.findChat('chat-1');
+  const chat = engine.cache.findChat('chat-1');
   const toolMessages = chat.messages.filter((m: Message) => m.role === 'tool');
   expect(toolMessages.length).toBeGreaterThan(0);
 });
 
 test('sendMessage handles invalid JSON in tool arguments gracefully', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Replace the model's reply (not the instance) so the agent's reference stays valid
   const badToolReply: Reply = {
@@ -364,14 +351,14 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
     },
   } as Reply;
 
-  (ctx.models['mock.model'] as MockModel).setReply(badToolReply);
+  (engine.models['mock.model'] as MockModel).setReply(badToolReply);
 
   // Should not throw - it should catch the JSON parse error and push an error result
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   expect(result).toBeDefined();
   // Verify tool error was pushed to chat
-  const chat = ctx.cache.findChat('chat-1');
+  const chat = engine.cache.findChat('chat-1');
   const toolMessages = chat.messages.filter((m: Message) => m.role === 'tool');
   expect(toolMessages.length).toBeGreaterThan(0);
   // The tool error message should contain the parse error
@@ -380,8 +367,7 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
 });
 
 test('sendMessage stops the AI loop when end chat tool call is found', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Replace the model's reply (not the instance) so the agent's reference stays valid
   const finalAnswerReply: Reply = {
@@ -396,24 +382,23 @@ test('sendMessage stops the AI loop when end chat tool call is found', async () 
     },
   } as Reply;
 
-  (ctx.models['mock.model'] as MockModel).setReply(finalAnswerReply);
+  (engine.models['mock.model'] as MockModel).setReply(finalAnswerReply);
 
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();;
 
   // Should only call the model once - the end chat causes an immediate exit
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
   expect(result!.content).toBe(''); // The end chat content is empty in our reply
 });
 
 test('sendMessage returns empty content when reply has no message content', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Replace the model's reply (not the instance) so the agent's reference stays valid
   // Stop=true ensures the loop exits after 1 iteration
-  (ctx.models['mock.model'] as MockModel).setReply({
+  (engine.models['mock.model'] as MockModel).setReply({
     id: 'reply-5',
     stop: true,
     finish: undefined,
@@ -421,22 +406,21 @@ test('sendMessage returns empty content when reply has no message content', asyn
     message: { role: 'assistant', content: '' },
   } as Reply);
 
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
   expect(result!.content).toBe('');
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
 test('sendMessage throws when agentId does not exist', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Should throw when agentId doesn't exist
   let threw = false;
   try {
-    await server.execChat(ctx, 'hello', 'chat-1', 'nonexistent', 5);
+    await engine.execChat('hello', 'chat-1', 'nonexistent', 5);
   } catch {
     threw = true;
   }
@@ -444,45 +428,41 @@ test('sendMessage throws when agentId does not exist', async () => {
 });
 
 test('sendMessage returns content and steps from model reply', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();;
 
   expect(result!.content).toBe('end chat');
   // The model runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
   expect(result!.steps).toBe(4);
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(5);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(5);
 });
 
 test('sendMessage passes correct agentId and chatId to cache', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  await server.execChat(ctx, 'hello', 'unique-chat-id', 'marvin', 5);
+  await engine.execChat('hello', 'unique-chat-id', 'marvin', 5);
 
-  const chat = ctx.cache.findChat('unique-chat-id');
+  const chat = engine.cache.findChat('unique-chat-id');
   expect(chat.id).toBe('unique-chat-id');
 });
 
 test('sendMessage respects maxSteps limit (1 step)', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // With maxSteps=1, the loop runs 1 time: steps=-1 -> 0, 0 < 0 false -> exit
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 1);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 1);
 
   expect(result).not.toBeNull();;
 
   expect(result!.steps).toBe(0);
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
 test('sendMessage warns when max steps are reached (maxSteps=1 with never-stopping model)', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // A model that never stops (no stop, no end chat, no tools)
   // Replace the model's reply (not the instance) so the agent's reference stays valid
@@ -494,25 +474,24 @@ test('sendMessage warns when max steps are reached (maxSteps=1 with never-stoppi
     message: { role: 'assistant', content: 'not done yet' },
   } as Reply;
 
-  (ctx.models['mock.model'] as MockModel).setReply(neverStoppingReply);
+  (engine.models['mock.model'] as MockModel).setReply(neverStoppingReply);
 
   // maxSteps=1: steps=-1 -> steps=0 (0 < 0 false) -> exit, steps=0
   // 0 >= 1 is true -> warning logged
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 1);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 1);
 
   expect(result).not.toBeNull();;
 
   expect(result!.steps).toBe(0);
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
 test('execChat returns empty string when reply.message is undefined', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Replace the model's reply (not the instance) so the agent's reference stays valid
   // Stop=true ensures the loop exits after 1 iteration
-  (ctx.models['mock.model'] as MockModel).setReply({
+  (engine.models['mock.model'] as MockModel).setReply({
     id: 'reply-7',
     stop: true,
     finish: undefined,
@@ -520,31 +499,30 @@ test('execChat returns empty string when reply.message is undefined', async () =
     message: {} as Message,
   } as Reply);
 
-  const result = await server.execChat(ctx, 'hello', 'chat-1', 'marvin', 5);
+  const result = await engine.execChat('hello', 'chat-1', 'marvin', 5);
 
   expect(result).not.toBeNull();
 
   expect(result!.content).toBe('');
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(1);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
 // ==================== execTask tests (integration with execChat) ====================
 
 // Note: In serve.ts, execTask calls execChat as:
-//   this.execChat(ctx, task.input, agentId, chatId, maxSteps)
+//   this.execChat(task.input, agentId, chatId, maxSteps)
 // But execChat's signature is:
-//   async execChat(ctx, message, chatId, agentId, maxSteps)
+//   async execChat(message, chatId, agentId, maxSteps)
 // So the 3rd and 4th params are swapped: agentId goes to chatId slot,
 // and chatId goes to agentId slot. This means sendMessage looks up
-// ctx.agents[chatId] which won't exist unless we set up the agent
+// engine.agents[chatId] which won't exist unless we set up the agent
 // with the chatId as its key.
 
 test('execTask calls execChat and sends result through agent channels', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Add a task directly to the existing agent (identity is already set by buildTestContext)
-  ctx.agents['marvin']!.tasks = {
+  engine.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -556,20 +534,19 @@ test('execTask calls execChat and sends result through agent channels', async ()
   };
 
   // Call execTask directly
-  await server.execTask(ctx, 'marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
 
   // The mock channel was loaded, so the result should have been sent through it
-  expect(ctx.channels['test.channel']).toBeDefined();
+  expect(engine.channels['test.channel']).toBeDefined();
   // execChat was called by execTask
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
 test('execTask skips disabled tasks', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Add a disabled task directly to the existing agent (identity is already set)
-  ctx.agents['marvin']!.tasks = {
+  engine.agents['marvin']!.tasks = {
     'disabled-task': {
       id: 'disabled-task',
       enabled: false,
@@ -581,19 +558,18 @@ test('execTask skips disabled tasks', async () => {
   };
 
   // Should log and return without calling sendMessage
-  await server.execTask(ctx, 'marvin', 'disabled-task');
+  await engine.execTask('marvin', 'disabled-task');
 
   // Verify the model was never invoked
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(0);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
 test('execTask skips disabled agents', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Disable the agent directly (identity is already set by buildTestContext)
-  (ctx.agents['marvin'] as any).enabled = false;
-  ctx.agents['marvin']!.tasks = {
+  (engine.agents['marvin'] as any).enabled = false;
+  engine.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -604,19 +580,18 @@ test('execTask skips disabled agents', async () => {
     },
   };
 
-  await server.execTask(ctx, 'marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
 
   // Verify the model was never invoked
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(0);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
 test('execTask warns and skips when agent channel is not loaded', async () => {
-  const ctx = buildTestContext({ channelEnabled: false });
-  const server = mockServer(ctx);
+  const engine = buildTestEngine({ channelEnabled: false });
 
   // Set a missing channel directly (identity is already set by buildTestContext)
-  ctx.agents['marvin']!.channels = { 'missing.channel': 'default' };
-  ctx.agents['marvin']!.tasks = {
+  engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
+  engine.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -628,17 +603,16 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await server.execTask(ctx, 'marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
   // sendMessage was called (execTask tries it), but the channel send failed
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
 test('execTask skips disabled tasks', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Add a disabled task directly to the existing agent (identity is already set)
-  ctx.agents['marvin']!.tasks = {
+  engine.agents['marvin']!.tasks = {
     'disabled-task': {
       id: 'disabled-task',
       enabled: false,
@@ -650,19 +624,18 @@ test('execTask skips disabled tasks', async () => {
   };
 
   // Should log and return without calling sendMessage
-  await server.execTask(ctx, 'marvin', 'disabled-task');
+  await engine.execTask('marvin', 'disabled-task');
 
   // Verify the model was never invoked
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(0);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
 test('execTask skips disabled agents', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Disable the agent directly (identity is already set by buildTestContext)
-  (ctx.agents['marvin'] as any).enabled = false;
-  ctx.agents['marvin']!.tasks = {
+  (engine.agents['marvin'] as any).enabled = false;
+  engine.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -673,19 +646,18 @@ test('execTask skips disabled agents', async () => {
     },
   };
 
-  await server.execTask(ctx, 'marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
 
   // Verify the model was never invoked
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBe(0);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
 test('execTask warns and skips when agent channel is not loaded', async () => {
-  const ctx = buildTestContext({ channelEnabled: false });
-  const server = mockServer(ctx);
+  const engine = buildTestEngine({ channelEnabled: false });
 
   // Set a missing channel directly (identity is already set by buildTestContext)
-  ctx.agents['marvin']!.channels = { 'missing.channel': 'default' };
-  ctx.agents['marvin']!.tasks = {
+  engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
+  engine.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
       enabled: true,
@@ -697,15 +669,15 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await server.execTask(ctx, 'marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
   // sendMessage was called (execTask tries it), but the channel send failed
-  expect((ctx.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
 // ==================== execReload tests ====================
 
 test('execReload sets state to running after reload', async () => {
-  const ctx = buildTestContext({
+  const engine = buildTestEngine({
     configAgents: {
       marvin: {
         enabled: true,
@@ -716,35 +688,34 @@ test('execReload sets state to running after reload', async () => {
       },
     },
   });
-  const server = mockServer(ctx);
 
   // Set up a test home directory so loadAgents can read MARVIN.md
   const testHome = '/tmp/marvin-test-' + Date.now();
-  (ctx as any).home = testHome;
-  (ctx as any).root = testHome;
+  engine.home = testHome;
+  engine.root = testHome;
   mkdirSync(testHome, { recursive: true });
   writeFileSync(testHome + '/MARVIN.md', 'You are Marvin.');
   // Create subdirectories needed by loadAgents
   mkdirSync(testHome + '/agents', { recursive: true });
 
   // Pre-load some state
-  ctx.state = 'running';
+  engine.state = 'running';
 
   // Stub loadAgents to not actually try to load models from disk (which fails in tests).
   // execReload calls loadAgents internally, so we replace it with a no-op that
   // preserves the existing mock model.
-  const originalInitAgents = server.loadAgents.bind(server);
-  (server as any).loadAgents = async () => {
+  const originalInitAgents = engine.loadAgents.bind(engine);
+  engine.loadAgents = async () => {
     // Re-install the mock model so agents can use it
-    const mockModelInstance = new MockModel(ctx, {
+    const mockModelInstance = new MockModel(engine, {
       id: 'reply-1',
       stop: true,
       finish: undefined,
       usage: { completion: 0, prompt: 0 },
       message: { role: 'assistant', content: '' },
     } as Reply);
-    ctx.models['mock.model'] = mockModelInstance;
-    ctx.agents['marvin'] = {
+    engine.models['mock.model'] = mockModelInstance;
+    engine.agents['marvin'] = {
       id: 'marvin',
       enabled: true,
       identity: 'You are Marvin.',
@@ -754,47 +725,43 @@ test('execReload sets state to running after reload', async () => {
     };
   };
 
-  await server.execReload();
+  await engine.execReload();
 
-  expect(ctx.state).toBe('running');
+  expect(engine.state).toBe('running');
 });
 
 // ==================== drop methods tests ====================
 
 test('dropChannels clears all channels from context', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  await server.dropChannels();
+  await engine.dropChannels();
 
-  expect(Object.keys(ctx.channels).length).toBe(0);
+  expect(Object.keys(engine.channels).length).toBe(0);
 });
 
 test('dropChannel removes a single channel by id', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  await server.dropChannel('test.channel');
+  await engine.dropChannel('test.channel');
 
-  expect(ctx.channels['test.channel']).toBeUndefined();
+  expect(engine.channels['test.channel']).toBeUndefined();
 });
 
 test('dropChannel does nothing for non-existent channel', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Should not throw
-  await server.dropChannel('nonexistent.channel');
+  await engine.dropChannel('nonexistent.channel');
 
-  expect(ctx.channels['test.channel']).toBeDefined();
+  expect(engine.channels['test.channel']).toBeDefined();
 });
 
 test('dropAgents clears all agents and clears their timeouts', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
   // Add a task with a timeout
-  ctx.agents['marvin']!.tasks['test-task'] = {
+  engine.agents['marvin']!.tasks['test-task'] = {
     id: 'test-task',
     enabled: true,
     schedule: 0,
@@ -803,16 +770,13 @@ test('dropAgents clears all agents and clears their timeouts', async () => {
     timeout: setTimeout(() => {}, 0),
   };
 
-  await server.drop(); // calls dropAgents internally
-
-  expect(Object.keys(ctx.agents).length).toBe(0);
+  expect(Object.keys(engine.agents).length).toBe(0);
 });
 
 test('dropModels clears all models', async () => {
-  const ctx = buildTestContext();
-  const server = mockServer(ctx);
+  const engine = buildTestEngine();
 
-  await (server as any).dropModels();
+  await engine.dropModels();
 
-  expect(Object.keys(ctx.models).length).toBe(0);
+  expect(Object.keys(engine.models).length).toBe(0);
 });

@@ -28,16 +28,16 @@ export default class WebSearchTool extends Tool {
   public async call(args: { query: string }) {
     console.debug('[WebSearchTool.call]', JSON.stringify(args));
 
-    if (this.ctx.isDry) {
+    if (this.engine.isDry) {
       console.info('[WebSearchTool.call]', '[dry] search:', args.query);
       return { results: [] };
     }
 
-    if (!this.ctx.systems['browser']) {
+    if (!this.engine.systems['browser']) {
       throw new Error('[WebSearchTool.call] ERROR - Browser is not loaded in the server context');
     }
 
-    const system = this.ctx.systems['browser'] as BrowserSystem;
+    const system = this.engine.systems['browser'] as BrowserSystem;
     const query = args.query;
     const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
 

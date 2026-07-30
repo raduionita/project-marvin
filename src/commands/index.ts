@@ -2,16 +2,16 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { readdirSync } from 'fs';
 
-import { Context } from "../types";
+import type Engine from '../engine';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
-export function listCommands(ctx: Context): string[] {
+export function listCommands(engine: Engine): string[] {
   return readdirSync(tdir).filter(f =>
     f !== 'index.ts' &&
     !f.includes('.test.') &&
     !f.includes('.d.') &&
-    (ctx.isTest || !f.includes('.mock.')) &&
+    (engine.isTest || !f.includes('.mock.')) &&
     f.endsWith('.ts')
   );
 }

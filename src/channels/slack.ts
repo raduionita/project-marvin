@@ -1,9 +1,6 @@
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import { Channel, Message, Agent } from '../types.js';
-import { Context } from '../types.js';
-import * as constants from '../constants.js';
-import ServeCommand from '../commands/serve.js';
 
 export type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>, ack: (response?: Record<string, unknown>) => Promise<void> };
 
@@ -34,14 +31,14 @@ export default class SlackChannel extends Channel {
   protected web!: IWebClient;
 
   async load() {
-    console.debug('[SlackChannel.load]', this.ctx.config.channels.slack);
+    console.debug('[SlackChannel.load]', this.engine.config.channels.slack);
 
-    if (this.ctx.isDry) {
+    if (this.engine.isDry) {
       console.info('[SlackChannel.load]', '[dry] channel slack attached');
       return;
     }
 
-    const config = this.ctx.config.channels.slack as SlackConfig | undefined;
+    const config = this.engine.config.channels.slack as SlackConfig | undefined;
     if (!config) {
       console.error('[SlackChannel.load]', 'no settings found, skipping');
       return;
@@ -89,9 +86,10 @@ export default class SlackChannel extends Channel {
   }
 
   async drop() {
+    console.debug('[SlackChannel.drop]');
     if (this.sok) {
       await this.sok.disconnect();
-      console.info('[SlackChannel.drop]','channel slack dropped');
+      console.debug('[SlackChannel.drop]','channel slack dropped');
     }
   }
 
@@ -99,7 +97,7 @@ export default class SlackChannel extends Channel {
   async sendMessage(message: Message) : Promise<SlackResponse> {
     console.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
 
-    if (this.ctx.isDry) {
+    if (this.engine.isDry) {
       console.info('[SlackChannel.sendMessage]', '[dry] send message to:', message.channel);
       return { ts: '0000000000.000000', ok: true, error: '', message: '(dry)', channel: message.channel };
     }
@@ -162,15 +160,6 @@ export default class SlackChannel extends Channel {
         return; 
       }
 
-      // get the server reference from context
-      const server = this.ctx.command as ServeCommand;
-      // this should never happen, but just in case throw an error
-      if (!server) {
-        console.error('[SlackChannel.onMention]', 'server not available');
-        await this.sendMessage({ role: 'assistant', content: '(server not available)', channel: event.channel, thread: thread });
-        return;
-      }
-
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
       const agentId = agent.id;
@@ -179,7 +168,7 @@ export default class SlackChannel extends Channel {
       console.info(`processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await server.execChat(this.ctx, text, chatId, agentId);
+      const result = await this.engine.execChat(text, chatId, agentId);
       if (!result) {
         console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
         await this.sendMessage({ role: 'assistant', content: '(no response from the AI)', channel: event.channel, thread: thread });
@@ -204,14 +193,6 @@ export default class SlackChannel extends Channel {
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
 
-      // get the server reference from context
-      const server = this.ctx.command as ServeCommand;
-      if (!server) {
-        console.error('[SlackChannel.onDirectMessage]', 'server not available');
-        await this.sendMessage({ role: 'assistant', content: '(ServeCommand.onDirectMessage ERROR - server not available)', channel: event.channel, thread: thread });
-        return;
-      }
-
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
       const agentId = agent.id;
@@ -220,7 +201,7 @@ export default class SlackChannel extends Channel {
       console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await server.execChat(this.ctx, text, chatId, agentId);
+      const result = await this.engine.execChat(text, chatId, agentId);
       if (!result) {
         console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
         await this.sendMessage({ role: 'assistant', content: '(SlackChannel.onDirectMessage ERROR - no response from the AI)', channel: event.channel, thread: thread });
@@ -271,7 +252,7 @@ export default class SlackChannel extends Channel {
     // TOOD: should remove @bot-name with "" NOT other user's @mentions
     // TODO: other user metions should be replaced with their names?
 
-    // const marvin = `@${this.ctx.config.settings.name}`;
+    // const marvin = `@${this.engine.config.settings.name}`;
 
     // strip @marvin mention (Slack format: <@U12345>)
     text = text.replace(/<@[\w]+>/g, '').trim();
@@ -288,11 +269,11 @@ export default class SlackChannel extends Channel {
 
     // diretly use marvin/orchestrator agent
     if (!channel) {
-      return this.ctx.agents[this.ctx.config.settings.name]!;
+      return this.engine.agents[this.engine.config.settings.name]!;
     }
 
     // find ir first enabled agent that has slack configured
-    for (const agent of Object.values(this.ctx.agents)) {
+    for (const agent of Object.values(this.engine.agents)) {
       if (!agent.enabled) continue;
 
       // find the agent that has the slack+group configured
@@ -302,6 +283,6 @@ export default class SlackChannel extends Channel {
     }
 
     // fallback: default agent (settings.name), fallback doesnt need slack configured
-    return this.ctx.agents[this.ctx.config.settings.name]!;
+    return this.engine.agents[this.engine.config.settings.name]!;
   }
 }

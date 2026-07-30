@@ -4,14 +4,15 @@ import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { configDotenv } from 'dotenv';
 
-import { Context, Command, Config } from './types.js';
+import {  Command, Config } from './types.js';
 import * as constants from './constants.js';
 import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
+import Engine from './engine.js';
 
 await (new class Marvin {
-  ctx: Context = new Context();
-  cmd: Command = this.ctx.command; // dummy
+  engine : Engine = new Engine();
+  command: Command | undefined = undefined;
 
   async exec() {
     console.debug('[Marvin.exec]');
@@ -19,7 +20,7 @@ await (new class Marvin {
           this.loadProcess();
           this.loadConfig();
           this.loadFlags();
-    await this.loadCommand();
+    await this.execCommand();
   }
 
   loadProcess() {
@@ -62,7 +63,7 @@ await (new class Marvin {
   loadConfig(config?: Config | undefined) {
     console.debug('[Marvin.loadConfig]');
     if (config) {
-      this.ctx.config = config;
+      this.engine.config = config;
       return;
     }
 
@@ -71,16 +72,16 @@ await (new class Marvin {
     config = {} as Config;
 
     // at this stage marvin.json MUST exist, but just in case
-    const cpath = join(this.ctx.home, 'marvin.json');
+    const cpath = join(this.engine.home, 'marvin.json');
     if (!existsSync(cpath)) {
       console.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
-      this.ctx.config = constants.DEFAULT_CONFIG as Config;
+      this.engine.config = constants.DEFAULT_CONFIG as Config;
       return;
     }
 
     const data = readFileSync(cpath, 'utf8');
 
-    this.ctx.config = tryJsonParse(data)!;
+    this.engine.config = tryJsonParse(data)!;
   }
 
   loadFlags() {
@@ -88,15 +89,15 @@ await (new class Marvin {
     // const args = process.argv.slice(2);
   }
 
-  async loadCommand() {
-    console.debug('[Marvin.loadCommand]');
+  async execCommand() {
+    console.debug('[Marvin.execCommand]');
 
     const args = process.argv.slice(2);
     let   cmd  = args[0] || 'help';
-    const cmds = listCommands(this.ctx).map(f => f.replace('.ts', ''));
+    const cmds = listCommands(this.engine).map(f => f.replace('.ts', ''));
 
     if (!cmds.includes(cmd)) {
-      console.warn('[Marvin.loadCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
+      console.warn('[Marvin.execCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
       cmd = 'help';
     }
 
@@ -105,25 +106,29 @@ await (new class Marvin {
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        console.warn('[Marvin.loadCommand]', `${cmd} does not export a Command class, exiting`);
+        console.warn('[Marvin.execCommand]', `${cmd} does not export a Command class, exiting`);
         return;
       }
       // create command and load/run it
-      this.cmd = new Class(this.ctx, args.slice(1));
-      await this.cmd.exec();
+      this.command = new Class(this.engine, args.slice(1));
+      if (!this.command) {
+        process.exit(1);
+      }
+      
+      await this.command.exec();
 
       // if !deamon, exit
-      if (!this.cmd.deamon) {
+      if (!this.command.deamon) {
         process.exit(0);
       }
     } catch (err) {
-      console.error('[Marvin.loadCommand]', `failed to load ${cmd}:`, err);
+      console.error('[Marvin.execCommand]', `failed to load ${cmd}:`, err);
     }
   }
 
   async drop() {
     console.debug('[Marvin.drop]');
 
-    await this.cmd.drop();
+    await this.command?.drop();
   }
 }).exec();

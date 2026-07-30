@@ -8,8 +8,8 @@ export default class ReloadCommand extends Command {
     // const url = new URL(`http://localhost:${this.ctx!.config.settings.port}/`);
     // url.pathname = '/reload';
 
-    if (this.ctx.isDry) {
-      console.log('[ReloadCommand.exec]', '[dry]', 'repload service:', ['systemctl', '--user', 'reload', 'marvin'].join(' '));
+    if (this.engine.isDry) {
+      console.info('[ReloadCommand.exec]', '[dry]', 'repload service:', ['systemctl', '--user', 'reload', 'marvin'].join(' '));
     } else {
       // const res = await fetch(url.toString());
       // if (!res.ok) {

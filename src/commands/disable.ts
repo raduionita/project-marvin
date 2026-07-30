@@ -6,16 +6,18 @@ export default class DisableCommand extends Command {
     console.debug('[DisableCommand.exec]');
 
     // stop service
-    if (this.ctx.isDry) {
-      console.log('[DisableCommand.exec]', '[dry]', 'stop service: systemctl --user stop marvin');
-      console.log('[DisableCommand.exec]', '[dry]', 'disable service: systemctl --user disable marvin');
+    if (this.engine.isDry) {
+      console.info('[DisableCommand.exec]', '[dry]', 'stop service: systemctl --user stop marvin');
+      console.info('[DisableCommand.exec]', '[dry]', 'disable service: systemctl --user disable marvin');
     } else {
-      console.log('[DisableCommand.exec]', 'stopping service...');
+      console.debug('[DisableCommand.exec]', 'stopping service...');
       // stop and disable
       execSync(['systemctl', '--user', 'stop', 'marvin'].join(' '), { stdio: 'inherit' });
       execSync(['systemctl', '--user', 'disable', 'marvin'].join(' '), { stdio: 'inherit' });
       // check if service is stopped
       execSync(['systemctl', '--user', 'is-active', 'marvin'].join(' '), { stdio: 'inherit' });
     }
+
+    console.debug('[DisableCommand.exec]', 'marin disabled');
   }
 }

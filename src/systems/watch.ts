@@ -8,6 +8,29 @@ export default class WatchSystem extends System {
 
   async load(): Promise<void> {
     console.debug('[WatchSystem.load]');
+
+    const files = [
+      join(this.engine.home, 'marvin.json'),
+    ]
+    for (const file of files) {
+      try {
+        const watcher = watch(file, (eventType, filename) => {
+          switch (eventType) {
+            case 'change':
+              this.handleChange(filename!);
+              break;
+            default:
+              console.debug(`[WatchSystem.load]`, `eventType=${eventType} filename=${filename}`);
+              break;
+          }
+        });
+        watcher.on('error', this.handleError.bind(this));
+        console.debug(`[WatchSystem.load]`, `watching ${file}`);
+        this.watchers.push(watcher);
+      } catch (err) {
+        console.error('[WatchSystem.load]', 'error:', err);
+      } 
+    }
   }
 
   async drop(): Promise<void> {
@@ -18,35 +41,9 @@ export default class WatchSystem extends System {
     this.watchers = [];
   }
 
-  addFile(file: string) {
-    console.debug(`[WatchSystem.addFile]`, file);
-    try {
-      const watcher = watch(file, (eventType, filename) => {
-        switch (eventType) {
-          case 'change':
-            this.handleChange(filename!);
-            break;
-          default:
-            console.debug(`[WatchSystem.addFile]`, `eventType=${eventType} filename=${filename}`);
-            break;
-        }
-      });
-      watcher.on('error', this.handleError.bind(this));
-      console.debug(`[WatchSystem.addFile]`, `watching ${file}`);
-      this.watchers.push(watcher);
-    } catch (err) {
-      console.error('[WatchSystem.addFile]', 'error:', err);
-    }
-  }
-
   handleChange(filename: string) {
     console.debug(`[WatchSystem.handleChange]`, filename);
-    const serve = this.ctx.command as ServeCommand;
-    if (!serve) {
-      console.error('[WatchSystem.handleChange]', 'serve command not found');
-      return;
-    }
-    serve.execReload();
+    this.engine.execReload();
   }
 
   handleError(err: Error) {

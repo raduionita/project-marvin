@@ -15,22 +15,22 @@ export default class ModelsCommand extends Command {
         console.warn('[ModelsCommand.exec]', 'unknown action: models', act); 
       case ''       :  
       case 'help'   : // default = empty = help 
-        console.info('[ModelsCommand.exec]', 'usage: marvin models [action]');
-        console.info('[ModelsCommand.exec]', 'actions:');
-        console.info('[ModelsCommand.exec]', '  help    ', 'show this help');
-        console.info('[ModelsCommand.exec]', '  list    ', 'list available models, for each one, it\'s connected agents');
-        console.info('[ModelsCommand.exec]', '  add     ', 'add a model');
-        console.info('[ModelsCommand.exec]', '  bind    ', 'bind a model to an agent');
-        console.info('[ModelsCommand.exec]', '  remove <modelId>', 'remove a model');
+        console.info('usage: marvin models [action]');
+        console.info('actions:');
+        console.info('  help    ', 'show this help');
+        console.info('  list    ', 'list available models, for each one, it\'s connected agents');
+        console.info('  add     ', 'add a model');
+        console.info('  bind    ', 'bind a model to an agent');
+        console.info('  remove <modelId>', 'remove a model');
       break;
       case 'list' : { // list available models, for each one, it's connected agents
-        console.info('[ModelsCommand.exec]', 'list models:');
+        console.info('list models:');
         // for each model, list enabled agents
-        listModels(this.ctx!).forEach(modelId => {
-          console.debug('[ModelsCommand.exec]', `  ${modelId.replace('.ts', '')}`);
-          const config = this.ctx.config.models[modelId];
+        listModels(this.engine!).forEach(modelId => {
+          console.info(`  ${modelId.replace('.ts', '')}`);
+          const config = this.engine.config.models[modelId];
           if (config) {
-            console.info('[ModelsCommand.exec]', '    enabled:', config.enabled);
+            console.info('  - enabled:', config.enabled);
           }
         });
       } break;
@@ -51,14 +51,14 @@ export default class ModelsCommand extends Command {
 
         const modelId = config['provider'] + '/' + config['model'];
 
-        this.ctx.config.models[modelId] = config;
+        this.engine.config.models[modelId] = config;
 
-        const cpath = join(this.ctx.home, 'marvin.json');
+        const cpath = join(this.engine.home, 'marvin.json');
         // write to config file
-        if (this.ctx.isDry) {
+        if (this.engine.isDry) {
           console.info('[ModelsCommand.exec]', '[dry]',`would configure model "${modelId}", config persisted to ${cpath}`);
         } else {
-          writeFileSync(cpath, JSON.stringify(this.ctx.config, null, 2));
+          writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
           console.info('[ModelsCommand.exec]', `model "${modelId}" configured, config persisted to ${cpath}`);
         }
       } break;

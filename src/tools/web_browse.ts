@@ -23,16 +23,16 @@ export default class WebBrowseTool extends Tool {
   public async call(args: { url: string }) {
     console.debug('[WebBrowseTool.call]', args);
 
-    if (this.ctx.isDry) {
+    if (this.engine.isDry) {
       console.info('[WebBrowseTool.call]', '[dry] browse:', args.url);
       return { title: '', body: '', error: '' };
     }
 
-    if (!this.ctx.systems['browser']) {
+    if (!this.engine.systems['browser']) {
       return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server context' }
     }
 
-    const system = this.ctx.systems['browser'] as BrowserSystem;
+    const system = this.engine.systems['browser'] as BrowserSystem;
     const url = args.url;
 
     const page = await system.newPage();

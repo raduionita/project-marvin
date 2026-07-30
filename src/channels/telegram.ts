@@ -6,7 +6,7 @@ export default class TelegramChannel extends Channel {
   }
 
   async load() : Promise<void> {
-    console.debug('[TelegramChannel.load]', 'attached', this.ctx.config.settings);
+    console.debug('[TelegramChannel.load]', 'attached', this.engine.config.settings);
   }
 
   async sendMessage(message: Message) : Promise<any> {

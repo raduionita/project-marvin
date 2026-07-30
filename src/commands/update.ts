@@ -18,30 +18,30 @@ export default class UpdateCommand extends Command {
     }
 
     // pull project, install dependencies, restart service
-    if (this.ctx.isDry) {
-      console.log('[UpdateCommand.exec]', '[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
-      console.log('[UpdateCommand.exec]', '[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
-      console.log('[UpdateCommand.exec]', '[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
+    if (this.engine.isDry) {
+      console.info('[UpdateCommand.exec]', '[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
+      console.info('[UpdateCommand.exec]', '[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
+      console.info('[UpdateCommand.exec]', '[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
     } else {
       // git pull from main
-      console.info('[UpdateCommand.exec]', 'pulling project...');
+      console.debug('[UpdateCommand.exec]', 'pulling project...');
       execSync(['git', '-C', root, 'pull', 'origin', 'main'].join(' '), { stdio: 'inherit' });
 
       // Reinstall dependencies
-      console.info('[UpdateCommand.exec]', 'reinstalling dependencies...');
+      console.debug('[UpdateCommand.exec]', 'reinstalling dependencies...');
       execSync(['bun', 'install'].join(' '), { cwd: root, stdio: 'inherit' });
 
       // update service file by copy
-      console.info('[UpdateCommand.exec]', 'updating service file...');
+      console.debug('[UpdateCommand.exec]', 'updating service file...');
       const src = join(root, 'marvin.service');
       const dst = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
       copyFileSync(src, dst);
 
       // Restart service
-      console.info('[UpdateCommand.exec]', 'restarting service...');
+      console.debug('[UpdateCommand.exec]', 'restarting service...');
       execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
     }
 
-    console.info('[UpdateCommand.exec]', 'update complete');
+    console.debug('[UpdateCommand.exec]', 'marvin updated');
   }
 }
