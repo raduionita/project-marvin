@@ -18,7 +18,7 @@ export default class DeepseekModel extends Model {
         model: this.model,
         messages: chat.messages.map(m => JSON.parse(JSON.stringify({role: m.role, content: m.content, name: m.name, tool_call_id: m.toolId }))),
         stream: false,
-        thinking: chat.thinking,
+        thinking: { type: (chat.thinking ? 'enabled' : 'disabled') },
         user_id: chat.userId,
         reasoning_effort: this.reasoning, // TODO: this should be configurable depending on the task
         response_format: { type: this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
