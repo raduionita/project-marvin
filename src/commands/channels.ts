@@ -10,9 +10,7 @@ export default class ChannelsCommand extends Command {
   async exec() {
     console.debug('[ChannelsCommand.exec]');
 
-    const cmds = process.argv.slice(2);
-    const cmd = cmds[1] || 'help';
-
+    const cmd = this.args[0] || 'help';
     switch (cmd) {
       default: 
         console.warn('[ChannelsCommand.exec]', 'unknown command: channels', cmd); 
@@ -45,7 +43,7 @@ export default class ChannelsCommand extends Command {
       case 'add' : {
         // TODO: refactor to use readline prompts
 
-        const channelId = cmds[2];
+        const channelId = this.args[1];
 
         // warn and stop if no name (channelId) provided
         if (!channelId) {
@@ -115,9 +113,9 @@ export default class ChannelsCommand extends Command {
     } break;
       case 'bind' : {
         console.info('[ChannelsCommand.exec]', 'binding a channel:group to an agent...');
-        const agentId = cmds[2];
-        const channelId = cmds[3];
-        const groupId = cmds[4] || cmd[3] || ''; // optional
+        const agentId = this.args[1];
+        const channelId = this.args[2];
+        const groupId = this.args[3] || ''; // optional
 
         if (!channelId || !agentId) {
           console.warn('[ChannelsCommand.exec]', 'invalid arguments');

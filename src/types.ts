@@ -40,12 +40,12 @@ export interface Config {
 }
 
 export class Command {
-  constructor(public readonly ctx: Context, public readonly deamon: boolean = false) {
-    console.debug(`[${this.constructor.name||'Command'}.constructor]`);
+  constructor(public readonly ctx: Context, public args: string[], public readonly deamon: boolean = false) {
+    console.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
     this.ctx.command = this;
   }
 
-  async exec(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.load]`); }
+  async exec(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.exec]`); }
   async drop(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 

@@ -13,8 +13,8 @@ import WatchSystem from '../systems/watch.js';
 
 // `marvin serve [help] [--dry]`
 export default class ServeCommand extends Command {
-  constructor(ctx: Context, deamon: boolean = true) {
-    super(ctx, deamon);
+  constructor(ctx: Context, args: string[], deamon: boolean = true) {
+    super(ctx, args, deamon);
   }
 
   // load the app/server and its internal systems
@@ -22,12 +22,13 @@ export default class ServeCommand extends Command {
     console.debug('[ServeCommand.exec]');
 
     await this.loadSystems();
-          this.loadProject();
+    await this.loadProject();
     await this.loadTools();
     await this.loadChannels();
     await this.loadModels();
     await this.loadAgents();
 
+    await this.execWatch();
     await this.execAgents();
   }
 
@@ -44,8 +45,8 @@ export default class ServeCommand extends Command {
     await this.dropSystems();
   }
 
-  // create ~/.marvin folder and required files
-  loadProject() {
+  // check ~/.marvin folder and required files
+  async loadProject() {
     console.debug('[ServeCommand.loadProject]', this.ctx.root);
 
     // create project/workspace folder (~/.marvin)
@@ -86,17 +87,6 @@ export default class ServeCommand extends Command {
       console.error('[ServeCommand.loadProject]', `missing ${cpath} file`, 'please run "marvin install" again');
       return;
     }
-
-    if (!this.ctx.systems['watch']) {
-      console.error('[ServeCommand.loadProject]', 'watch system not loaded, please run "marvin install" again');
-      return;
-    }
-
-    // watch marvin.json
-    const system = this.ctx.systems['watch'] as WatchSystem;
-    system.addFile(cpath);
-
-    // TODO: watch MARVIN.md
   }
 
   async loadSystems() {
@@ -419,6 +409,27 @@ export default class ServeCommand extends Command {
     ctx.systems = {};
   }
 
+  async execWatch() {
+    console.debug('[ServeCommand.execWatch]');
+
+    if (!this.ctx.systems['watch']) {
+      console.error('[ServeCommand.execWatch]', 'watch system not loaded, please run "marvin install" again');
+      return;
+    }
+
+    const system = this.ctx.systems['watch'] as WatchSystem;
+
+    if (this.ctx.isDry) {
+      console.info('[ServeCommand.execWatch]', '[dry] watching marvin.json');
+      return;
+    } else {
+      const cpath = join(this.ctx.home, 'marvin.json');
+      console.info('[ServeCommand.execWatch]', 'watching marvin.json');
+      system.addFile(cpath);
+      // TODO: watch MARVIN.md
+    }
+  }
+
   // for each agent, for each task, start setTimeout
   async execAgents() {
     console.debug('[ServeCommand.execAgents]');
@@ -431,10 +442,10 @@ export default class ServeCommand extends Command {
         }
         if (agentId === this.ctx.config.settings.name) {
           task.timeout = setTimeout(this.execOrchestrator.bind(this), task.schedule, this.ctx, agentId, taskId);
-          console.info('[ServeCommand.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (orchestrator ${agentId})`);
+          console.debug('[ServeCommand.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (orchestrator ${agentId})`);
         } else {
           task.timeout = setTimeout(this.execTask.bind(this), task.schedule, this.ctx, agentId, taskId);
-          console.info('[ServeCommand.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
+          console.debug('[ServeCommand.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
         }
       }
     }

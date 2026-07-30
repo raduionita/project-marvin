@@ -5,9 +5,7 @@ export default class StatusCommand extends Command {
   async exec() {
     console.debug('[StatusCommand.exec]');
 
-    const cmds = process.argv.slice(2);
-    const cmd = cmds[1];
-
+    const cmd = this.args[1];
     switch (cmd) {
       case 'help'   : 
         console.debug('[StatusCommand.exec]', 'usage: marvin status [command]', 'check the daemon status');

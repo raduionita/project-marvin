@@ -1,4 +1,4 @@
-import readline, { promises } from 'readline';
+import { promises } from 'readline';
 
 import { listModels } from "../models";
 import { Command, Config, Provider } from "../types";
@@ -9,30 +9,28 @@ export default class ModelsCommand extends Command {
   async exec() {
     console.debug('[ModelsCommand.exec]');
 
-    const cmds = process.argv.slice(2);
-    const cmd = cmds[1] || 'help';
-
-    switch (cmd) {
+    const act = this.args[0] || 'help';
+    switch (act) {
       default: 
-        console.warn('[ModelsCommand.exec]', 'unknown command: models', cmd); 
+        console.warn('[ModelsCommand.exec]', 'unknown action: models', act); 
       case ''       :  
       case 'help'   : // default = empty = help 
-        console.log('[ModelsCommand.exec]', 'usage: marvin models [command]');
-        console.log('[ModelsCommand.exec]', 'commands:');
-        console.log('[ModelsCommand.exec]', '  help    ', 'show this help');
-        console.log('[ModelsCommand.exec]', '  list    ', 'list available models, for each one, it\'s connected agents');
-        console.log('[ModelsCommand.exec]', '  add     ', 'add a model');
-        console.log('[ModelsCommand.exec]', '  bind    ', 'bind a model to an agent');
-        console.log('[ModelsCommand.exec]', '  remove <modelId>', 'remove a model');
+        console.info('[ModelsCommand.exec]', 'usage: marvin models [action]');
+        console.info('[ModelsCommand.exec]', 'actions:');
+        console.info('[ModelsCommand.exec]', '  help    ', 'show this help');
+        console.info('[ModelsCommand.exec]', '  list    ', 'list available models, for each one, it\'s connected agents');
+        console.info('[ModelsCommand.exec]', '  add     ', 'add a model');
+        console.info('[ModelsCommand.exec]', '  bind    ', 'bind a model to an agent');
+        console.info('[ModelsCommand.exec]', '  remove <modelId>', 'remove a model');
       break;
       case 'list' : { // list available models, for each one, it's connected agents
-        console.log('[ModelsCommand.exec]', 'list models:');
+        console.info('[ModelsCommand.exec]', 'list models:');
         // for each model, list enabled agents
         listModels(this.ctx!).forEach(modelId => {
           console.debug('[ModelsCommand.exec]', `  ${modelId.replace('.ts', '')}`);
           const config = this.ctx.config.models[modelId];
           if (config) {
-            console.log('[ModelsCommand.exec]', '    enabled:', config.enabled);
+            console.info('[ModelsCommand.exec]', '    enabled:', config.enabled);
           }
         });
       } break;

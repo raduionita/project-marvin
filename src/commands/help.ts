@@ -2,21 +2,21 @@ import { Command } from "../types";
 
 export default class HelpCommand extends Command {
   async exec() {
-    console.debug('[HelpCommand.load]');
+    console.debug('[HelpCommand.exec]');
 
-    console.info('[HelpCommand.load]', 'usage: marvin [command] [options] [--flags]');
-    console.info('[HelpCommand.load]', 'commands:');
-    console.info('[HelpCommand.load]', '  help    ', 'show this help');
-    console.info('[HelpCommand.load]', '  install ', 'install the project');
-    console.info('[HelpCommand.load]', '  enable  ', 'load the project and service');
-    console.info('[HelpCommand.load]', '  disable ', 'stop the app service');
-    console.info('[HelpCommand.load]', '  serve   ', 'start the app service');
-    console.info('[HelpCommand.load]', '  tool    ', 'call a tool');
-    console.info('[HelpCommand.load]', '  update  ', 'update Marvin to the latest version');
-    console.info('[HelpCommand.load]', '  version ', 'show the current version');
-    console.info('[HelpCommand.load]', '  reload  ', 'reload the daemon');
-    console.info('[HelpCommand.load]', '  status  ', 'check the daemon status');
-    console.info('[HelpCommand.load]', '  chat    ', 'send a chat message');
-    console.info('[HelpCommand.load]', '  channels', 'list, add, bind, remove channels');
+    console.info('[HelpCommand.exec]', 'usage: marvin [command] [options] [--flags]');
+    console.info('[HelpCommand.exec]', 'commands:');
+    console.info('[HelpCommand.exec]', '  help    ', 'show this help');
+    console.info('[HelpCommand.exec]', '  install ', 'install the project');
+    console.info('[HelpCommand.exec]', '  enable  ', 'load the project and service');
+    console.info('[HelpCommand.exec]', '  disable ', 'stop the app service');
+    console.info('[HelpCommand.exec]', '  serve   ', 'start the app service');
+    console.info('[HelpCommand.exec]', '  tool    ', 'call a tool');
+    console.info('[HelpCommand.exec]', '  update  ', 'update Marvin to the latest version');
+    console.info('[HelpCommand.exec]', '  version ', 'show the current version');
+    console.info('[HelpCommand.exec]', '  reload  ', 'reload the daemon');
+    console.info('[HelpCommand.exec]', '  status  ', 'check the daemon status');
+    console.info('[HelpCommand.exec]', '  chat    ', 'send a chat message');
+    console.info('[HelpCommand.exec]', '  channels', 'list, add, bind, remove channels');
   }
 }

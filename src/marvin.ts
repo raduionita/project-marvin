@@ -109,7 +109,7 @@ await (new class Marvin {
         return;
       }
       // create command and load/run it
-      this.cmd = new Class(this.ctx);
+      this.cmd = new Class(this.ctx, args.slice(1));
       await this.cmd.exec();
 
       // if !deamon, exit
