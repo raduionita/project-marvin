@@ -9,19 +9,14 @@ export default class EndChatTool extends Tool {
       description: constants.END_CHAT_DESCRIPTION,
       parameters: {
         type: 'object',
-        properties: {
-          answer: {
-            type: 'string',
-            description: 'Final answer',
-          }
-        },
-        required: ['answer'],
+        properties: {},
+        required: [],
       }
     },
   }
 
-  async call(args: { answer: string }) {
+  async call(args?: any) {
     console.debug('[FinalAnswerTool.call]', args);
-    return {answer: args.answer};
+    return {};
   }
 }

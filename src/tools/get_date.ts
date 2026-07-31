@@ -14,7 +14,7 @@ export default class GetDateTool extends Tool {
             description: 'Optional timestamp',
           }
         },
-        required: ['timestamp'],
+        required: [],
       }
     },
   }

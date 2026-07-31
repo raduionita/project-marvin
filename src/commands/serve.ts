@@ -33,7 +33,7 @@ export default class ServeCommand extends Command {
 
   // will drop all the resources from the context
   async drop() {
-    console.debug('[ServeCommand.drop]');
+    console.debug('[ServeCommand.drop]', this.engine.state);
 
     if (this.engine.state !== 'running') return;
     this.engine.state = 'stopped';

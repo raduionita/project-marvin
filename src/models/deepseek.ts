@@ -5,7 +5,23 @@ export default class DeepseekModel extends Model {
   public baseUrl: string = 'https://api.deepseek.com';
 
   async sendMessage(chat: Chat) : Promise<Reply> {
-    console.debug('[DeepseekModel.sendMessage]', 'chat:', JSON.stringify(chat));
+    const body = {
+      model: this.model,
+      messages: chat.messages.map(m => JSON.parse(JSON.stringify({role: m.role, content: m.content, name: m.name, tool_call_id: m.toolId }))),
+      stream: false,
+      thinking: { type: (chat.thinking ? 'enabled' : 'disabled') },
+      user_id: chat.userId,
+      reasoning_effort: this.reasoning, // TODO: this should be configurable depending on the task
+      response_format: { type: this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
+      tools: this.tools,
+      tool_choice: this.tools ? 'auto' : 'none',
+      temperature: this.temperature,
+      top_p: this.topP,
+      max_tokens: this.maxTokens,
+    }
+
+    console.debug('[DeepseekModel.sendMessage]', 'body:', JSON.stringify(chat, null, 2));
+
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
@@ -14,20 +30,7 @@ export default class DeepseekModel extends Model {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: this.model,
-        messages: chat.messages.map(m => JSON.parse(JSON.stringify({role: m.role, content: m.content, name: m.name, tool_call_id: m.toolId }))),
-        stream: false,
-        thinking: { type: (chat.thinking ? 'enabled' : 'disabled') },
-        user_id: chat.userId,
-        reasoning_effort: this.reasoning, // TODO: this should be configurable depending on the task
-        response_format: { type: this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
-        tools: this.tools,
-        tool_choice: this.tools ? 'auto' : 'none',
-        temperature: this.temperature,
-        top_p: this.topP,
-        max_tokens: this.maxTokens,
-      }),
+      body: JSON.stringify(body),
     });
 
     // check if response is ok
@@ -45,6 +48,8 @@ export default class DeepseekModel extends Model {
       console.warn('[DeepseekModel.sendMessage]', 'no choices, no reply');
       return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
     }
+
+    console.debug('[DeepseekModel.sendMessage]', 'json', JSON.stringify(json, null, 2));
 
     // choice 0, for now only one choice is supported
     const choice = json.choices[0];

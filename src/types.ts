@@ -60,7 +60,7 @@ export abstract class System {
   abstract drop(): Promise<void>;
 }
 
-export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string}}, required:string[]}} };
+export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string}}, required?:string[]}} };
 
 export abstract class Tool {
   constructor(public readonly engine: Engine) {

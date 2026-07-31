@@ -330,11 +330,12 @@ export default class Engine {
   }
 
   dropAgents() {
-    console.log('[Engine.dropAgents]');
+    console.debug('[Engine.dropAgents]', Object.keys(this.agents).length, 'agents');
     for (const agent of Object.values(this.agents)) {
+      console.debug('[Engine.dropAgents]', Object.keys(agent.tasks).length, 'tasks');
       for (const task of Object.values(agent.tasks)) {
         if (task.timeout) { 
-          console.log('[Engine.dropAgents]', `stopping task ${task.id}`);
+          console.debug('[Engine.dropAgents]', `stopping task ${task.id}`);
           clearTimeout(task.timeout);
         }
       }
@@ -343,13 +344,13 @@ export default class Engine {
   }
 
   dropModels() {
-    console.log('[Engine.dropModels]');
+    console.debug('[Engine.dropModels]', Object.keys(this.models).length, 'models');
     this.models = {};
   }
 
   // will detach and delete ALL channels from the context
   async dropChannels() {
-    console.log('[Engine.dropChannels]');
+    console.debug('[Engine.dropChannels]', Object.keys(this.channels).length, 'channels');
     for (const channel of Object.values(this.channels)) {
       try {
         await channel.drop();
@@ -374,7 +375,7 @@ export default class Engine {
   }
 
   async dropSystems() {
-    console.log('[Engine.dropSystems]');
+    console.debug('[Engine.dropSystems]', Object.keys(this.systems).length, 'systems');
     for (const system of Object.values(this.systems)) {
       try {
         await system.drop();
