@@ -1,3 +1,4 @@
+import { tryJsonParse } from '../helpers.js';
 import { Chat, Model, Provider, Reply, Message } from '../types.js';
 
 export default class DeepseekModel extends Model {
@@ -7,12 +8,25 @@ export default class DeepseekModel extends Model {
   async sendMessage(chat: Chat) : Promise<Reply> {
     const body = {
       model: this.model,
-      messages: chat.messages.map(m => JSON.parse(JSON.stringify({role: m.role, content: m.content, name: m.name, tool_call_id: m.toolId }))),
+      messages: chat.messages.map(m => JSON.parse(JSON.stringify({
+        role: m.role, 
+        content: m.content, 
+        name: m.name, 
+        tool_call_id: m.toolId, 
+        tool_calls: m.tools?.map(t => ({
+          id: t.id,
+          type: 'function',
+          function: {
+            name: t.name,
+            arguments: JSON.stringify(t.arguments),
+          },
+        })), 
+      }))),
       stream: false,
       thinking: { type: (chat.thinking ? 'enabled' : 'disabled') },
       user_id: chat.userId,
       reasoning_effort: this.reasoning, // TODO: this should be configurable depending on the task
-      response_format: { type: this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
+      response_format: { type: 'json_object' }, //  this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
       tools: this.tools,
       tool_choice: this.tools ? 'auto' : 'none',
       temperature: this.temperature,
@@ -20,7 +34,7 @@ export default class DeepseekModel extends Model {
       max_tokens: this.maxTokens,
     }
 
-    console.debug('[DeepseekModel.sendMessage]', 'body:', JSON.stringify(chat, null, 2));
+    console.debug('[DeepseekModel.sendMessage]', 'body:', JSON.stringify(body, null, 2));
 
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
@@ -61,10 +75,10 @@ export default class DeepseekModel extends Model {
       message: {
         role: choice.message.role, // always "assistant" here
         content: choice.message.content,
-        tools: choice.message.tool_calls?.map((tool: {[key: string]: any}) => ({
-          id: tool.id,
-          name: tool.function.name,
-          arguments: tool.function.arguments,
+        tools: choice.message.tool_calls?.map((t: {[key: string]: any}) => ({
+          id: t.id,
+          name: t.function.name,
+          arguments: tryJsonParse(t.function.arguments),
         }))
         // TODO: research of reasoning_content may be needed?
       },

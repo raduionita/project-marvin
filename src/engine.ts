@@ -235,6 +235,9 @@ export default class Engine {
         console.error('[Engine.loadAgents]', `no MARVIN.md found for agent ${marvinId}, using default`);
         identity = constants.MARVIN_MD;
       }
+
+      // add format to input
+      identity += '\n\n' + constants.FORMAT_MD;
       
       // add ochestrator agent
       this.agents[marvinId] = {
@@ -291,6 +294,9 @@ export default class Engine {
           console.warn('[Engine.loadAgents]', `no input found for task ${taskId}, disabling`);
           enabled = false;
         }
+
+        // add format to input
+        input += '\n\n' + constants.FORMAT_MD;
 
         if (this.isDry) {
           console.info('[Engine.loadAgents]', `[dry] task ${taskId} created (agent ${agentId})`);
@@ -546,7 +552,8 @@ export default class Engine {
     this.state = 'running';
   }
 
-  async  execTool(tool: string, args: any) : Promise<{[key:string]:any}> {
+  // tool call
+  async  execTool(tool: string, args: {[key:string]:any}) : Promise<{[key:string]:any}> {
     console.debug('[Engine.execTool]', tool);
 
     const instance = this.tools[tool];
@@ -555,9 +562,16 @@ export default class Engine {
       return {tool: tool, error: `tool ${tool} does NOT exist`};
     }
 
-    return await instance.call(args);
+    try {
+      // ! tool call
+      return await instance.call(args);
+    } catch (err) {
+      console.error('[Engine.execTool]', `tool ${tool} failed:`, err);
+      return {tool: tool, error: (err as Error).message};
+    }
   }
 
+  // agent loop
   async execChat(message: string, chatId: string | undefined, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
     try {
       console.debug('[Engine.execChat]', chatId, agentId, message.slice(0, 100));
@@ -588,11 +602,11 @@ export default class Engine {
       do {
         steps++;
 
-        // core of the AI loop: call model, execute tool calls, repeat until done
+        // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
         reply = await agent.model.sendMessage(chat);
 
         // persist assistant reply to chat history
-        chat.messages.push({ role: 'assistant', content: reply.message.content || '' });
+        chat.messages.push({ role: 'assistant', content: reply.message.content, tools: reply.message.tools });
 
         // trim result, this can be really big
         console.debug('[Engine.execChat]', `step=${steps}`, JSON.stringify(reply));
@@ -604,27 +618,19 @@ export default class Engine {
         }
 
         // execute any tool calls
-        if (reply.message.tools && reply.message.tools.length > 0) {
-          for (const tool of reply.message.tools) {
-            console.debug('[Engine.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+        for (const tool of reply.message.tools || []) {
+          console.debug('[Engine.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
-            if (tool.name === constants.END_CHAT_NAME) {
-              ender = true;
-              break;
-            }
-
-            let result: any;
-            try {
-              const args = JSON.parse(tool.arguments);
-              result = await this.execTool(tool.name, args);
-            } catch (err) {
-              console.error('[Engine.execChat]', `tool ${tool.name} failed:`, err);
-              result = {error: (err as Error).message};
-            }
-
-            // add tool call to chat history
-            chat.messages.push({ role: 'tool', content: JSON.stringify(result), toolId: tool.id });
+          if (tool.name === constants.END_CHAT_NAME) {
+            ender = true;
+            break;
           }
+
+          // ! tool call
+          let result = await this.execTool(tool.name, tool.arguments);
+
+          // add tool call to chat history
+          chat.messages.push({ role: 'tool', content: JSON.stringify(result), toolId: tool.id });
         }
 
         // if model produced content without pending tool calls, we're done

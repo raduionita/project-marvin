@@ -176,7 +176,7 @@ export interface Message {
     // name of the function call
     name: string;
     // arguments as a JSON, might be invalid
-    arguments: string; 
+    arguments: {[key:string]:any};
   }[];
 }
 
