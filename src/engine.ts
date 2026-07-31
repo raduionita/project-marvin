@@ -585,7 +585,7 @@ export default class Engine {
       chat.messages.push({ role: 'system', content: agent.identity });
 
       // load task input as user message
-      chat.messages.push({ role: 'user', content: message });
+      chat.messages.push({ role: 'user', content: message.trim() });
 
       // return early
       if (this.isDry) {
@@ -606,7 +606,7 @@ export default class Engine {
         reply = await agent.model.sendMessage(chat);
 
         // persist assistant reply to chat history
-        chat.messages.push({ role: 'assistant', content: reply.message.content, tools: reply.message.tools });
+        chat.messages.push({ role: 'assistant', content: reply.message.content.trim(), tools: reply.message.tools });
 
         // trim result, this can be really big
         console.debug('[Engine.execChat]', `step=${steps}`, JSON.stringify(reply));
