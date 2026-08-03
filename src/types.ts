@@ -37,6 +37,8 @@ export interface Config {
       schedule: number;
       maxSteps: number;
       input?: string;
+      format?: 'text' | 'json';
+      schema?: {[key:string]:string};
     }>;
   }>;
 }

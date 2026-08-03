@@ -53,17 +53,17 @@ export default class Engine {
   }
 
   async drop() {
-    console.debug('[Engine.stop]');
+    console.debug('[Engine.drop]');
 
     if (this.state !== 'load' && this.state !== 'exec') {
-      console.error('[Engine.stop]', 'engine is not in the "exec" state, cannot stop');
+      console.error('[Engine.drop]', 'engine is not in the "exec" state, cannot stop');
       return;
     }
 
     this.state = 'drop';
 
-          this.dropAgents();
-          this.dropModels();
+    await this.dropAgents();
+    await this.dropModels();
     await this.dropChannels();
     await this.dropSystems();
 
@@ -155,16 +155,16 @@ export default class Engine {
         const Module = await import(`./systems/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof System)) {
-          console.error('[Engine.loadSystems]', `${name} does not export a System class, skipping`);
+          console.error('[Engine.loadSystems]', `"${name}" does not export a System class, skipping`);
           continue;
         }
         // register instance of System
         const instance = new Class(this);
         await instance.load();
         this.systems[name] = instance;
-        console.info('[Engine.loadSystems]', `system [${name}] loaded`);
+        console.info('[Engine.loadSystems]', `system "${name}" loaded`);
       } catch (err) {
-        console.error('[Engine.loadSystems]', `failed to load ${name}:`, err);
+        console.error('[Engine.loadSystems]', `failed to load "${name}":`, err);
       }
     }
   }
@@ -181,23 +181,23 @@ export default class Engine {
         const Module = await import(`./tools/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
-          console.error('[Engine.loadTools]', `${file} does not export a Tool class, skipping`);
+          console.error('[Engine.loadTools]', `"${file}" does not export a Tool class, skipping`);
           continue;
         }
         // register instance of Tool
         const instance = new Class(this);
         const meta = instance.meta as ToolMeta;
         this.tools[meta.function.name] = instance;
-        console.info('[Engine.loadTools]', `tool [${meta.function.name}] loaded`);
+        console.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded`);
       } catch (err) {
-        console.error('[Engine.loadTools]', `failed to load ${file}:`, err);
+        console.error('[Engine.loadTools]', `failed to load "${file}":`, err);
       }
     }
   }
 
   async loadChannels() {
     console.log('[Engine.loadChannels]');
-
+    
     const files = listChannels(this).map(f => f.replace('.ts', ''));
     for (const [id, config] of Object.entries(this.config.channels)) {
       if (!config.enabled) continue;
@@ -215,16 +215,16 @@ export default class Engine {
         const Class = Module.default;
         // must be a Channel class
         if (!Class || !(Class.prototype instanceof Channel)) {
-          console.error('[Engine.loadChannels]', `${file} does not export a Channel class, skipping ${id}`);
+          console.error('[Engine.loadChannels]', `"${file}" does not export a Channel class, skipping ${id}`);
           continue;
         }
         // register instance of Channel 
         const instance = new Class(this);
         await instance.load();
         this.channels[id] = instance;
-        console.info('[Engine.loadChannels]', `channel [${id}] loaded`);
+        console.info('[Engine.loadChannels]', `channel "${id}" loaded`);
       } catch (err) {
-        console.error('[Engine.loadChannels]', `failed to load ${id}:`, err);
+        console.error('[Engine.loadChannels]', `failed to load "${id}":`, err);
       }
     }
   }
@@ -239,13 +239,13 @@ export default class Engine {
         if (this.models[modelId]) continue;
 
         if (!config.enabled) {
-          console.warn('[Engine.loadModels]', `model ${modelId} is disabled, skipping`);
+          console.warn('[Engine.loadModels]', `model "${modelId}" is disabled, skipping`);
           continue;
         }
 
         const file = files.find(f => f === config.provider);
         if (!file) {
-          console.error('[Engine.loadModels]', `no file for provider "${config.provider}", skipping ${modelId}`);
+          console.error('[Engine.loadModels]', `no file for provider ${config.provider}, skipping "${modelId}"`);
           continue;
         }
 
@@ -255,7 +255,7 @@ export default class Engine {
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[Engine.loadModels]', `${modelId} does not export a Model class, skipping`);
+          console.error('[Engine.loadModels]', `"${modelId}" does not export a Model class, skipping`);
           continue;
         }
         
@@ -263,9 +263,9 @@ export default class Engine {
         const instance = new Class(this, config);
         this.models[modelId] = instance;
 
-        console.info('[Engine.loadModels]', `model [${modelId}] loaded (${config.provider} ${config.model})`);
+        console.info('[Engine.loadModels]', `model "${modelId}" loaded (${config.provider} ${config.model})`);
       } catch (err) {
-        console.error('[Engine.loadModels]', `failed to load ${modelId}:`, err);
+        console.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
       }
     }
 
@@ -280,7 +280,7 @@ export default class Engine {
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[Engine.loadModels]', `${modelId} does not export a Model class!`);
+          console.error('[Engine.loadModels]', `"${modelId}" does not export a Model class!`);
           process.exit(1);
         }
 
@@ -288,9 +288,9 @@ export default class Engine {
         this.models[modelId] = instance;
 
         // warn because fallback model is not a good idea, and does NOTHING
-        console.info('[Engine.loadModels]', `model [${modelId}] fallback`);
+        console.info('[Engine.loadModels]', `model "${modelId}" fallback`);
       } catch (err) {
-        console.error('[Engine.loadModels]', `failed to load ${modelId}:`, err);
+        console.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
       }
     }
   }
@@ -300,18 +300,17 @@ export default class Engine {
 
     // type: orchestrator/supervisor
     if (!this.agents[this.config.settings.name]) {
-      console.debug('[Engine.loadAgents]');
-
       const marvinId = this.config.settings.name;
       
       // model: default or first
       const model = Object.values(this.models).find(m => m.enabled && m.default) || this.models[Object.keys(this.models)[0] as string]!;
 
       // load agent system prompt (~/.marvin/IDENTITY.md)
-      let identity = readFileSync(join(this.home, 'MARVIN.md'), 'utf8').trim();
-      if (!identity) {
-        console.error('[Engine.loadAgents]', `no MARVIN.md found for agent ${marvinId}, using default`);
-        identity = constants.MARVIN_MD;
+      let identity = constants.MARVIN_MD;
+      if (existsSync(join(this.home, 'MARVIN.md'))) {
+        identity = readFileSync(join(this.home, 'MARVIN.md'), 'utf8').trim();
+      } else {
+        console.warn('[Engine.loadAgents]', `no MARVIN.md found for agent "${marvinId}", using default`);
       }
 
       // add format to input
@@ -336,9 +335,9 @@ export default class Engine {
         input: 'status',
       } as Task;
 
-      console.info('[Engine.loadAgents]', `task [status] created (orchestrator ${marvinId})`);
+      console.info('[Engine.loadAgents]', `task "status" created (agent ${marvinId})`);
 
-      console.info('[Engine.loadAgents]',`agent [${marvinId}] loaded`);
+      console.info('[Engine.loadAgents]',`agent "${marvinId}" loaded`);
     }
 
     // type: agent
@@ -347,7 +346,7 @@ export default class Engine {
 
       const model = this.models[agent.model || ''];
       if (!model) {
-        console.error('[Engine.loadAgents]', `model not found for agent ${agentId}: ${agent.model}`);
+        console.error('[Engine.loadAgents]', `model not found for agent "${agentId}": ${agent.model}`);
         continue;
       }
 
@@ -371,7 +370,7 @@ export default class Engine {
         }
 
         if (!input) {
-          console.warn('[Engine.loadAgents]', `no input found for task ${taskId}, disabling`);
+          console.warn('[Engine.loadAgents]', `no input found for task "${taskId}", disabling`);
           enabled = false;
         }
 
@@ -379,7 +378,7 @@ export default class Engine {
         input += '\n\n' + constants.FORMAT_MD;
 
         if (this.isDry) {
-          console.info('[Engine.loadAgents]', `[dry] task ${taskId} created (agent ${agentId})`);
+          console.info('[Engine.loadAgents]', `[dry] task "${taskId}" created (agent ${agentId})`);
           continue;
         }
 
@@ -392,14 +391,15 @@ export default class Engine {
           input: input,
         } as Task;
 
-        console.info('[Engine.loadAgents]', `task [${taskId}] created (agent ${agentId})`);
+        console.info('[Engine.loadAgents]', `task "${taskId}" created (agent ${agentId})`);
       }
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
-      let identity = readFileSync(join(this.home, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
-      if (!identity) {
-        console.warn('[Engine.loadAgents]', `no IDENTITY.md found for agent ${agentId}, using default`);
-        identity = constants.IDENTITY_MD;
+      let identity = constants.IDENTITY_MD;
+      if (existsSync(join(this.home, 'agents', agentId, 'IDENTITY.md'))) {
+        identity = readFileSync(join(this.home, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
+      } else {
+        console.warn('[Engine.loadAgents]', `no IDENTITY.md found for agent "${agentId}", using default`);
       }
 
       this.agents[agentId] = {
@@ -415,7 +415,7 @@ export default class Engine {
     }
   }
 
-  dropAgents() {
+  async dropAgents() {
     console.debug('[Engine.dropAgents]');
     for (const [agentId, agent] of Object.entries(this.agents)) {
       for (const [taskId, task] of Object.entries(agent.tasks)) {
@@ -430,7 +430,7 @@ export default class Engine {
     this.agents = {};
   }
 
-  dropModels() {
+  async dropModels() {
     console.debug('[Engine.dropModels]');
     this.models = {};
   }

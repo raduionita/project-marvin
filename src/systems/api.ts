@@ -96,7 +96,7 @@ export default class ApiSystem extends System {
 
     return new Promise<void>((resolve) => {
       this.server!.listen(this.port, this.host, () => {
-        console.log(`[marvin] API server listening on port ${this.port}`);
+        console.debug('[ApiSystem.listen]', `API server listening on port ${this.port}`);
         resolve();
       });
     });

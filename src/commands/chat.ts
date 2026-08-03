@@ -26,35 +26,31 @@ export default class ChatCommand extends Command {
 
     // TODO: start interactive prompt mode here...loop until /exit/quit/stop
 
-    console.log('\n');
-    {
-      // prompt interactively
-      const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
-      const answer = (await pli.question('You: ')).trim();
-      pli.close();
-  
-      // if empty answer, exit
-      if (!answer) {
-        console.warn('[ChatCommand.execChat]', 'empty message');
+    // prompt interactively
+    const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
+    const answer = (await pli.question('You: ')).trim();
+    pli.close();
+
+    // if empty answer, exit
+    if (!answer) {
+      console.warn('[ChatCommand.execChat]', 'empty message');
+      return;
+    }
+
+    // send chat message to server /chat
+    if (this.engine.isDry) {
+      console.debug('[ChatCommand.execChat]', '[dry]', 'message:', answer);
+      console.debug('[ChatCommand.execChat]', '[dry]', 'agent:', agentId);
+    } else {
+      const result = await this.engine.execChat(answer, chatId, agentId);
+      if (!result) {
+        console.error('[ChatCommand.execChat]', 'no result from sendMessage for agent', agentId);
         return;
       }
-  
-      // send chat message to server /chat
-      if (this.engine.isDry) {
-        console.debug('[ChatCommand.execChat]', '[dry]', 'message:', answer);
-        console.debug('[ChatCommand.execChat]', '[dry]', 'agent:', agentId);
-      } else {
-        const result = await this.engine.execChat(answer, chatId, agentId);
-        if (!result) {
-          console.error('[ChatCommand.execChat]', 'no result from sendMessage for agent', agentId);
-          return;
-        }
-  
-        // call send chat
-        console.log('LLM: ', result.content);
-      }
+
+      // call send chat
+      console.log('LLM: ', result.content);
     }
-    console.log('\n');
 
     console.debug('[ChatCommand.execChat]', 'done');
   }

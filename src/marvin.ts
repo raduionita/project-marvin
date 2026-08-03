@@ -28,7 +28,8 @@ await (new class Marvin {
 
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
-      console.log('[Marvin.loadProcess]', 'exit', `${code}`);
+      console.debug('[Marvin.loadProcess]', 'exit', `${code}`);
+      // console.debug(process._getActiveHandles())
       // cleanup
       await this.drop();
     });
@@ -119,7 +120,10 @@ await (new class Marvin {
 
       // if !deamon, exit
       if (!this.command.deamon) {
-        process.exit(0);
+        await this.drop();
+        console.debug('[Marvin.execCommand]', 'done');
+      } else {
+        console.debug('[Marvin.execCommand]', 'deamon, keep running');
       }
     } catch (err) {
       console.error('[Marvin.execCommand]', `failed to load ${cmd}:`, err);
@@ -127,13 +131,14 @@ await (new class Marvin {
   }
 
   async drop() {
-    console.debug('[Marvin.drop]');
-
     if (!this.command) {
-      console.error('[Marvin.drop]', 'no command to drop');
       return;
     }
 
+    console.debug('[Marvin.drop]');
+
     await this.command.drop();
+
+    this.command = undefined;
   }
 }).exec();
