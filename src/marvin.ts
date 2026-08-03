@@ -26,12 +26,17 @@ await (new class Marvin {
   loadProcess() {
     console.debug('[Marvin.loadProcess]');
 
+    process.on('beforeExit', async (code) => {
+      console.debug('[Marvin.loadProcess]', 'beforeExit', `${code}`);
+      // console.debug(process._getActiveHandles())
+      // cleanup
+      await this.drop();
+    });
+
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
       console.debug('[Marvin.loadProcess]', 'exit', `${code}`);
       // console.debug(process._getActiveHandles())
-      // cleanup
-      await this.drop();
     });
 
     // SIGINT (Ctrl+C)

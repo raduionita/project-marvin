@@ -19,7 +19,7 @@ export default class BrowserSystem extends System {
 
     this.browser = await puppeteer.launch({
       // TODO: adapt to different OSs
-      // executablePath: '/usr/bin/chromium-browser',
+      executablePath: '/usr/bin/chromium-browser',
       headless: true,
       args: [
         // for ducker/ci/root env, chrome won't start sandbox w/o these
