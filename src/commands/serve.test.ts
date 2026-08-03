@@ -695,7 +695,7 @@ test('execReload sets state to running after reload', async () => {
   mkdirSync(testHome + '/agents', { recursive: true });
 
   // Pre-load some state
-  engine.state = 'running';
+  engine.state = 'exec';
 
   // Stub loadAgents to not actually try to load models from disk (which fails in tests).
   // execReload calls loadAgents internally, so we replace it with a no-op that

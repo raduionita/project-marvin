@@ -20,27 +20,12 @@ export default class ServeCommand extends Command {
   // load the app/server and its internal systems
   async exec() {
     console.debug('[ServeCommand.exec]');
-
-    await this.engine.scanProject();
-    await this.engine.loadSystems();
-    await this.engine.loadTools();
-    await this.engine.loadChannels();
-    await this.engine.loadModels();
-    await this.engine.loadAgents();
-
-    await this.engine.execAgents();
+    await this.engine.exec();
   }
 
   // will drop all the resources from the engine
   async drop() {
-    console.debug('[ServeCommand.drop]', this.engine.state);
-
-    if (this.engine.state !== 'running') return;
-    this.engine.state = 'stopped';
-
-          this.engine.dropAgents();
-          this.engine.dropModels();
-    await this.engine.dropChannels();
-    await this.engine.dropSystems();
+    console.debug('[ServeCommand.drop]', 'was', this.engine.state);
+    this.engine.drop();
   }
 }

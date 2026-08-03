@@ -9,7 +9,7 @@ import { listModels } from "./models/index.js";
 import { join } from "path";
 
 export default class Engine {
-  public state: 'running' | 'reloading' | 'stopped' = 'running';
+  public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
 
   public config: Config = {} as Config;
 
@@ -34,7 +34,79 @@ export default class Engine {
 
   public get isDebug() { return this.config.settings.logLevel === 'debug'; }
 
+  async load() {
+    console.debug('[Engine.load]');
+
+    if (this.state === 'load' || this.state === 'exec') {
+      console.error('[Engine.load]', 'engine, already loaded');
+      return;
+    }
+
+    await this.scanProject();
+    await this.loadSystems();
+    await this.loadTools();
+    await this.loadChannels();
+    await this.loadModels();
+    await this.loadAgents();
+
+    this.state = 'load';
+  }
+
+  async drop() {
+    console.debug('[Engine.stop]');
+
+    if (this.state !== 'load' && this.state !== 'exec') {
+      console.error('[Engine.stop]', 'engine is not in the "exec" state, cannot stop');
+      return;
+    }
+
+    this.state = 'drop';
+
+          this.dropAgents();
+          this.dropModels();
+    await this.dropChannels();
+    await this.dropSystems();
+
+    this.state = 'none';
+  }
+
+  async exec() {
+    console.debug('[Engine.exec]');
+
+    // force load if not loaded
+    if (this.state === 'none') {
+      this.load();
+    }
+
+    // continue only if loaded
+    if (this.state !== 'load') {
+      console.error('[Engine.exec]', 'engine is not in the "load" state, cannot exec');
+      return;
+    }
+
+    // for each agent, for each task, start setTimeout
+    for (const [agentId, agent] of Object.entries(this.agents)) {
+      for (const [taskId, task] of Object.entries(agent.tasks)) {
+        if (this.isDry) {
+          console.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
+          continue;
+        }
+        if (agentId === this.config.settings.name) {
+          task.timeout = setTimeout(this.execOrchestrator.bind(this), task.schedule, agentId, taskId);
+          console.debug('[Engine.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (orchestrator ${agentId})`);
+        } else {
+          task.timeout = setTimeout(this.execTask.bind(this), task.schedule, agentId, taskId);
+          console.debug('[Engine.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
+        }
+      }
+    }
+
+    this.state = 'exec';
+  }
+
   async scanProject() {
+    console.debug('[Engine.scanProject]');
+
     // create project/workspace folder (~/.marvin)
     const hpath = this.home;
     if (this.isDry) {
@@ -78,6 +150,8 @@ export default class Engine {
     const files = listSystems(this).map(f => f.replace('.ts', ''));
     for (const name of files) {
       try {
+        if (this.systems[name]) continue;
+
         const Module = await import(`./systems/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof System)) {
@@ -102,6 +176,8 @@ export default class Engine {
     for (const file of files) {
       const name = file;
       try {
+        if (this.tools[name]) continue;
+
         const Module = await import(`./tools/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
@@ -123,7 +199,7 @@ export default class Engine {
     console.log('[Engine.loadChannels]');
 
     const files = listChannels(this).map(f => f.replace('.ts', ''));
-    for (const [id, config] of Object.entries(this.config.channels) as [string, Config['channels'][string]][]) {
+    for (const [id, config] of Object.entries(this.config.channels)) {
       if (!config.enabled) continue;
 
       const file = files.find(f => f === id);
@@ -133,6 +209,8 @@ export default class Engine {
       }
 
       try {
+        if (this.channels[id]) continue;
+
         const Module = await import(`./channels/${file}.js`);
         const Class = Module.default;
         // must be a Channel class
@@ -158,6 +236,8 @@ export default class Engine {
     const files = listModels(this).map(f => f.replace('.ts', ''))
     for (const [modelId, config] of Object.entries(this.config.models)) {
       try {
+        if (this.models[modelId]) continue;
+
         if (!config.enabled) {
           console.warn('[Engine.loadModels]', `model ${modelId} is disabled, skipping`);
           continue;
@@ -219,7 +299,7 @@ export default class Engine {
     console.debug('[Engine.loadAgents]');
 
     // type: orchestrator/supervisor
-    {
+    if (!this.agents[this.config.settings.name]) {
       console.debug('[Engine.loadAgents]');
 
       const marvinId = this.config.settings.name;
@@ -263,6 +343,8 @@ export default class Engine {
 
     // type: agent
     for (const [agentId, agent] of Object.entries(this.config.agents)) {
+      if (this.agents[agentId]) continue;
+
       const model = this.models[agent.model || ''];
       if (!model) {
         console.error('[Engine.loadAgents]', `model not found for agent ${agentId}: ${agent.model}`);
@@ -334,13 +416,14 @@ export default class Engine {
   }
 
   dropAgents() {
-    console.debug('[Engine.dropAgents]', Object.keys(this.agents).length, 'agents');
-    for (const agent of Object.values(this.agents)) {
-      console.debug('[Engine.dropAgents]', Object.keys(agent.tasks).length, 'tasks');
-      for (const task of Object.values(agent.tasks)) {
+    console.debug('[Engine.dropAgents]');
+    for (const [agentId, agent] of Object.entries(this.agents)) {
+      for (const [taskId, task] of Object.entries(agent.tasks)) {
         if (task.timeout) { 
-          console.debug('[Engine.dropAgents]', `stopping task ${task.id}`);
+          console.debug('[Engine.dropAgents]', `stopping task ${taskId}`);
           clearTimeout(task.timeout);
+        } else {
+          console.debug('[Engine.dropAgents]', `task ${taskId} not running, continuing`);
         }
       }
     }
@@ -348,15 +431,16 @@ export default class Engine {
   }
 
   dropModels() {
-    console.debug('[Engine.dropModels]', Object.keys(this.models).length, 'models');
+    console.debug('[Engine.dropModels]');
     this.models = {};
   }
 
   // will detach and delete ALL channels from the engine
   async dropChannels() {
-    console.debug('[Engine.dropChannels]', Object.keys(this.channels).length, 'channels');
-    for (const channel of Object.values(this.channels)) {
+    console.debug('[Engine.dropChannels]');
+    for (const [channelId, channel] of Object.entries(this.channels)) {
       try {
+        console.debug('[Engine.dropChannels]', `detaching channel ${channelId}`);
         await channel.drop();
       } catch (err) {
         console.error('[Engine.dropChannels]', `error detaching channel:`, err);
@@ -379,9 +463,10 @@ export default class Engine {
   }
 
   async dropSystems() {
-    console.debug('[Engine.dropSystems]', Object.keys(this.systems).length, 'systems');
-    for (const system of Object.values(this.systems)) {
+    console.debug('[Engine.dropSystems]');
+    for (const [name, system] of Object.entries(this.systems)) {
       try {
+        console.debug('[Engine.dropSystems]', `detaching system ${name}`);
         await system.drop();
       } catch (err) {
         console.error('[Engine.dropSystems]', `error detaching system:`, err);
@@ -391,31 +476,12 @@ export default class Engine {
   }
 
   // for each agent, for each task, start setTimeout
-  async execAgents() {
-    console.debug('[Engine.execAgents]');
-
-    for (const [agentId, agent] of Object.entries(this.agents)) {
-      for (const [taskId, task] of Object.entries(agent.tasks)) {
-        if (this.isDry) {
-          console.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
-          continue;
-        }
-        if (agentId === this.config.settings.name) {
-          task.timeout = setTimeout(this.execOrchestrator.bind(this), task.schedule, agentId, taskId);
-          console.debug('[Engine.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (orchestrator ${agentId})`);
-        } else {
-          task.timeout = setTimeout(this.execTask.bind(this), task.schedule, agentId, taskId);
-          console.debug('[Engine.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
-        }
-      }
-    }
-  }
 
   async execOrchestrator(agentId: string, taskId: string) {
     console.debug('[Engine.execOrchestrator]', agentId, taskId);
 
     // check assistant state
-    if (this.state  !== 'running') {
+    if (this.state  !== 'exec') {
       console.info('[Engine.execOrchestrator]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
@@ -457,7 +523,7 @@ export default class Engine {
     console.log('[Engine.execTask]', `${agentId}/${taskId}`);
 
     // check assistant state
-    if (this.state  !== 'running') {
+    if (this.state  !== 'exec') {
       console.info('[Engine.execTask]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
@@ -533,21 +599,11 @@ export default class Engine {
 
   async execReload() {
     console.log('[Engine.execReload]');
-    this.state = 'reloading';
 
     // drop in reverse order
-          this.dropAgents();
-          this.dropModels();
-    await this.dropChannels();
-    await this.dropSystems();
-
-    // re-load in dependency order
-    await this.loadSystems();
-    await this.loadChannels();
-    await this.loadModels();
-    await this.loadAgents();
-
-    this.state = 'running';
+    await this.drop();
+    // re-load & in dependency order and exec
+    await this.exec();
   }
 
   // tool call

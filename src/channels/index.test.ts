@@ -16,7 +16,7 @@ function mockEngine(config: Config = {} as Config): Engine {
   engine.models = {};
   engine.agents = {};
   engine.tools = {};
-  engine.state = 'running';
+  engine.state = 'exec';
   (engine as any).isTest = true; // allow .mock.ts files
   return engine;
 }
