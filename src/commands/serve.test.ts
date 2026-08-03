@@ -78,7 +78,7 @@ class TestChannel extends Channel {
   }
 }
 
-/** Build a fully wired context with an agent, mock model, and mock channel. */
+/** Build a fully wired engine with an agent, mock model, and mock channel. */
 function buildTestEngine(opts?: {
   channelEnabled?: boolean;
   channelName?: string;
@@ -317,7 +317,7 @@ test('sendMessage executes tool calls from model reply', async () => {
     message: {
       role: 'assistant',
       content: '',
-      tools: [{ id: 'tool-1', name: 'mock_tool', arguments: '{}' }],
+      tools: [{ id: 'tool-1', name: 'mock_tool', arguments: {} }],
     },
   } as Reply;
 
@@ -347,7 +347,7 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
     message: {
       role: 'assistant',
       content: '',
-      tools: [{ id: 'tool-2', name: 'mock_tool', arguments: 'not-valid-json' }],
+      tools: [{ id: 'tool-2', name: 'mock_tool', arguments: {} }],
     },
   } as Reply;
 
@@ -378,7 +378,7 @@ test('sendMessage stops the AI loop when end chat tool call is found', async () 
     message: {
       role: 'assistant',
       content: '',
-      tools: [{ id: 'final-1', name: constants.END_CHAT_NAME, arguments: '{"answer": "done"}' }],
+      tools: [{ id: 'final-1', name: constants.END_CHAT_NAME, arguments: {"answer": "done"} }],
     },
   } as Reply;
 
@@ -521,7 +521,7 @@ test('execChat returns empty string when reply.message is undefined', async () =
 test('execTask calls execChat and sends result through agent channels', async () => {
   const engine = buildTestEngine();
 
-  // Add a task directly to the existing agent (identity is already set by buildTestContext)
+  // Add a task directly to the existing agent
   engine.agents['marvin']!.tasks = {
     'test-task': {
       id: 'test-task',
@@ -567,7 +567,6 @@ test('execTask skips disabled tasks', async () => {
 test('execTask skips disabled agents', async () => {
   const engine = buildTestEngine();
 
-  // Disable the agent directly (identity is already set by buildTestContext)
   (engine.agents['marvin'] as any).enabled = false;
   engine.agents['marvin']!.tasks = {
     'test-task': {
@@ -589,7 +588,6 @@ test('execTask skips disabled agents', async () => {
 test('execTask warns and skips when agent channel is not loaded', async () => {
   const engine = buildTestEngine({ channelEnabled: false });
 
-  // Set a missing channel directly (identity is already set by buildTestContext)
   engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
   engine.agents['marvin']!.tasks = {
     'test-task': {
@@ -633,7 +631,6 @@ test('execTask skips disabled tasks', async () => {
 test('execTask skips disabled agents', async () => {
   const engine = buildTestEngine();
 
-  // Disable the agent directly (identity is already set by buildTestContext)
   (engine.agents['marvin'] as any).enabled = false;
   engine.agents['marvin']!.tasks = {
     'test-task': {
@@ -655,7 +652,6 @@ test('execTask skips disabled agents', async () => {
 test('execTask warns and skips when agent channel is not loaded', async () => {
   const engine = buildTestEngine({ channelEnabled: false });
 
-  // Set a missing channel directly (identity is already set by buildTestContext)
   engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
   engine.agents['marvin']!.tasks = {
     'test-task': {
@@ -732,7 +728,7 @@ test('execReload sets state to running after reload', async () => {
 
 // ==================== drop methods tests ====================
 
-test('dropChannels clears all channels from context', async () => {
+test('dropChannels clears all channels from engine', async () => {
   const engine = buildTestEngine();
 
   await engine.dropChannels();

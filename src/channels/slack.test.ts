@@ -1,13 +1,14 @@
 import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
-import { Command, Context } from '../types.js';
+import { Command } from '../types.js';
+import Engine from '../engine.js';
 import { Config, Message, Agent } from '../types.js';
 import SlackChannel from './slack.js';
 import { type HandlerParams, type SlackResponse, type ISocketModeClient, type IWebClient } from './slack.js'
 import ServeCommand from '../commands/serve.js';
 
 interface MockServer {
-  sendMessage: (ctx: Context, chatId: string, agentId: string, input: string) => Promise<{ content: string; steps: number } | null>;
+  sendMessage: (engine: Engine, chatId: string, agentId: string, input: string) => Promise<{ content: string; steps: number } | null>;
 }
 
 class MockSocketModeClient implements ISocketModeClient {
@@ -54,8 +55,8 @@ class MockWebClient implements IWebClient {
 }
 
 class MockSlackChannel extends SlackChannel {
-  constructor(ctx: Context) {
-    super(ctx);
+  constructor(engine: Engine) {
+    super(engine);
   }
 
   async load() {
@@ -128,28 +129,17 @@ class MockSlackChannel extends SlackChannel {
       return;
     }
 
-    const server = this.ctx.command as ServeCommand;
-    if (!server) {
-      console.error('[SlackChannel.onMention]', 'server not available');
-      await this.sendMessage({ role: 'assistant', content: '(server not available)' });
-      return;
-    }
+    const chatId = `slack-${event.channel}-${event.thread_ts}`;
+    const agentId = this.findAgent(event.channel as string | undefined).id;
 
-    const agent = this.findAgent(event.channel as string | undefined);
-    const thread = (event.thread_ts || event.ts || event.event_ts) as string | undefined;
-    const agentId = agent.id;
-    const chatId: string = `slack-${event.channel}-${thread}`;
-
-    console.log('[SlackChannel.onMention]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
-
-    const result = await server.execChat(this.ctx, text, chatId, agentId);
+    const result = await this.engine.execChat(text, chatId, agentId);
     if (!result) {
       console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
       await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
       return;
     }
 
-    await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel as string, thread: thread });
+    await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel as string, thread: event.thread_ts });
   }
 
   async onDirectMessage({ event, body, ack }: HandlerParams) {
@@ -159,11 +149,6 @@ class MockSlackChannel extends SlackChannel {
       // extract the actual message text (strip @marvin mention)
       let text = (event.text as string | undefined) || '';
 
-      const server = this.ctx.command as ServeCommand;
-      if (!server) {
-        throw new Error('SlackChannel.onDirectMessage: server not available');
-      }
-
       const agent = this.findAgent(event.channel as string | undefined);
       const thread = (event.thread_ts || event.ts || event.event_ts) as string | undefined;
       const agentId = agent.id;
@@ -171,7 +156,7 @@ class MockSlackChannel extends SlackChannel {
 
       console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${(text as string).slice(0, 100)}`);
 
-      const result = await server.execChat(this.ctx, text, chatId, agentId);
+      const result = await this.engine.execChat(text, chatId, agentId);
 
       if (!result) {
         console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
@@ -221,14 +206,14 @@ function mockConfig(options: {
   };
 }
 
-function mockContext(config?: Config): Context {
-  const ctx = new Context();
+function mockEngine(config?: Config): Engine {
+  const engine = new Engine();
   if (config) {
-    (ctx as Context & { config: Config }).config = config;
+    (engine as Engine & { config: Config }).config = config;
   } else {
-    ctx.config = mockConfig();
+    engine.config = mockConfig();
   }
-  return ctx;
+  return engine;
 }
 
 // ============================================================================
@@ -321,43 +306,43 @@ test('extractText handles mixed content (mentions + links + formatting)', async 
 // ============================================================================
 
 test('findSlackAgent returns agent with slack configured', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'agent-1': { enabled: true, channels: { slack: 'C123' } },
       'agent-2': { enabled: true, channels: {} },
     },
   }));
 
-  ctx.agents['agent-1'] = {
+  engine.agents['agent-1'] = {
     id: 'agent-1', enabled: true, channels: { slack: 'C123' }, tasks: {}, model: {} as never, identity: '',
   } as Agent;
-  ctx.agents['agent-2'] = {
+  engine.agents['agent-2'] = {
     id: 'agent-2', enabled: true, channels: {}, tasks: {}, model: {} as never, identity: '',
   } as Agent;
 
-  const configChannels = ctx.config.agents['agent-1']?.channels || {};
+  const configChannels = engine.config.agents['agent-1']?.channels || {};
   expect(configChannels.slack).toBe('C123');
 });
 
 test('findSlackAgent skips disabled agents', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'agent-disabled': { enabled: false, channels: { slack: 'C456' } },
       'agent-active': { enabled: true, channels: { slack: 'C789' } },
     },
   }));
 
-  ctx.agents['agent-disabled'] = {
+  engine.agents['agent-disabled'] = {
     id: 'agent-disabled', enabled: false, channels: { slack: 'C456' }, tasks: {}, model: {} as never, identity: '',
   } as Agent;
-  ctx.agents['agent-active'] = {
+  engine.agents['agent-active'] = {
     id: 'agent-active', enabled: true, channels: { slack: 'C789' }, tasks: {}, model: {} as never, identity: '',
   } as Agent;
 
   let found: string | null = null;
-  for (const [agentId, agent] of Object.entries(ctx.agents)) {
+  for (const [agentId, agent] of Object.entries(engine.agents)) {
     if (!agent.enabled) continue;
-    const channels = ctx.config.agents[agentId]?.channels || {};
+    const channels = engine.config.agents[agentId]?.channels || {};
     if (channels.slack) {
       found = agentId;
       break;
@@ -368,20 +353,20 @@ test('findSlackAgent skips disabled agents', async () => {
 });
 
 test('findSlackAgent returns null when no agent has slack', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'agent-1': { enabled: true, channels: { slacktonly: 'C111' } },
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, channels: { slacktonly: 'C111' }, tasks: {}, model: {} as never, identity: '',
   } as Agent;
 
   let found: string | null = null;
-  for (const [agentId, agent] of Object.entries(ctx.agents)) {
+  for (const [agentId, agent] of Object.entries(engine.agents)) {
     if (!agent.enabled) continue;
-    const channels = ((ctx.config.agents as Record<string, { channels: Record<string, string> }>)?.[agentId] as { channels: Record<string, string> })?.channels || {};
+    const channels = ((engine.config.agents as Record<string, { channels: Record<string, string> }>)?.[agentId] as { channels: Record<string, string> })?.channels || {};
     if (channels.slack) {
       found = agentId;
       break;
@@ -413,13 +398,13 @@ test('non-thread message has no thread', async () => {
 // ============================================================================
 
 test('onMention extracts text, finds agent, and calls processMessage', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} },
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1',
     enabled: true,
     identity: 'You are a helpful assistant.',
@@ -435,22 +420,22 @@ test('onMention extracts text, finds agent, and calls processMessage', async () 
 
   expect(text).toBe('what time is it?');
 
-  const configChannels = ((ctx.config.agents as Record<string, { channels: Record<string, string> }>)['agent-1'])?.channels || {};
+  const configChannels = ((engine.config.agents as Record<string, { channels: Record<string, string> }>)['agent-1'])?.channels || {};
   expect(configChannels.slack).toBe('C123');
 
-  const agent = ctx.agents['agent-1'];
+  const agent = engine.agents['agent-1'];
   expect(agent).toBeDefined();
   expect(agent!.enabled).toBe(true);
 });
 
 test('onMention with thread_ts replies in the same thread', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} },
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1',
     enabled: true,
     identity: 'You are a helpful assistant.',
@@ -477,13 +462,13 @@ test('onMention with thread_ts replies in the same thread', async () => {
 });
 
 test('onDirectMessage processes DM without threading', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'agent-1': { enabled: true, channels: { slack: 'D456' }, tasks: {} },
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1',
     enabled: true,
     identity: 'You are a helpful assistant.',
@@ -506,24 +491,24 @@ test('onDirectMessage processes DM without threading', async () => {
 });
 
 test('processMessage returns null when agent not found', async () => {
-  const ctx = mockContext();
-  const result = ctx.agents['nonexistent'];
+  const engine = mockEngine();
+  const result = engine.agents['nonexistent'];
   expect(result).toBeUndefined();
 });
 
 // --- load() tests ---
 
 test('load() creates mock clients and calls start()', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     channels: { slack: { appToken: 'xapp-test', botToken: 'xbot-test' } },
     agents: { marvin: { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   expect(ch.sokClient).toBeDefined();
@@ -532,31 +517,31 @@ test('load() creates mock clients and calls start()', async () => {
 });
 
 test('load() falls back to env vars when config is missing', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: {}, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   expect((ch.sokClient as MockSocketModeClient).started).toBe(true);
 });
 
 test('load() handles partial slack config (only appToken)', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     channels: { slack: { appToken: 'xapp-partial' } },
     agents: { marvin: { enabled: true, channels: {}, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   expect((ch.sokClient as MockSocketModeClient).started).toBe(true);
@@ -565,15 +550,15 @@ test('load() handles partial slack config (only appToken)', async () => {
 // --- drop() tests ---
 
 test('drop() disconnects the mock socket', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: {}, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   expect((ch.sokClient as MockSocketModeClient).started).toBe(true);
@@ -581,24 +566,24 @@ test('drop() disconnects the mock socket', async () => {
 });
 
 test('drop() before load does not throw', async () => {
-  const ctx = mockContext();
+  const engine = mockEngine();
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.drop();
 });
 
 // --- sendMessage() tests ---
 
 test('sendMessage() success returns SlackResponse with ts and ok', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -615,15 +600,15 @@ test('sendMessage() success returns SlackResponse with ts and ok', async () => {
 });
 
 test('sendMessage() includes thread_ts for threaded messages', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -641,15 +626,15 @@ test('sendMessage() includes thread_ts for threaded messages', async () => {
 });
 
 test('sendMessage() logs warning on channel mismatch', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -666,7 +651,7 @@ test('sendMessage() logs warning on channel mismatch', async () => {
 });
 
 test('sendMessage() returns undefined when web is not attached', async () => {
-  const ch = new MockSlackChannel(mockContext());
+  const ch = new MockSlackChannel(mockEngine());
   // Don't call load - web is null.
 
   const result = await ch.sendMessage({ role: 'assistant', content: 'hello' });
@@ -679,26 +664,16 @@ test('sendMessage() returns undefined when web is not attached', async () => {
 test('onMention() happy path: extracts text, finds agent, calls sendMessage, sends reply', async () => {
   let sendMessageCalled = false;
 
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {},
     model: {} as never,
   } as Agent;
 
-  (ctx as { command: Command }).command = {
-    execChat: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
-      sendMessageCalled = true;
-      expect(chatId).toBe('slack-C123-1700000000.999');
-      expect(agentId).toBe('agent-1');
-      expect(input).toBe('hello there');
-      return { content: 'reply from agent', steps: 1 };
-    },
-  } as ServeCommand;
-
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -725,16 +700,16 @@ test('onMention() happy path: extracts text, finds agent, calls sendMessage, sen
 test('onMention() with no text content sends (no text content)', async () => {
   let sendMessageCalled = false;
 
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {},
     model: {} as never,
   } as Agent;
 
-  let ch = new MockSlackChannel(ctx);
+  let ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -756,18 +731,18 @@ test('onMention() with no text content sends (no text content)', async () => {
 test('onMention() with no server sends (server not available)', async () => {
   let sendMessageCalled = false;
 
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {},
     model: {} as never,
   } as Agent;
 
-  (ctx as Context & { server?: MockServer }).server = undefined;
+  (engine as { server?: MockServer }).server = undefined;
 
-  let ch = new MockSlackChannel(ctx);
+  let ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -789,20 +764,16 @@ test('onMention() with no server sends (server not available)', async () => {
 test('onMention() with null sendMessage result sends (no response from the AI)', async () => {
   let sendMessageCalled = false;
 
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {},
     model: {} as never,
   } as Agent;
 
-  (ctx as { command: Command }).command = {
-    // sendMessage: ,
-  } as ServeCommand;
-
-  let ch = new MockSlackChannel(ctx);
+  let ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -826,24 +797,16 @@ test('onMention() with null sendMessage result sends (no response from the AI)',
 test('onDirectMessage() happy path: finds agent by channel, calls sendMessage, sends reply without thread', async () => {
   let sendMessageCalled = false;
 
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'D456' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'D456' }, tasks: {},
     model: {} as never,
   } as Agent;
 
-  (ctx as { command: Command }).command = {
-    execChat: async (_ctx: Context, input: string, chatId: string, agentId: string) => {
-      sendMessageCalled = true;
-      expect(agentId).toBe('agent-1'); // DM should resolve agent by channel (bug fix)
-      return { content: 'DM reply', steps: 1 };
-    },
-  } as ServeCommand;
-
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -858,22 +821,16 @@ test('onDirectMessage() happy path: finds agent by channel, calls sendMessage, s
 test('onDirectMessage() with no text content sends (no text content)', async () => {
   let sendMessageCalled = false;
 
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'D456' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'D456' }, tasks: {},
     model: {} as never,
   } as Agent;
 
-  (ctx as { command: Command }).command = {
-    execChat: async (ctx: Context, input: string, chatId: string, agentId: string) => {
-      return { content: 'should not reach here', steps: 0 };
-    }
-  } as ServeCommand;
-
-  let ch = new MockSlackChannel(ctx);
+  let ch = new MockSlackChannel(engine);
   await ch.load();
 
   const mockWeb = ch.webClient! as MockWebClient;
@@ -895,19 +852,16 @@ test('onDirectMessage() with no text content sends (no text content)', async () 
 });
 
 test('onDirectMessage() catches and logs when server is not available (existing behavior)', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { 'agent-1': { enabled: true, channels: { slack: 'D456' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'D456' }, tasks: {},
     model: {} as never,
   } as Agent;
 
-  // No server.
-  (ctx as Context & { server?: MockServer }).server = undefined;
-
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const event = { text: '<@U12345678> hi', channel: 'D456' };
@@ -925,8 +879,8 @@ test('onSlashCommand() acknowledges with stub response', async () => {
   let acked = false;
   let ackResponse: Record<string, unknown> | undefined;
 
-  const ctx = mockContext();
-  const ch = new MockSlackChannel(ctx);
+  const engine = mockEngine();
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   await ch.onSlashCommand({
@@ -946,8 +900,8 @@ test('onSlashCommand() acknowledges with stub response', async () => {
 // --- Connection state handler tests ---
 
 test('onError() logs error to console.error', async () => {
-  const ctx = mockContext();
-  const ch = new MockSlackChannel(ctx);
+  const engine = mockEngine();
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const originalError = console.error;
@@ -962,8 +916,8 @@ test('onError() logs error to console.error', async () => {
 });
 
 test('onConnecting() logs connecting message', async () => {
-  const ctx = mockContext();
-  const ch = new MockSlackChannel(ctx);
+  const engine = mockEngine();
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const originalInfo = console.info;
@@ -978,8 +932,8 @@ test('onConnecting() logs connecting message', async () => {
 });
 
 test('onConnected() logs connected message', async () => {
-  const ctx = mockContext();
-  const ch = new MockSlackChannel(ctx);
+  const engine = mockEngine();
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const originalInfo = console.info;
@@ -994,8 +948,8 @@ test('onConnected() logs connected message', async () => {
 });
 
 test('onReconnecting() logs warning with attempt number', async () => {
-  const ctx = mockContext();
-  const ch = new MockSlackChannel(ctx);
+  const engine = mockEngine();
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const originalWarn = console.warn;
@@ -1011,8 +965,8 @@ test('onReconnecting() logs warning with attempt number', async () => {
 });
 
 test('onReconnected() logs reconnected message', async () => {
-  const ctx = mockContext();
-  const ch = new MockSlackChannel(ctx);
+  const engine = mockEngine();
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const originalWarn = console.warn;
@@ -1027,8 +981,8 @@ test('onReconnected() logs reconnected message', async () => {
 });
 
 test('onDisconnected() logs warning with error', async () => {
-  const ctx = mockContext();
-  const ch = new MockSlackChannel(ctx);
+  const engine = mockEngine();
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const originalWarn = console.warn;
@@ -1047,22 +1001,22 @@ test('onDisconnected() logs warning with error', async () => {
 // ============================================================================
 
 test('findAgent() returns agent whose channels.slack matches the passed channel', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'agent-1': { enabled: true, channels: { slack: 'C123' }, tasks: {} },
       'agent-2': { enabled: true, channels: { slack: 'C456' }, tasks: {} },
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['agent-1'] = {
+  (engine.agents as Record<string, Agent>)['agent-1'] = {
     id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  (ctx.agents as Record<string, Agent>)['agent-2'] = {
+  (engine.agents as Record<string, Agent>)['agent-2'] = {
     id: 'agent-2', enabled: true, identity: '', channels: { slack: 'C456' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const agent = ch.findAgent('C123');
@@ -1070,15 +1024,15 @@ test('findAgent() returns agent whose channels.slack matches the passed channel'
 });
 
 test('findAgent() returns default agent when no channel is passed', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: {}, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const agent = ch.findAgent();
@@ -1086,22 +1040,22 @@ test('findAgent() returns default agent when no channel is passed', async () => 
 });
 
 test('findAgent() skips disabled agents and returns next enabled with slack config', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: {
       'disabled-agent': { enabled: false, channels: { slack: 'C999' }, tasks: {} },
       'active-agent': { enabled: true, channels: { slack: 'C789' }, tasks: {} },
     },
   }));
 
-  (ctx.agents as Record<string, Agent>)['disabled-agent'] = {
+  (engine.agents as Record<string, Agent>)['disabled-agent'] = {
     id: 'disabled-agent', enabled: false, identity: '', channels: { slack: 'C999' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  (ctx.agents as Record<string, Agent>)['active-agent'] = {
+  (engine.agents as Record<string, Agent>)['active-agent'] = {
     id: 'active-agent', enabled: true, identity: '', channels: { slack: 'C789' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const agent = ch.findAgent('C789');
@@ -1109,15 +1063,15 @@ test('findAgent() skips disabled agents and returns next enabled with slack conf
 });
 
 test('findAgent() fallback checks default agent slack config (bug fix)', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: { slack: 'CDEFAULT' }, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: { slack: 'CDEFAULT' }, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const agent = ch.findAgent('CUNKNOWN');
@@ -1126,15 +1080,15 @@ test('findAgent() fallback checks default agent slack config (bug fix)', async (
 });
 
 test('findAgent() returns default even when it has no slack config (existing behavior)', async () => {
-  const ctx = mockContext(mockConfig({
+  const engine = mockEngine(mockConfig({
     agents: { marvin: { enabled: true, channels: {}, tasks: {} } },
   }));
 
-  (ctx.agents as Record<string, Agent>)['marvin'] = {
+  (engine.agents as Record<string, Agent>)['marvin'] = {
     id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never,
   } as Agent;
 
-  const ch = new MockSlackChannel(ctx);
+  const ch = new MockSlackChannel(engine);
   await ch.load();
 
   const agent = ch.findAgent('CUNKNOWN');

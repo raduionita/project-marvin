@@ -31,7 +31,7 @@ export default class ServeCommand extends Command {
     await this.engine.execAgents();
   }
 
-  // will drop all the resources from the context
+  // will drop all the resources from the engine
   async drop() {
     console.debug('[ServeCommand.drop]', this.engine.state);
 

@@ -11,8 +11,6 @@ import { join } from "path";
 export default class Engine {
   public state: 'running' | 'reloading' | 'stopped' = 'running';
 
-  public command: Command = {} as Command;
-
   public config: Config = {} as Config;
 
   public cache: Cache = new Cache();
@@ -354,7 +352,7 @@ export default class Engine {
     this.models = {};
   }
 
-  // will detach and delete ALL channels from the context
+  // will detach and delete ALL channels from the engine
   async dropChannels() {
     console.debug('[Engine.dropChannels]', Object.keys(this.channels).length, 'channels');
     for (const channel of Object.values(this.channels)) {
@@ -367,7 +365,7 @@ export default class Engine {
     this.channels = {};
   }
 
-  // will detach and delete the channel from the context
+  // will detach and delete the channel from the engine
   async dropChannel(id: string) {
     console.log('[Engine.dropChannel]', id);
     if (this.channels[id]) {

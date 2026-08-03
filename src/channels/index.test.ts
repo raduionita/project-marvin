@@ -1,48 +1,48 @@
 import { test, expect } from 'bun:test';
+import Engine from '../engine.js';
 import { listChannels } from './index.js';
-import { Context } from '../types.js';
 import { Config } from '../types.js';
 
-function mockContext(config: Config = {} as Config): Context {
-  const ctx = new Context();
-  ctx.config = {
+function mockEngine(config: Config = {} as Config): Engine {
+  const engine = new Engine();
+  engine.config = {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: config.channels || {},
     models: {},
     agents: {},
   } as Config;
-  ctx.channels = {};
-  ctx.models = {};
-  ctx.agents = {};
-  ctx.tools = {};
-  ctx.state = 'running';
-  (ctx as any).isTest = true; // allow .mock.ts files
-  return ctx;
+  engine.channels = {};
+  engine.models = {};
+  engine.agents = {};
+  engine.tools = {};
+  engine.state = 'running';
+  (engine as any).isTest = true; // allow .mock.ts files
+  return engine;
 }
 
 test('listChannels returns channel files', () => {
-  const ctx = mockContext();
-  const channels = listChannels(ctx);
+  const engine = mockEngine();
+  const channels = listChannels(engine);
   expect(Array.isArray(channels)).toBe(true);
   expect(channels.length).toBeGreaterThan(0);
 });
 
 test('listChannels excludes index.ts', () => {
-  const ctx = mockContext();
-  const channels = listChannels(ctx);
+  const engine = mockEngine();
+  const channels = listChannels(engine);
   expect(channels).not.toContain('index.ts');
 });
 
 test('listChannels excludes test files', () => {
-  const ctx = mockContext();
-  const channels = listChannels(ctx);
+  const engine = mockEngine();
+  const channels = listChannels(engine);
   expect(channels).not.toContain('slack.test.ts');
 });
 
 test('listChannels includes known channels', () => {
-  const ctx = mockContext();
-  const channels = listChannels(ctx);
+  const engine = mockEngine();
+  const channels = listChannels(engine);
   expect(channels).toContain('slack.ts');
   expect(channels).toContain('telegram.ts');
   expect(channels).toContain('whatsapp.ts');

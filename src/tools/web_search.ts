@@ -34,7 +34,7 @@ export default class WebSearchTool extends Tool {
     }
 
     if (!this.engine.systems['browser']) {
-      throw new Error('[WebSearchTool.call] ERROR - Browser is not loaded in the server context');
+      throw new Error('[WebSearchTool.call] ERROR - Browser is not loaded in the server engine');
     }
 
     const system = this.engine.systems['browser'] as BrowserSystem;

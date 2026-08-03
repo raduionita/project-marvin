@@ -5,7 +5,7 @@ export default class ReloadCommand extends Command {
   async exec() {
     console.debug('[ReloadCommand.exec]');
 
-    // const url = new URL(`http://localhost:${this.ctx!.config.settings.port}/`);
+    // const url = new URL(`http://localhost:${this.engine.config.settings.port}/`);
     // url.pathname = '/reload';
 
     if (this.engine.isDry) {

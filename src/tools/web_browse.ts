@@ -29,7 +29,7 @@ export default class WebBrowseTool extends Tool {
     }
 
     if (!this.engine.systems['browser']) {
-      return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server context' }
+      return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server engine' }
     }
 
     const system = this.engine.systems['browser'] as BrowserSystem;

@@ -35,7 +35,7 @@ export default class ToolCommand extends Command {
 
   async listTools() {
     console.debug('[ToolCommand.listTools]', 'tools:');
-    const files = listTools(this.ctx).map(f => f.replace('.ts', ''));
+    const files = listTools(this.engine).map(f => f.replace('.ts', ''));
     for (const file of files) {
       const name = file;
       try {
@@ -46,9 +46,9 @@ export default class ToolCommand extends Command {
           continue;
         }
         // register instance of Tool
-        const instance = new Class(this.ctx);
+        const instance = new Class(this.engine);
         const meta = instance.meta as ToolMeta;
-        this.ctx.tools[meta.function.name] = instance;
+        this.engine.tools[meta.function.name] = instance;
         console.info('[ToolCommand.listTools]', `  tool [${meta.function.name}]`, JSON.stringify(meta.function.parameters.properties));
       } catch (err) {
         console.error('[ToolCommand.listTools]', `failed to load ${file}:`, err);
@@ -67,9 +67,9 @@ export default class ToolCommand extends Command {
         throw new Error(`[ToolCommand.callTool] ERROR - ${name} does not export a Tool class`);
       }
       // register instance of Tool
-      const instance = new Class(this.ctx);
+      const instance = new Class(this.engine);
       // dry guard
-      if (this.ctx.isDry) {
+      if (this.engine.isDry) {
         console.info('[ToolCommand.callTool]', '[dry] tool:', name, JSON.stringify(params));
         return;
       }
@@ -86,7 +86,7 @@ export default class ToolCommand extends Command {
   async loadSystems() {
     console.debug('[ToolCommand.loadSystems]');
 
-    const files = listSystems(this.ctx).map(f => f.replace('.ts', ''));
+    const files = listSystems(this.engine).map(f => f.replace('.ts', ''));
     for (const name of files) {
       try {
         const Module = await import(`../systems/${name}.js`);
@@ -96,9 +96,9 @@ export default class ToolCommand extends Command {
           continue;
         }
         // register instance of System
-        const instance = new Class(this.ctx);
+        const instance = new Class(this.engine);
         await instance.load();
-        this.ctx.systems[name] = instance;
+        this.engine.systems[name] = instance;
         console.debug('[ToolCommand.loadSystems]', `system [${name}] loaded`);
       } catch (err) {
         console.error('[ToolCommand.loadSystems]', `failed to load ${name}:`, err);
@@ -109,15 +109,14 @@ export default class ToolCommand extends Command {
 
   async dropSystems() {
     console.log('[ToolCommand.dropSystems]');
-    const ctx = this.ctx;
-    for (const system of Object.values(ctx.systems)) {
+    for (const system of Object.values(this.engine.systems)) {
       try {
         await system.drop();
       } catch (err) {
         console.error('[ToolCommand.dropSystems]', `error detaching system:`, err);
       }
     }
-    ctx.systems = {};
+    this.engine.systems = {};
   }
 
   async drop() {
