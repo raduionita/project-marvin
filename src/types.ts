@@ -42,7 +42,7 @@ export interface Config {
 }
 
 export class Command {
-  constructor(public readonly engine: Engine, public args: string[], public readonly deamon: boolean = false) {
+  constructor(public engine: Engine, public args: string[], public readonly deamon: boolean = false) {
     console.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
   }
 

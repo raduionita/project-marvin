@@ -129,6 +129,11 @@ await (new class Marvin {
   async drop() {
     console.debug('[Marvin.drop]');
 
-    await this.command?.drop();
+    if (!this.command) {
+      console.error('[Marvin.drop]', 'no command to drop');
+      return;
+    }
+
+    await this.command.drop();
   }
 }).exec();
