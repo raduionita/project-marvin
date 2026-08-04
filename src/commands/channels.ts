@@ -60,6 +60,7 @@ export default class ChannelsCommand extends Command {
         // check if channel is already loaded
         if (this.engine.config.channels[channelId]) {
           console.warn('[ChannelsCommand.exec]', `channel "${channelId}" is already loaded`);
+          pli.close();
           break;
         }
 
@@ -68,18 +69,16 @@ export default class ChannelsCommand extends Command {
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Channel)) {
           console.error('[ChannelsCommand.exec]', `${channelId} does not export a Channel class`);
+          pli.close();
           return;
         }
 
         // ask for arguments (for each arg in args, ask for value)
         const channel = new Class(this.engine);
-        const args = channel.args();
         const config: Record<string, string> = {};
 
-        console.log('');
-
-        for (const [arg, placeholder] of Object.entries(args) as [string, string][]) {
-          config[arg] = await pli.question(`Enter ${channelId} ${arg}: `) as string;
+        for (const [arg, placeholder] of Object.entries(channel.args)) {
+          config[arg] = await pli.question(`Enter ${channelId} ${arg} (e.g. ${placeholder}): `) as string;
         }
 
         pli.close();
@@ -109,7 +108,7 @@ export default class ChannelsCommand extends Command {
 
         console.log('');
         const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
-        const agentId = await pli.question('Enter agent (e.g. myAgent): ');
+        const agentId = await pli.question('Enter agent (e.g. my-agent): ');
         const channelId = await pli.question('Enter channel (e.g. slack): ');
         const groupId = await pli.question('Enter group (optional, e.g. general): ');
         pli.close();
