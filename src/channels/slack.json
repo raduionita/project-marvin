@@ -1,0 +1,91 @@
+{
+  "display_information": {
+    "name": "Marvin",
+    "description": "Slack connector for Marvin"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Marvin",
+      "always_online": true
+    },
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
+    "agent_view": {
+      "agent_description": "Marvin connects Slack Agent View conversations to Marvin agents.",
+      "suggested_prompts": [
+        {
+          "title": "What can you do?",
+          "message": "What can you help me with?"
+        },
+        {
+          "title": "Summarize this channel",
+          "message": "Summarize the recent activity in this channel."
+        },
+        {
+          "title": "Draft a reply",
+          "message": "Help me draft a reply."
+        }
+      ]
+    },
+    "slash_commands": [
+      {
+        "command": "/marvin",
+        "description": "Send a message to Marvin",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "app_mentions:read",
+        "assistant:write",
+        "channels:history",
+        "channels:read",
+        "chat:write",
+        "commands",
+        "emoji:read",
+        "files:read",
+        "files:write",
+        "groups:history",
+        "groups:read",
+        "im:history",
+        "im:read",
+        "im:write",
+        "mpim:history",
+        "mpim:read",
+        "mpim:write",
+        "pins:read",
+        "pins:write",
+        "reactions:read",
+        "reactions:write",
+        "usergroups:read",
+        "users:read"
+      ]
+    }
+  },
+  "settings": {
+    "socket_mode_enabled": true,
+    "event_subscriptions": {
+      "bot_events": [
+        "app_home_opened",
+        "app_mention",
+        "app_context_changed",
+        "channel_rename",
+        "member_joined_channel",
+        "member_left_channel",
+        "message.channels",
+        "message.groups",
+        "message.im",
+        "message.mpim",
+        "pin_added",
+        "pin_removed",
+        "reaction_added",
+        "reaction_removed"
+      ]
+    }
+  }
+}

@@ -64,7 +64,7 @@ export default class ChannelsCommand extends Command {
         }
 
         // dynamically import the channel class (see: server.ts Server.loadChannels)
-        const Module = await import(`./channels/${channelId}.js`);
+        const Module = await import(`../channels/${channelId}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Channel)) {
           console.error('[ChannelsCommand.exec]', `${channelId} does not export a Channel class`);
