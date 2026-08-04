@@ -42,7 +42,7 @@ export default class ChatCommand extends Command {
       console.debug('[ChatCommand.execChat]', '[dry]', 'message:', answer);
       console.debug('[ChatCommand.execChat]', '[dry]', 'agent:', agentId);
     } else {
-      const result = await this.engine.execChat(answer, chatId, agentId);
+      const result = await this.engine.execChat(chatId, agentId, answer);
       if (!result) {
         console.error('[ChatCommand.execChat]', 'no result from sendMessage for agent', agentId);
         return;

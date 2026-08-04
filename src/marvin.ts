@@ -28,28 +28,27 @@ await (new class Marvin {
 
     process.on('beforeExit', async (code) => {
       console.debug('[Marvin.loadProcess]', 'beforeExit', `${code}`);
-      // console.debug(process._getActiveHandles())
-      // cleanup
       await this.drop();
     });
 
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
       console.debug('[Marvin.loadProcess]', 'exit', `${code}`);
-      // console.debug(process._getActiveHandles())
     });
 
     // SIGINT (Ctrl+C)
-    process.on('SIGINT', () => {
+    process.on('SIGINT', async () => {
       console.log('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
       // goto process.on('exit') instead
+      await this.drop();
       process.exit(0);
     });
 
     // SIGTERM (kill)
-    process.on('SIGTERM', () => {
+    process.on('SIGTERM', async () => {
       console.log('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
       // goto process.on('exit')
+      await this.drop();
       process.exit(0);
     });
 

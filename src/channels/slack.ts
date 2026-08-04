@@ -168,7 +168,7 @@ export default class SlackChannel extends Channel {
       console.info(`processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await this.engine.execChat(text, chatId, agentId);
+      const result = await this.engine.execChat(chatId, agentId, text);
       if (!result) {
         console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
         await this.sendMessage({ role: 'assistant', content: '(no response from the AI)', channel: event.channel, thread: thread });
@@ -201,7 +201,7 @@ export default class SlackChannel extends Channel {
       console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await this.engine.execChat(text, chatId, agentId);
+      const result = await this.engine.execChat(chatId, agentId, text);
       if (!result) {
         console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
         await this.sendMessage({ role: 'assistant', content: '(SlackChannel.onDirectMessage ERROR - no response from the AI)', channel: event.channel, thread: thread });

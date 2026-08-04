@@ -43,12 +43,17 @@ export default class ChannelsCommand extends Command {
       case 'add' : {
         // TODO: refactor to use readline prompts
 
-        const channelId = this.args[1];
+        const channels = listChannels(this.engine).map(c => c.replace('.ts', ''));
 
-        // warn and stop if no name (channelId) provided
-        if (!channelId) {
-          console.warn('[ChannelsCommand.exec]', 'usage: marvin channels load <name>');
-          console.warn('[ChannelsCommand.exec]', 'available channels:', listChannels(this.engine).join(', '));
+        console.log('');
+        const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
+
+        const channelId = await pli.question('Enter channel name (e.g. slack): ');
+        
+        if (!channels.includes(channelId)) {
+          console.error('[ChannelsCommand.exec]', `unknown channel "${channelId}"`);
+          console.error('[ChannelsCommand.exec]', 'available channels:', channels.join(', '));
+          pli.close();
           break;
         }
 
@@ -56,14 +61,6 @@ export default class ChannelsCommand extends Command {
         if (this.engine.config.channels[channelId]) {
           console.warn('[ChannelsCommand.exec]', `channel "${channelId}" is already loaded`);
           break;
-        }
-
-        // channel MUST exist in listChannels
-        const available = listChannels(this.engine);
-        if (!available.includes(channelId)) {
-          console.error('[ChannelsCommand.exec]', `unknown channel "${channelId}"`);
-          console.error('[ChannelsCommand.exec]', 'available channels:', available.join(', '));
-          return;
         }
 
         // dynamically import the channel class (see: server.ts Server.loadChannels)
@@ -80,10 +77,11 @@ export default class ChannelsCommand extends Command {
         const config: Record<string, string> = {};
 
         console.log('');
-        const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
+
         for (const [arg, placeholder] of Object.entries(args) as [string, string][]) {
           config[arg] = await pli.question(`Enter ${channelId} ${arg}: `) as string;
         }
+
         pli.close();
         console.log('');
 
@@ -108,13 +106,16 @@ export default class ChannelsCommand extends Command {
     } break;
       case 'bind' : {
         console.info('[ChannelsCommand.exec]', 'binding a channel:group to an agent...');
-        const agentId = this.args[1];
-        const channelId = this.args[2];
-        const groupId = this.args[3] || ''; // optional
+
+        console.log('');
+        const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
+        const agentId = await pli.question('Enter agent (e.g. myAgent): ');
+        const channelId = await pli.question('Enter channel (e.g. slack): ');
+        const groupId = await pli.question('Enter group (optional, e.g. general): ');
+        pli.close();
 
         if (!channelId || !agentId) {
-          console.warn('[ChannelsCommand.exec]', 'invalid arguments');
-          console.warn('[ChannelsCommand.exec]', 'usage: marvin channels bind <agentId> <channelId> <groupId>');
+          console.warn('[ChannelsCommand.exec]', 'invalid inputs, exiting');
           break;
         }
 

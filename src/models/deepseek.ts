@@ -5,7 +5,7 @@ export default class DeepseekModel extends Model {
   provider: Provider = 'deepseek';
   public baseUrl: string = 'https://api.deepseek.com';
 
-  async sendMessage(chat: Chat) : Promise<Reply> {
+  async sendChat(chat: Chat) : Promise<Reply> {
     const body = {
       model: this.model,
       messages: chat.messages.map(m => JSON.parse(JSON.stringify({
@@ -26,7 +26,7 @@ export default class DeepseekModel extends Model {
       thinking: { type: (chat.thinking ? 'enabled' : 'disabled') },
       user_id: chat.userId,
       reasoning_effort: this.reasoning, // TODO: this should be configurable depending on the task
-      response_format: { type: 'json_object' }, //  this.format === 'json' ? 'json_object' : 'text' }, // TODO: this should be configurable depending on the task
+      response_format: { type: chat.format === 'json' ? 'json_object' : 'text' },
       tools: this.tools,
       tool_choice: this.tools ? 'auto' : 'none',
       temperature: this.temperature,
@@ -34,7 +34,7 @@ export default class DeepseekModel extends Model {
       max_tokens: this.maxTokens,
     }
 
-    console.debug('[DeepseekModel.sendMessage]', 'body:', JSON.stringify(body, null, 2));
+    console.debug('[DeepseekModel.sendChat]', 'body:', JSON.stringify(body, null, 2));
 
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
@@ -49,9 +49,9 @@ export default class DeepseekModel extends Model {
 
     // check if response is ok
     if (!response.ok) {
-      console.error('[DeepseekModel.sendMessage]', 'response NOT ok:', response);
+      console.error('[DeepseekModel.sendChat]', 'response NOT ok:', response);
       const body = await response.json();
-      throw new Error(`[DeepseekModel.sendMessage] ERROR ${body.error?.message || body.message || response.statusText}`);
+      throw new Error(`[DeepseekModel.sendChat] ERROR ${body.error?.message || body.message || response.statusText}`);
     }
 
     // extract json from response
@@ -59,11 +59,11 @@ export default class DeepseekModel extends Model {
 
     // no choices, no reply
     if (!json.choices || json.choices.length === 0) {
-      console.warn('[DeepseekModel.sendMessage]', 'no choices, no reply');
+      console.warn('[DeepseekModel.sendChat]', 'no choices, no reply');
       return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
     }
 
-    console.debug('[DeepseekModel.sendMessage]', 'json', JSON.stringify(json, null, 2));
+    console.debug('[DeepseekModel.sendChat]', 'json', JSON.stringify(json, null, 2));
 
     // choice 0, for now only one choice is supported
     const choice = json.choices[0];

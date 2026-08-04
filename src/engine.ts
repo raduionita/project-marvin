@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 
 import { listSystems } from "./systems";
-import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Cache, Message, Reply } from "./types";
+import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat } from "./types";
 import * as constants from './constants.js';
 import { listTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
@@ -13,7 +13,7 @@ export default class Engine {
 
   public config: Config = {} as Config;
 
-  public cache: Cache = new Cache();
+  private cache: Record<string, Chat> = {}; // chatId: chat
 
   // TODO: later consider moving browser, http, watch (file watcher) to a separate group "systems"
   public systems: Record<string, System> = {};
@@ -314,7 +314,7 @@ export default class Engine {
       }
 
       // add format to input
-      identity += '\n\n' + constants.FORMAT_MD;
+      identity += '\n\n' + constants.JSON_MD;
       
       // add ochestrator agent
       this.agents[marvinId] = {
@@ -331,8 +331,11 @@ export default class Engine {
         id: 'status',
         enabled: true,
         schedule: 60*60*1000,
+        timeout: null,
         maxSteps: 0,
         input: 'status',
+        format: 'json',
+        schema: constants.DEFAULT_SCHEMA,
       } as Task;
 
       console.info('[Engine.loadAgents]', `task "status" created (agent ${marvinId})`);
@@ -374,9 +377,6 @@ export default class Engine {
           enabled = false;
         }
 
-        // add format to input
-        input += '\n\n' + constants.FORMAT_MD;
-
         if (this.isDry) {
           console.info('[Engine.loadAgents]', `[dry] task "${taskId}" created (agent ${agentId})`);
           continue;
@@ -387,7 +387,10 @@ export default class Engine {
           id: taskId,
           enabled: enabled,
           schedule: schedule,
+          timeout: null,
           maxSteps: task.maxSteps,
+          format: task.format || 'json',
+          schema: task.schema || constants.DEFAULT_SCHEMA,
           input: input,
         } as Task;
 
@@ -523,8 +526,8 @@ export default class Engine {
     console.log('[Engine.execTask]', `${agentId}/${taskId}`);
 
     // check assistant state
-    if (this.state  !== 'exec') {
-      console.info('[Engine.execTask]', `task ${taskId} skipped (assistant NOT running)`);
+    if (this.state !== 'exec') {
+      console.warn('[Engine.execTask]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
 
@@ -557,8 +560,11 @@ export default class Engine {
     // TODO: should tasks have cached chats? chatId = `task-${agentId}-${taskId}-${Date.now()}`;
     const chatId = undefined; // stateless, design choice, for not
 
+    const format = task.format || 'json';
+    const schema = task.schema || constants.DEFAULT_SCHEMA;
+
     // set task input as user message to LLM
-    const result = await this.execChat(task.input, chatId, agentId, maxSteps);
+    const result = await this.execChat(chatId, agentId, task.input, format, schema, maxSteps);
     if (!result) {
       console.error('[Engine.execTask]', `no result from sendMessage for agent ${agentId}`);
       return;
@@ -625,18 +631,41 @@ export default class Engine {
     }
   }
 
+  // save chat to cache
+  saveChat(chatId: string | undefined, chat: Chat): void {
+    if (!chatId) return;
+    this.cache[chatId] = chat;
+  }
+
+  // find cached chat by id
+  findChat(chatId: string | undefined): Chat | null {
+    if (!chatId) return null;
+    return this.cache[chatId] as Chat || null;
+  }
+
   // agent loop
-  async execChat(message: string, chatId: string | undefined, agentId: string, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
+  async execChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
     try {
       console.debug('[Engine.execChat]', chatId, agentId, message.slice(0, 100));
 
-      // get chat from cache/store using sessionId
-      const chat = this.cache.findChat(chatId);
-
       const agent = this.agents[agentId]!;
 
-      // load agent IDENTITY.md as system message
-      chat.messages.push({ role: 'system', content: agent.identity });
+      // get chat from cache/store using chatId
+      let chat = this.findChat(chatId);
+      if (!chat) {
+        chat = { id: chatId, messages: [], thinking: false, userId: '', format: 'text' } as Chat;
+
+        let system = agent.identity;
+
+        if (format === 'json') {
+          chat.format = 'json';
+          system += '\n\n' + constants.JSON_MD;
+          system += '\n' + JSON.stringify(schema);
+        }
+
+        // load agent IDENTITY.md as system message
+        chat.messages.push({ role: 'system', content: system });
+      }
 
       // load task input as user message
       chat.messages.push({ role: 'user', content: message.trim() });
@@ -657,7 +686,7 @@ export default class Engine {
         steps++;
 
         // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
-        reply = await agent.model.sendMessage(chat);
+        reply = await agent.model.sendChat(chat);
 
         // persist assistant reply to chat history
         chat.messages.push({ role: 'assistant', content: reply.message.content.trim(), tools: reply.message.tools });
@@ -706,7 +735,7 @@ export default class Engine {
       }
 
       // save chat to cache
-      this.cache.saveChat(chatId, chat);
+      this.saveChat(chatId, chat);
 
       // TODO: more info here
       return { content: reply?.message?.content || '', steps: steps };

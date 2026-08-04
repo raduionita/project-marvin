@@ -4,8 +4,8 @@ export default class FallbackModel extends Model {
   provider: Provider = 'fallback';
   public baseUrl: string = 'http://localhost:1234';
 
-  async sendMessage(chat: Chat) : Promise<Reply> {
-    console.debug('[FallbackModel.sendMessage]', 'chat:', JSON.stringify(chat));
+  async sendChat(chat: Chat) : Promise<Reply> {
+    console.debug('[FallbackModel.sendChat]', 'chat:', JSON.stringify(chat));
 
     return {
       id: Date.now().toString(),

@@ -96,6 +96,8 @@ export interface Task {
   maxSteps: number;
   timeout: NodeJS.Timeout | null;
   input: string;
+  format?: 'text' | 'json';
+  schema?: {[key:string]:string};
 }
 
 // model interface class
@@ -129,7 +131,7 @@ export abstract class Model {
   }
 
   // sends messages to LLM model
-  abstract sendMessage(chat: Chat): Promise<Reply>;
+  abstract sendChat(chat: Chat): Promise<Reply>;
 }
 
 export interface Agent {
@@ -153,6 +155,8 @@ export interface Chat {
   thinking: boolean;
   // messages is the chat history
   messages: Message[];
+  // format
+  format?: 'text' | 'json';
   // userId is the user's id
   userId?: string;
   // sum/total of all usages (Reply.usage)
@@ -196,20 +200,4 @@ export interface Reply {
     prompt: number;
   };
   // TODO: research if choices?! would be useful
-}
-
-export class Cache {
-  private cache: Record<string, any> = {}; // chatId: chat
-
-  saveChat(chatId: string | undefined, chat: Chat): void {
-    if (!chatId) return;
-    this.cache[chatId] = chat;
-  }
-
-  findChat(chatId: string | undefined): Chat {
-    if (!chatId) return { id: '', messages: [], thinking: false, userId: '' };
-    return this.cache[chatId] || { id: chatId, messages: [], thinking: false, userId: '' };
-  }
-
-  // TODO: async persist to file (in the workspace folder)
 }

@@ -132,7 +132,7 @@ class MockSlackChannel extends SlackChannel {
     const chatId = `slack-${event.channel}-${event.thread_ts}`;
     const agentId = this.findAgent(event.channel as string | undefined).id;
 
-    const result = await this.engine.execChat(text, chatId, agentId);
+    const result = await this.engine.execChat(chatId, agentId, text);
     if (!result) {
       console.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
       await this.sendMessage({ role: 'assistant', content: '(no response from the AI)' });
@@ -156,7 +156,7 @@ class MockSlackChannel extends SlackChannel {
 
       console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${(text as string).slice(0, 100)}`);
 
-      const result = await this.engine.execChat(text, chatId, agentId);
+      const result = await this.engine.execChat(chatId, agentId, text);
 
       if (!result) {
         console.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
