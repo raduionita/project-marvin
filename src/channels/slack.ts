@@ -28,7 +28,7 @@ export default class SlackChannel extends Channel {
   }
 
   protected sok!: ISocketModeClient;
-  protected web!: IWebClient;
+  protected web!: WebClient;
 
   async load() {
     console.debug('[SlackChannel.load]', this.engine.config.channels.slack);
@@ -93,8 +93,25 @@ export default class SlackChannel extends Channel {
     }
   }
 
+  public async listGroups() : Promise<{[key:string]:string}> {
+    console.debug('[SlackChannel.listGroups]');
+    const response = await this.web.conversations.list({ exclude_archived: true, limit: 100 });
+    if (!response || !response.ok || !response.channels) {
+      console.error('[SlackChannel.listGroups]', 'error:', response.error);
+      return {};
+    }
+    // id=>name map
+    const channels: {[key:string]:string} = {};
+    for (const channel of response.channels) {
+      const id = channel.id || channel.user || channel.name;
+      if (!id) continue;
+      channels[id] = channel.name || id;
+    }
+    return channels;
+  }
+
   // send a message to Slack, optionally as a thread reply
-  async sendMessage(message: Message) : Promise<SlackResponse> {
+  public async sendMessage(message: Message) : Promise<SlackResponse> {
     console.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
 
     if (this.engine.isDry) {
@@ -118,7 +135,7 @@ export default class SlackChannel extends Channel {
       text: message.content,
       // OR .markdown_text
       // +  .mrkdwn
-      channel: message.channel || '',
+      channel: message.channel,
       thread_ts: message.thread || undefined,
     });
 

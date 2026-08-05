@@ -9,11 +9,15 @@ export default class WhatsAppChannel extends Channel {
     console.debug('[WhatsAppChannel.load]', 'attached', this.engine.config.settings);
   }
 
+  async drop() {
+    console.debug('[WhatsAppChannel.drop]', 'detached');
+  }
+
   async sendMessage(message: Message) : Promise<any> {
     console.debug('[WhatsAppChannel.sendMessage]', JSON.stringify(message));
   }
 
-  async drop() {
-    console.debug('[WhatsAppChannel.drop]', 'detached');
+  async listGroups(): Promise<{ [key: string]: string; }> {
+    throw new Error('Method not implemented.');
   }
 }

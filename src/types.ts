@@ -84,6 +84,7 @@ export abstract class Channel {
   abstract load(): Promise<void>;
   abstract drop(): Promise<void>;
 
+  abstract listGroups(): Promise<{[key:string]:string}>;
   abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;
 }
 

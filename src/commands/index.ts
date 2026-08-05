@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { readdirSync } from 'fs';
 
 import type Engine from '../engine';
+import { Channel } from '../types';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
