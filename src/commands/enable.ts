@@ -1,10 +1,11 @@
 
 import { homedir } from 'os';
 import { join } from 'path';
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { Command } from '../types';
 import * as constants from '../constants';
+import { delay } from '../helpers';
 
 // `marvin enable` install + start the daemon
 export default class EnableCommand extends Command {
@@ -64,6 +65,37 @@ export default class EnableCommand extends Command {
       console.info('[EnableCommand.makeProject]', '~/.marvin/marvin.json exists');
     }
 
+    // /var/logs/marvin.log -> ~/.marvin/marvin.log (system log access)
+    const realLog = join(hpath, 'marvin.log');
+    const sysLog = '/var/logs/marvin.log';
+    if (this.engine.isDry) {
+      console.info('[EnableCommand.makeProject]', '[dry]', 'would symlink', sysLog, '->', realLog);
+    } else {
+      try {
+        lstatSync(sysLog);
+        console.info('[EnableCommand.makeProject]', 'symlink already exists:', sysLog);
+      } catch {
+        try {
+          mkdirSync('/var/logs', { recursive: true });
+          symlinkSync(realLog, sysLog);
+          console.info('[EnableCommand.makeProject]', 'created symlink:', sysLog, '->', realLog);
+        } catch (err) {
+          console.warn('[EnableCommand.makeProject]', 'cannot create symlink (retry with sudo):', (err as Error).message);
+        }
+      }
+    }
+
+    // ~/.marvin/.env (systemd EnvironmentFile must exist or the unit will never start)
+    const epath = join(hpath, '.env');
+    if (this.engine.isDry) {
+      console.info('[EnableCommand.makeProject]', '[dry]', epath);
+    } else if (!existsSync(epath)) {
+      writeFileSync(epath, '', { flag: 'a' });
+      console.info('[EnableCommand.makeProject]', 'created .env file:', epath);
+    } else {
+      console.info('[EnableCommand.makeProject]', '~/.marvin/.env exists');
+    }
+
     console.info('[EnableCommand.makeProject]', 'project installed');
   }
 
@@ -104,8 +136,37 @@ export default class EnableCommand extends Command {
       console.debug('[EnableCommand.execService]', 'enabling service...');
       execSync(['systemctl', '--user', 'daemon-reload'].join(' '), { stdio: 'inherit' });
       execSync(['systemctl', '--user', 'enable', '--now', 'marvin'].join(' '), { stdio: 'inherit' });
+      await this.waitForActive();
     }
     
     console.debug('[EnableCommand.execService]', 'marvin enabled');
+  }
+
+  // poll the service until it settles, so we can diagnose a stuck "activating"
+  async waitForActive(timeout = 15000) {
+    console.debug('[EnableCommand.waitForActive]');
+
+    for (let waited = 0; waited < timeout; waited += 1000) {
+      let state = '';
+      try {
+        state = execSync(['systemctl', '--user', 'is-active', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
+      } catch (err) {
+        state = ((err as { stdout?: string }).stdout || '').trim() || 'failed';
+      }
+
+      if (state !== 'activating') {
+        if (state === 'active') {
+          console.info('[EnableCommand.waitForActive]', 'marvin service is:', state);
+        } else {
+          console.error('[EnableCommand.waitForActive]', 'marvin service is stuck in state:', state,
+            'run "journalctl --user -u marvin -e" for details');
+        }
+        return;
+      }
+      await delay(1000);
+    }
+
+    console.error('[EnableCommand.waitForActive]', 'marvin service still "activating" after', timeout, 'ms,',
+      'run "journalctl --user -u marvin -e" for details');
   }
 }

@@ -17,10 +17,12 @@ export default class HelpCommand extends Command {
     console.info('  version ', 'show the current version');
     console.info('  reload  ', 'reload the daemon');
     console.info('  status  ', 'check the daemon status');
+    console.info('  logs    ', 'tail the daemon log file [-f|--follow] [-n|--lines]');
 
     console.info('  agents  ', 'list, add, bind, chat, drop agents');
     console.info('  channels', 'list, add, bind, chat, drop channels');
     console.info('  models  ', 'list, add, bind, drop models');
+    console.info('  tasks   ', 'list, add tasks for an agent');
     console.log('');
   }
 }

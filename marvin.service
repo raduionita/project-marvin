@@ -4,13 +4,13 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/.local/share/marvin
-EnvironmentFile=%h/.local/share/marvin/.env
-ExecStart=/usr/local/bin/marvin --server
+WorkingDirectory=%h/.marvin
+EnvironmentFile=%h/.marvin/.env
+ExecStart=/usr/local/bin/marvin serve
 Restart=on-failure
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
+StandardOutput=append:%h/.marvin/marvin.log
+StandardError=append:%h/.marvin/marvin.log
 SyslogIdentifier=marvin
 
 [Install]
