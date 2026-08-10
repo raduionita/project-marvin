@@ -5,6 +5,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, watch, writeFileSync
 import { execSync } from 'child_process';
 import { Command } from '../types';
 
+// `marvin update [--dry]` pull latest changes, reinstall dependencies, restart service
 export default class UpdateCommand extends Command {
   async exec() {
     console.debug('[UpdateCommand.exec]');

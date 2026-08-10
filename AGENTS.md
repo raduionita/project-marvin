@@ -20,9 +20,9 @@ You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI
     - `deepseek.ts`         # deepseek model-provider implementation
   - `tools/`                # internal tools folder
     - `index.ts`            # lists tools
-    - `getDate.ts`          # tool implementation
-    - `webBrowse.ts`        # tool implementation
-    - `webSearch.ts`        # tool implementation
+    - `get_date.ts`          # tool implementation
+    - `web_browse.ts`        # tool implementation
+    - `web_search.ts`        # tool implementation
   - `commands/`             # command line interface
     - `help.ts`             # help command
     - `load.ts`             # load command
@@ -31,7 +31,7 @@ You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI
     - `update.ts`           # update command
     - `version.ts`          # version command
     - `status.ts`           # status command
-    - `chat.ts`             # chat command, chat with the LLM
+    - `agents.ts`           # agents command
     - `channels.ts`         # channels command
     - `reload.ts`           # reload command
   - `systems/`              # system implementations
@@ -57,8 +57,9 @@ Loaded from `~/.marvin/` at runtime (created on first run):
   - `agents/`
     - `agent-1/`
       - `IDENTITY.md`   # agent identity file
-      - `tasks/`
-        - `TASK-1.md`   # task prompt - seeds the AI loop
+      - `tasks/`        # task prompts
+        - `task-1/`     # task-1 folder
+          - `TASK.md`   # task prompt - seeds the AI loop
   - `tools/`            # user-defined tools (mirrors src/tools/)
     - `index.ts`
     - `doSomething.ts`
@@ -74,7 +75,7 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 - `Tool` - executable action: `webSearch`, `webBrowse`, `getDate`, …
 - `Agent` - runs scheduled tasks; communicates via configured channels
 - `Task` - periodic prompt or `.md` file that starts the AI loop
-- `execTask` - engine: runs the AI loop, then reschedules itself
+- `execInput` - engine: prompts the LLM with task input, then reschedules itself (`execMonitor`/`execSweep` handle monitor/sweep tasks)
 
 Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-contained entry points for their respective modes.
 Do not confuse Marvin channels with Slack channels, they are different things. In Marvin they are communication channels between the client and the server.

@@ -3,20 +3,22 @@ import { listSystems } from "../systems";
 import { listTools } from "../tools";
 import { Command, System, Tool, ToolMeta } from "../types";
 
-export default class ToolCommand extends Command {
+export default class ToolsCommand extends Command {
   async exec() {
-    console.debug('[ToolCommand.exec]');
+    console.debug('[ToolsCommand.exec]');
 
     const cmds = process.argv.slice(2);
     const name = cmds[1] || 'help';
 
     switch (name) {
       case 'help':
-        console.debug('[ToolCommand.exec]', 'usage: marvin tool [name] [params] [--dry]', 'call a tool');
-        console.debug('[ToolCommand.exec]', 'commands:');
-        console.debug('[ToolCommand.exec]', '  help    ', 'show this help');
-        console.debug('[ToolCommand.exec]', '  list    ', 'list available tools, for each one, it\'s connected agents');
-        console.debug('[ToolCommand.exec]', '  [name]  ', 'call a tool');
+        console.log('');
+        console.info('usage: marvin tool [name] [params] [--dry]', 'call a tool');
+        console.info('commands:');
+        console.info('  help    ', 'show this help');
+        console.info('  list    ', 'list available tools, for each one, it\'s connected agents');
+        console.info('  [name]  ', 'call a tool');
+        console.log('');
       break;
       case 'list':
         // for each tool, list enabled agents

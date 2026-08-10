@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import { Command } from '../types';
 import * as constants from '../constants';
 
+// `marvin enable` install + start the daemon
 export default class EnableCommand extends Command {
   async exec() {
     console.debug('[EnableCommand.exec]');
@@ -19,7 +20,7 @@ export default class EnableCommand extends Command {
     console.debug('[EnableCommand.makeProject]', 'checking if project is already installed and install it if not');
 
     // ~/.marvin
-    const hpath = this.engine.home;
+    const hpath = this.engine.work;
     if (this.engine.isDry) {
       console.info('[EnableCommand.makeProject]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {

@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import { Command } from "../types";
 
+// `marvin reload` reloads the daemon
 export default class ReloadCommand extends Command {
   async exec() {
     console.debug('[ReloadCommand.exec]');

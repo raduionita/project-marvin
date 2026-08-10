@@ -34,6 +34,7 @@ export interface Config {
     tools?: string[];
     tasks?: Record<string, {
       enabled: boolean;
+      type?: TaskType;
       schedule: number;
       maxSteps: number;
       input?: string;
@@ -89,14 +90,18 @@ export abstract class Channel {
 }
 
 // task keeps track of the setTimeout id, schedule
+export type TaskType = 'input' | 'monitor' | 'sweep';
+
 export interface Task {
   id: string;
   enabled: boolean;
+  // what the task does: prompt the LLM (input), watch the state (monitor), or clean up (sweep)
+  type: TaskType;
   // TODO: persistant: boolean = false; // should tasks have persistent chats?
   schedule: number;
   maxSteps: number;
   timeout: NodeJS.Timeout | null;
-  input: string;
+  input?: string;
   format?: 'text' | 'json';
   schema?: {[key:string]:string};
 }
@@ -160,6 +165,8 @@ export interface Chat {
   format?: 'text' | 'json';
   // userId is the user's id
   userId?: string;
+  // last time this chat was used (for TTL eviction)
+  updatedAt?: number;
   // sum/total of all usages (Reply.usage)
   usage?: {
     completion: number;

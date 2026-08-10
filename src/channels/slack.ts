@@ -1,6 +1,7 @@
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import { Channel, Message, Agent } from '../types.js';
+import { extractOutput } from '../helpers.js';
 
 export type HandlerParams = { event: { [key: string]: any }, body: Record<string, any>, ack: (response?: Record<string, unknown>) => Promise<void> };
 
@@ -19,6 +20,12 @@ export interface IWebClient {
   chat: {
     postMessage: (args: ChatPostMessageArguments) => Promise<ChatPostMessageResponse>;
   };
+  conversations: {
+    list: (args?: any) => Promise<any>;
+  };
+  auth: {
+    test: (args?: any) => Promise<any>;
+  };
 }
 
 export default class SlackChannel extends Channel {
@@ -28,7 +35,10 @@ export default class SlackChannel extends Channel {
   }
 
   protected sok!: ISocketModeClient;
-  protected web!: WebClient;
+  protected web!: IWebClient;
+
+  // the bot's user id, used to strip only the bot's own mention from messages
+  protected botId: string = '';
 
   async load() {
     console.debug('[SlackChannel.load]', this.engine.config.channels.slack);
@@ -58,15 +68,24 @@ export default class SlackChannel extends Channel {
 
     this.sok = new SocketModeClient({
       appToken: appToken as string,
-      logLevel: LogLevel.DEBUG,
+      logLevel: LogLevel.ERROR,
       autoReconnectEnabled: true,
       clientOptions: { retryConfig: { retries: 5 } }
     });
 
     this.web = new WebClient(botToken, {
-      logLevel: LogLevel.DEBUG,
+      logLevel: LogLevel.ERROR,
       retryConfig: { retries: 5 }
+      
     });
+
+    // verify the Slack app is correctly set up before attaching
+    const prereqs = await this.checkPrereqs(appToken, botToken);
+    if (!prereqs.ok) {
+      console.error('[SlackChannel.load]', 'prerequisite check failed, skipping:', prereqs.error);
+      return;
+    }
+    this.botId = prereqs.botId!;
 
     this.sok.on('error', this.onError.bind(this));
     this.sok.on('connecting', this.onConnecting.bind(this));
@@ -77,12 +96,14 @@ export default class SlackChannel extends Channel {
 
     // route Slack events to Marvin's AI loop
     this.sok.on('app_mention', this.onMention.bind(this));
-    this.sok.on('message.im', this.onDirectMessage.bind(this));
+    // the SocketMode client emits DM messages as "message" with channel_type "im"
+    this.sok.on('message', this.onSocketMessage.bind(this));
     this.sok.on('slash_commands', this.onSlashCommand.bind(this));
 
     await this.sok.start();
 
     console.log('[SlackChannel.load]','channel slack started');
+    console.info('[SlackChannel.load]', 'tip: subscribe "app_mention" and "message.im" events in the Slack App (Socket Mode) to receive messages');
   }
 
   async drop() {
@@ -93,9 +114,43 @@ export default class SlackChannel extends Channel {
     }
   }
 
+  // verify the Slack app is correctly set up before attaching
+  protected async checkPrereqs(appToken: string | undefined, botToken: string | undefined): Promise<{ ok: boolean; botId?: string; error?: string }> {
+    console.debug('[SlackChannel.checkPrereqs]');
+
+    if (!appToken?.startsWith('xapp-')) {
+      console.error('[SlackChannel.checkPrereqs]', 'appToken does not look like a socket-mode token (should start with "xapp-")');
+      return { ok: false, error: 'appToken does not look like a socket-mode token (should start with "xapp-")' };
+    }
+
+    if (!botToken?.startsWith('xoxb-')) {
+      console.error('[SlackChannel.checkPrereqs]', 'botToken does not look like a bot token (should start with "xoxb-")');
+      return { ok: false, error: 'botToken does not look like a bot token (should start with "xoxb-")' };
+    }
+
+    // verify the bot token is valid, and capture the bot's user id
+    const auth = await this.web.auth.test();
+    if (!auth.ok || !auth.user_id) {
+      console.error('[SlackChannel.checkPrereqs]', 'bot token invalid:', auth.error);
+      return { ok: false, error: `bot token invalid: ${auth.error || 'unknown error'}` };
+    }
+
+    // verify we can list conversations (bot token scopes + bot added to channels)
+    const conversations = await this.web.conversations.list({ limit: 1 });
+    if (!conversations.ok) {
+      console.error('[SlackChannel.checkPrereqs]', 'cannot list conversations:', conversations.error);
+      return { ok: false, error: `cannot list conversations (missing scope / bot not added to any channel): ${conversations.error || 'unknown error'}` };
+    }
+
+    return { ok: true, botId: auth.user_id };
+  }
+
   public async listGroups() : Promise<{[key:string]:string}> {
     console.debug('[SlackChannel.listGroups]');
-    const response = await this.web.conversations.list({ exclude_archived: true, limit: 100 });
+    const response = await this.web.conversations.list({ 
+      exclude_archived: true, 
+      limit: 100,
+    });
     if (!response || !response.ok || !response.channels) {
       console.error('[SlackChannel.listGroups]', 'error:', response.error);
       return {};
@@ -141,8 +196,9 @@ export default class SlackChannel extends Channel {
 
     // check if response is ok
     if (!response.ok) {
-      console.error('[SlackChannel.sendMessage]', 'response NOT ok:', response);
-      return { ts: '', ok: false, error: response.error, message: '(slack response not ok)' };
+      const hint = this.slackErrorHint(response.error);
+      console.error('[SlackChannel.sendMessage]', 'response NOT ok:', response.error, hint);
+      return { ts: '', ok: false, error: response.error, message: hint || '(slack response not ok)' };
     }
 
     // we should know if there is a mismatch between the channel in the message and the response
@@ -192,7 +248,8 @@ export default class SlackChannel extends Channel {
         return;
       }
 
-      await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel, thread: thread });
+      const content = extractOutput(result.content);
+      await this.sendMessage({ role: 'assistant', content, channel: event.channel, thread: thread });
     } catch (error) {
       console.error('[SlackChannel.onMention]', error);
     }
@@ -209,6 +266,11 @@ export default class SlackChannel extends Channel {
 
       // extract the actual message text (strip @marvin mention)
       const text = this.extractText(event);
+      if (!text) {
+        console.warn('[SlackChannel.onDirectMessage]', 'no text content');
+        await this.sendMessage({ role: 'assistant', content: '(no text content)', channel: event.channel, thread: thread });
+        return;
+      }
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
@@ -225,9 +287,25 @@ export default class SlackChannel extends Channel {
         return;
       }
 
-      await this.sendMessage({ role: 'assistant', content: result.content, channel: event.channel, thread: thread });
+      const content = extractOutput(result.content);
+      await this.sendMessage({ role: 'assistant', content, channel: event.channel, thread: thread });
     } catch (error) {
       console.error('[SlackChannel.onDirectMessage]', error);
+    }
+  }
+
+  // route SocketMode "message" events: DM messages reach onDirectMessage,
+  // everything else (bot's own messages, channel messages) is acknowledged & ignored
+  protected async onSocketMessage({ event, body, ack }: HandlerParams) {
+    try {
+      const isBotOwn = event.subtype === 'bot_message' || !!event.bot_id;
+      if (event.channel_type !== 'im' || isBotOwn) {
+        await ack();
+        return;
+      }
+      await this.onDirectMessage({ event, body, ack });
+    } catch (error) {
+      console.error('[SlackChannel.onSocketMessage]', error);
     }
   }
 
@@ -262,17 +340,14 @@ export default class SlackChannel extends Channel {
     console.warn('[SlackChannel.onDisconnected]', 'disconnected!', error);
   }
 
-  // extract the actual text from a Slack event, stripping @marvin mention
+  // extract the actual text from a Slack event, stripping ONLY the bot's own mention
   protected extractText(event: { [key: string]: any }): string {
     let text: string = (event.text || '');
 
-    // TOOD: should remove @bot-name with "" NOT other user's @mentions
-    // TODO: other user metions should be replaced with their names?
-
-    // const marvin = `@${this.engine.config.settings.name}`;
-
-    // strip @marvin mention (Slack format: <@U12345>)
-    text = text.replace(/<@[\w]+>/g, '').trim();
+    // strip only the bot's own mention (e.g. <@U12345678>), keeping other users' mentions
+    if (this.botId) {
+      text = text.replace(new RegExp(`<@${this.botId}>`, 'g'), ' ');
+    }
 
     // clean up extra whitespace
     text = text.replace(/\s+/g, ' ').trim();
@@ -301,5 +376,22 @@ export default class SlackChannel extends Channel {
 
     // fallback: default agent (settings.name), fallback doesnt need slack configured
     return this.engine.agents[this.engine.config.settings.name]!;
+  }
+
+  // translate common Slack API errors into actionable hints
+  protected slackErrorHint(error: string | undefined): string {
+    switch (error) {
+      case 'not_authorized':
+      case 'missing_scope':
+        return '(hint: the bot needs the "chat:write" scope)';
+      case 'channel_not_found':
+        return '(hint: make sure the bot has been added/invited to the channel)';
+      case 'invalid_auth':
+        return '(hint: check the botToken, it looks invalid)';
+      case 'account_inactive':
+        return '(hint: the Slack bot token has been deactivated)';
+      default:
+        return '';
+    }
   }
 }

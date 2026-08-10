@@ -11,7 +11,7 @@ test('getDate tool metadata', () => {
   const engine = mockEngine();
   const tool = new GetDateTool(engine);
   const meta = tool.meta;
-  expect(meta.function.name).toBe('getDate');
+  expect(meta.function.name).toBe('get_date');
   expect(meta.function.description).toBe('Get the current date');
 });
 

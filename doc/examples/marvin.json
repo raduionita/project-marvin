@@ -1,53 +1,25 @@
 {
   "settings": {
     "name": "marvin",
-    "port": 13337,
-    "logLevel": "debug"
+    "host": "127.0.0.1",
+    "port": 7331,
+    "logLevel": "info",
+    "apiToken": "changeme"
   },
   "channels": {
     "slack": {
       "enabled": true,
-      "appToken": "SLACK_APP_TOKEN",
-      "botToken": "SLACK_BOT_TOKEN"
+      "appToken": "xapp-1-app-token",
+      "botToken": "xoxb-bot-token"
     }
   },
   "models": {
     "deepseek/deepseek-v4-flash": {
-      "enabled": false,
       "provider": "deepseek",
       "model": "deepseek-v4-flash",
-      "baseUrl": "https://api.deepseek.com",
-      "apiKey": "DEEPSEEK_API_KEY"
-    },
-    "google/gemma-4-26b-a4b": {
-      "enabled": true,
-      "provider": "lmstudio",
-      "model": "google/gemma-4-26b-a4b",
-      "baseUrl": "http://localhost:1234"
+      "apiKey": "sk-api-ket",
+      "enabled": true
     }
   },
-  "agents": {
-    "agent-id": {
-      "enabled": true,
-      "model": "googlex/gemma-4-26b-a4b",
-      "channels": {
-        "slack": "slack-channel-id"
-      },
-      "tools": ["webSearcn", "webBrowse", "postWordpress"],
-      "tasks": {
-        "do-something": {
-          "enabled": true,
-          "schedule": 5,
-          "maxSteps": 10,
-          "input": "@file:TASK.md"
-        },
-        "should-be-disabled": {
-          "enabled": false,
-          "schedule": 5,
-          "maxSteps": 10,
-          "input": "@file:TASK.md"
-        }
-      }
-    }
-  }
+  "agents": {}
 }

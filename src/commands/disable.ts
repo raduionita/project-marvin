@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { Command } from "../types";
 
+// `marvin disable` stops the daemon and disables it from starting at boot
 export default class DisableCommand extends Command {
   async exec() {
     console.debug('[DisableCommand.exec]');

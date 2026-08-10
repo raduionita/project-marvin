@@ -2,7 +2,7 @@ import { promises } from 'readline';
 
 import { Command } from "../types";
 
-// marvin chat [agentId] [--dry]
+// `marvin agents [command] [--dry]` list, add, bind, chat, drop agents
 export default class AgentsCommand extends Command {
   async exec() {
     console.debug('[AgentsCommand.exec]');

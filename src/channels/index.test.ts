@@ -46,6 +46,5 @@ test('listChannels includes known channels', () => {
   expect(channels).toContain('slack.ts');
   expect(channels).toContain('telegram.ts');
   expect(channels).toContain('whatsapp.ts');
-  expect(channels).toContain('example.ts');
   expect(channels).toContain('channel.mock.ts');
 });

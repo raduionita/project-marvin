@@ -7,6 +7,7 @@ import { listTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
+import { extractOutput } from "./helpers.js";
 
 export default class Engine {
   public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
@@ -24,8 +25,8 @@ export default class Engine {
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
 
-  // home (~/.marvin) data folder
-  public home: string = process.env.HOME + '/.marvin';
+  // workspace (~/.marvin) data folder
+  public work: string = process.env.HOME + '/.marvin';
   // root (~/) app folder
   public root: string = import.meta.dirname.replace(/\/src.*/, '');
 
@@ -67,6 +68,9 @@ export default class Engine {
     await this.dropChannels();
     await this.dropSystems();
 
+    // release all cached chats
+    this.cache = {};
+
     this.state = 'none';
   }
 
@@ -75,7 +79,7 @@ export default class Engine {
 
     // force load if not loaded
     if (this.state === 'none') {
-      this.load();
+      await this.load();
     }
 
     // continue only if loaded
@@ -91,13 +95,24 @@ export default class Engine {
           console.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
           continue;
         }
-        if (agentId === this.config.settings.name) {
-          task.timeout = setTimeout(this.execOrchestrator.bind(this), task.schedule, agentId, taskId);
-          console.debug('[Engine.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (orchestrator ${agentId})`);
-        } else {
-          task.timeout = setTimeout(this.execTask.bind(this), task.schedule, agentId, taskId);
-          console.debug('[Engine.execAgents]', `task [${taskId}] scheduled (${task.schedule}ms) (agent ${agentId})`);
+
+        // route each task to its handler by type
+        let run: (agentId: string, taskId: string) => void;
+        switch (task.type) {
+          case 'monitor':
+            run = this.execMonitor.bind(this);
+            break;
+          case 'sweep':
+            run = this.execSweep.bind(this);
+            break;
+          case 'input':
+          default:
+            run = this.execInput.bind(this);
+            break;
         }
+
+        task.timeout = setTimeout(run, task.schedule, agentId, taskId);
+        console.debug('[Engine.execAgents]', `task [${taskId}] (${task.type}) scheduled (${task.schedule}ms) (agent ${agentId})`);
       }
     }
 
@@ -108,7 +123,7 @@ export default class Engine {
     console.debug('[Engine.scanProject]');
 
     // create project/workspace folder (~/.marvin)
-    const hpath = this.home;
+    const hpath = this.work;
     if (this.isDry) {
       console.info('[Engine.scanProject]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {
@@ -307,8 +322,8 @@ export default class Engine {
 
       // load agent system prompt (~/.marvin/IDENTITY.md)
       let identity = constants.MARVIN_MD;
-      if (existsSync(join(this.home, 'MARVIN.md'))) {
-        identity = readFileSync(join(this.home, 'MARVIN.md'), 'utf8').trim();
+      if (existsSync(join(this.work, 'MARVIN.md'))) {
+        identity = readFileSync(join(this.work, 'MARVIN.md'), 'utf8').trim();
       } else {
         console.warn('[Engine.loadAgents]', `no MARVIN.md found for agent "${marvinId}", using default`);
       }
@@ -326,19 +341,29 @@ export default class Engine {
         tasks: {},
       } as Agent;
 
-      // add dry taks to orchestrator agent
-      this.agents[marvinId].tasks['status'] = {
-        id: 'status',
+      // add monitor task (state/health check) to the orchestrator agent
+      this.agents[marvinId].tasks['monitor'] = {
+        id: 'monitor',
         enabled: true,
+        type: 'monitor',
         schedule: 60*60*1000,
         timeout: null,
         maxSteps: 0,
-        input: 'status',
-        format: 'json',
-        schema: constants.DEFAULT_SCHEMA,
       } as Task;
 
-      console.info('[Engine.loadAgents]', `task "status" created (agent ${marvinId})`);
+      console.info('[Engine.loadAgents]', `task "monitor" created (agent ${marvinId})`);
+
+      // add sweep task (evict idle cached chats) to the orchestrator agent
+      this.agents[marvinId].tasks['sweep'] = {
+        id: 'sweep',
+        enabled: true,
+        type: 'sweep',
+        schedule: constants.CHAT_SWEEP_MS,
+        timeout: null,
+        maxSteps: 0,
+      } as Task;
+
+      console.info('[Engine.loadAgents]', `task "sweep" created (agent ${marvinId})`);
 
       console.info('[Engine.loadAgents]',`agent "${marvinId}" loaded`);
     }
@@ -364,12 +389,10 @@ export default class Engine {
         // if ends with .md
         if (input && !input.endsWith('.md')) {
           // continue as is, input is a string
-        } else if (existsSync(join(this.home, 'agents', agentId, 'tasks', `${taskId.toUpperCase()}.md`))) {
-          // TAASK-ID-UPPERCASE.md
-          input = readFileSync(join(this.home, 'agents', agentId, 'tasks', `${taskId.toUpperCase()}.md`), 'utf8').trim();
-        } else if (existsSync(join(this.home, 'agents', agentId, 'tasks', `${taskId}.md`))) {
-          // task-ID-as-is.md
-          input = readFileSync(join(this.home, 'agents', agentId, 'tasks', `${taskId}.md`), 'utf8').trim();
+        } else if (input && existsSync(input)) {
+          readFileSync(input, 'utf8').trim();
+        } else if (existsSync(join(this.work, 'agents', agentId, 'tasks', taskId, `TASK.md`))) {
+          input = readFileSync(join(this.work, 'agents', agentId, 'tasks', taskId, `TASK.md`), 'utf8').trim();
         }
 
         if (!input) {
@@ -386,6 +409,7 @@ export default class Engine {
         tasks[taskId] = {
           id: taskId,
           enabled: enabled,
+          type: task.type || 'input',
           schedule: schedule,
           timeout: null,
           maxSteps: task.maxSteps,
@@ -399,8 +423,8 @@ export default class Engine {
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
       let identity = constants.IDENTITY_MD;
-      if (existsSync(join(this.home, 'agents', agentId, 'IDENTITY.md'))) {
-        identity = readFileSync(join(this.home, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
+      if (existsSync(join(this.work, 'agents', agentId, 'IDENTITY.md'))) {
+        identity = readFileSync(join(this.work, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
       } else {
         console.warn('[Engine.loadAgents]', `no IDENTITY.md found for agent "${agentId}", using default`);
       }
@@ -480,78 +504,85 @@ export default class Engine {
 
   // for each agent, for each task, start setTimeout
 
-  async execOrchestrator(agentId: string, taskId: string) {
-    console.debug('[Engine.execOrchestrator]', agentId, taskId);
+  // monitors the state: checks agents and tasks, then reschedules itself
+  async execMonitor(agentId: string, taskId: string) {
+    console.debug('[Engine.execMonitor]', agentId, taskId);
 
     // check assistant state
     if (this.state  !== 'exec') {
-      console.info('[Engine.execOrchestrator]', `task ${taskId} skipped (assistant NOT running)`);
+      console.info('[Engine.execMonitor]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
 
     // check if agent exists
     const agent = this.agents[agentId];
     if (!agent) {
-      console.error('[Engine.execOrchestrator]', `agent ${agentId} NOT found`);
+      console.error('[Engine.execMonitor]', `agent ${agentId} NOT found`);
       return;
     }
     // check if task exists
     const task = agent.tasks[taskId]!;
     if (!task) {
-      console.error('[Engine.execOrchestrator]', `task ${taskId} NOT found`);
+      console.error('[Engine.execMonitor]', `task ${taskId} NOT found`);
       return;
     }
     
     // log agents and their tasks
-    console.info('[Engine.execOrchestrator]', `marvin agents:`);
+    console.info('[Engine.execMonitor]', `marvin agents:`);
     for (const [agentId, agent] of Object.entries(this.agents)) {
-      console.info('[Engine.execOrchestrator]', `  agent ${agentId}:`);
-      console.info('[Engine.execOrchestrator]', `    enabled: ${agent.enabled?'yes':'no'}`);
-      console.info('[Engine.execOrchestrator]', `    model: ${agent.model.model}`);
-      console.info('[Engine.execOrchestrator]', `    channels:`);
+      console.info('[Engine.execMonitor]', `  agent ${agentId}:`);
+      console.info('[Engine.execMonitor]', `    enabled: ${agent.enabled?'yes':'no'}`);
+      console.info('[Engine.execMonitor]', `    model: ${agent.model.model}`);
+      console.info('[Engine.execMonitor]', `    channels:`);
       for (const [channelId, channel] of Object.entries(agent.channels)) {
-        console.info('[Engine.execOrchestrator]', `      channel: ${channelId} ${channel}`);
+        console.info('[Engine.execMonitor]', `      channel: ${channelId} ${channel}`);
       }
-      console.info('[Engine.execOrchestrator]', `    tasks:`);
+      console.info('[Engine.execMonitor]', `    tasks:`);
       for (const [taskId, task] of Object.entries(agent.tasks)) {
-        console.info('[Engine.execOrchestrator]', `      task ${taskId}: ${task.schedule}ms ${task.enabled?'enabled':'disabled'}`);
+        console.info('[Engine.execMonitor]', `      task ${taskId}: ${task.schedule}ms ${task.enabled?'enabled':'disabled'}`);
       }
     }
     
     // re-schedule next execution
-    task.timeout = setTimeout(this.execOrchestrator.bind(this), task.schedule, agentId, taskId);
+    task.timeout = setTimeout(this.execMonitor.bind(this), task.schedule, agentId, taskId);
   }
 
-  async execTask(agentId: string, taskId: string) {
-    console.log('[Engine.execTask]', `${agentId}/${taskId}`);
+  // prompts the LLM with the task input, sends the result through channels, then reschedules
+  async execInput(agentId: string, taskId: string) {
+    console.log('[Engine.execInput]', `${agentId}/${taskId}`);
 
     // check assistant state
     if (this.state !== 'exec') {
-      console.warn('[Engine.execTask]', `task ${taskId} skipped (assistant NOT running)`);
+      console.warn('[Engine.execInput]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
 
     // check if agent exists
     const agent = this.agents[agentId];
     if (!agent) {
-      console.info('[Engine.execTask]', `task ${taskId} skipped (agent not found)`);
+      console.info('[Engine.execInput]', `task ${taskId} skipped (agent not found)`);
       return;
     }
     // check if agent is enabled
     if (!agent.enabled) {
-      console.info('[Engine.execTask]', `task ${taskId} skipped (agent disabled)`);
+      console.info('[Engine.execInput]', `task ${taskId} skipped (agent disabled)`);
       return;
     }
 
     // check if task exists
     const task = agent.tasks[taskId]!;
     if (!task) {
-      console.info('[Engine.execTask]', `task ${taskId} skipped (task not found)`);
+      console.info('[Engine.execInput]', `task ${taskId} skipped (task not found)`);
       return;
     }
     // check if task is enabled
     if (!task.enabled) {
-      console.info('[Engine.execTask]', `task ${taskId} skipped (task disabled)`);
+      console.info('[Engine.execInput]', `task ${taskId} skipped (task disabled)`);
+      return;
+    }
+
+    if (!task.input) {
+      console.info('[Engine.execInput]', `task ${taskId} skipped (no input)`);
       return;
     }
 
@@ -566,10 +597,12 @@ export default class Engine {
     // set task input as user message to LLM
     const result = await this.execChat(chatId, agentId, task.input, format, schema, maxSteps);
     if (!result) {
-      console.error('[Engine.execTask]', `no result from sendMessage for agent ${agentId}`);
+      console.error('[Engine.execInput]', `no result from sendMessage for agent ${agentId}`);
       return;
     }
 
+    // extract "output" from result json 
+    const content = extractOutput(result.content);
     // send final result through configured channels
     for (const [channelId, groupId] of Object.entries(agent.channels)) {
       try {
@@ -577,30 +610,30 @@ export default class Engine {
 
         // verify channel exists, warn if not, then skip
         if (!channel) {
-          console.warn('[Engine.execTask]', `channel ${channelId} not found, skipping`);
+          console.warn('[Engine.execInput]', `channel ${channelId} not found, skipping`);
           continue;
         }
 
-        const reply = await channel.sendMessage({ role: 'assistant', content: result.content, channel: groupId } as Message);
+        const reply = await channel.sendMessage({ role: 'assistant', content, channel: groupId } as Message);
         if (!reply.ok) {
-          console.warn('[Engine.execTask]', `channel ${channelId} send failed, skipping`);
+          console.warn('[Engine.execInput]', `channel ${channelId} send failed, skipping`);
           continue;
         }
 
         // try to send, log error if failed, continue
-        console.info('[Engine.execTask]', `message sent to channel ${channelId}:${groupId}`);
+        console.info('[Engine.execInput]', `message sent to channel ${channelId}:${groupId}`);
       } catch (err) {
-        console.error('[Engine.execTask]', `channel ${channelId} send failed:`, err);
+        console.error('[Engine.execInput]', `channel ${channelId} send failed:`, err);
       }
     }
 
     if (this.isDry) {
-      console.info('[Engine.execTask]', '[dry]', 'task executed (once)');
+      console.info('[Engine.execInput]', '[dry]', 'task executed (once)');
       return;
     }
 
     // re-schedule next execution
-    task.timeout = setTimeout(this.execTask.bind(this), task.schedule, agentId, taskId);
+    task.timeout = setTimeout(this.execInput.bind(this), task.schedule, agentId, taskId);
   }
 
   async execReload() {
@@ -634,13 +667,73 @@ export default class Engine {
   // save chat to cache
   saveChat(chatId: string | undefined, chat: Chat): void {
     if (!chatId) return;
+    chat.updatedAt = Date.now();
     this.cache[chatId] = chat;
   }
 
   // find cached chat by id
   findChat(chatId: string | undefined): Chat | null {
     if (!chatId) return null;
-    return this.cache[chatId] as Chat || null;
+    const chat = this.cache[chatId] as Chat || null;
+    if (chat) chat.updatedAt = Date.now();
+    return chat;
+  }
+
+  // bound chat history to the system message + the last N messages
+  trimChat(chat: Chat): void {
+    if (!chat.messages || chat.messages.length <= constants.MAX_CHAT_MESSAGES) return;
+
+    // drop the oldest messages, always keeping the system message (index 0)
+    const drop = chat.messages.length - constants.MAX_CHAT_MESSAGES;
+    if (chat.messages[0]?.role === 'system') {
+      chat.messages = [chat.messages[0]!, ...chat.messages.slice(drop + 1)];
+    } else {
+      chat.messages = chat.messages.slice(drop);
+    }
+  }
+
+  // removes cached chats idle for longer than the TTL, then reschedules itself
+  async execSweep(agentId: string, taskId: string) {
+    console.log('[Engine.execSweep]', `${agentId}/${taskId}`);
+
+    // check assistant state
+    if (this.state !== 'exec') {
+      console.info('[Engine.execSweep]', `task ${taskId} skipped (assistant NOT running)`);
+      return;
+    }
+
+    // check if agent exists
+    const agent = this.agents[agentId];
+    if (!agent) {
+      console.info('[Engine.execSweep]', `task ${taskId} skipped (agent not found)`);
+      return;
+    }
+    // check if task exists
+    const task = agent.tasks[taskId]!;
+    if (!task) {
+      console.info('[Engine.execSweep]', `task ${taskId} skipped (task not found)`);
+      return;
+    }
+
+    // remove cached chats idle for longer than the TTL
+    const now = Date.now();
+    let removed = 0;
+    for (const [chatId, chat] of Object.entries(this.cache)) {
+      if (now - (chat.updatedAt || 0) > constants.CHAT_TTL_MS) {
+        console.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
+        delete this.cache[chatId];
+        removed++;
+      }
+    }
+    console.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
+
+    if (this.isDry) {
+      console.info('[Engine.execSweep]', '[dry]', 'task executed (once)');
+      return;
+    }
+
+    // re-schedule next execution
+    task.timeout = setTimeout(this.execSweep.bind(this), task.schedule, agentId, taskId);
   }
 
   // agent loop
@@ -653,7 +746,7 @@ export default class Engine {
       // get chat from cache/store using chatId
       let chat = this.findChat(chatId);
       if (!chat) {
-        chat = { id: chatId, messages: [], thinking: false, userId: '', format: 'text' } as Chat;
+        chat = { id: chatId, messages: [], thinking: false, userId: '', format: 'text', updatedAt: Date.now() } as Chat;
 
         let system = agent.identity;
 
@@ -673,6 +766,7 @@ export default class Engine {
       // return early
       if (this.isDry) {
         console.info('[Engine.execChat]', '[dry]', 'send messages to:', agent.model.model);
+        this.saveChat(chatId, chat);
         return { content: '(dry)', steps: 0 };
       }
 
@@ -685,11 +779,14 @@ export default class Engine {
       do {
         steps++;
 
+        // keep the chat history bounded (system message + last N messages)
+        this.trimChat(chat);
+
         // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
         reply = await agent.model.sendChat(chat);
 
         // persist assistant reply to chat history
-        chat.messages.push({ role: 'assistant', content: reply.message.content.trim(), tools: reply.message.tools });
+        chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
         // trim result, this can be really big
         console.debug('[Engine.execChat]', `step=${steps}`, JSON.stringify(reply));

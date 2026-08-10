@@ -1,0 +1,68 @@
+import { readFileSync, writeFileSync } from 'fs';
+import { Tool, ToolMeta } from '../types.js';
+import { resolveInsideHome } from '../helpers.js';
+
+export default class EditFileTool extends Tool {
+  public meta: ToolMeta = {
+    type: 'function',
+    function: {
+      name: 'edit_file',
+      description: 'Edit a file inside the ~/.marvin workspace: pass oldString + newString to replace a snippet, or just newString to create/overwrite the file',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Path to the file to edit (must be inside ~/.marvin)',
+          },
+          newString: {
+            type: 'string',
+            description: 'Replacement text, or the full file content when oldString is omitted',
+          },
+          oldString: {
+            type: 'string',
+            description: 'Text to replace (all occurrences). Omit to write the full content',
+          },
+        },
+        required: ['path', 'newString'],
+      }
+    },
+  }
+
+  public async call(args: { path: string; newString?: string; oldString?: string }) {
+    console.debug('[EditFileTool.call]', args);
+
+    if (!args?.path) {
+      return { error: 'edit_file: no path provided' };
+    }
+
+    if (args.newString === undefined) {
+      return { error: 'edit_file: no newString provided' };
+    }
+
+    const path = resolveInsideHome(this.engine.work, args.path);
+    if (!path) {
+      return { error: `edit_file: path "${args.path}" is outside the workspace (~/.marvin)` };
+    }
+
+    try {
+      let content = args.newString;
+
+      // snippet replace mode
+      if (args.oldString !== undefined) {
+        const current = readFileSync(path, 'utf-8');
+        if (!current.includes(args.oldString)) {
+          return { path: args.path, error: 'edit_file: oldString not found in file' };
+        }
+        content = current.split(args.oldString).join(args.newString);
+      }
+
+      writeFileSync(path, content, 'utf-8');
+
+      return { path: args.path, ok: true };
+    } catch (err) {
+      console.error('[EditFileTool.call]', 'error:', err);
+      return { path: args.path, error: (err as Error).message };
+    }
+  }
+}

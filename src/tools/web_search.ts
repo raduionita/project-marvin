@@ -61,12 +61,14 @@ export default class WebSearchTool extends Tool {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10_000 });
 
+      // after the html/doc is loaded, duck requests d.js that contains the search results
       const script = await page.waitForResponse((response) => response.url().includes('links.duckduckgo.com/d.js'), { timeout: 10_000 });
       const text = await script.text();
       
       // done with the page
       await page.close();
 
+      // the results need to be extracted/parsed
       const start = text.indexOf(SEARCH_START_TAG);
       const end = text.indexOf(SEARCH_END_TAG, start);
       const raw = text.substring(start + SEARCH_START_TAG.length, end);

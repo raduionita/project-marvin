@@ -53,7 +53,7 @@ export default class ModelsCommand extends Command {
 
         this.engine.config.models[modelId] = config;
 
-        const cpath = join(this.engine.home, 'marvin.json');
+        const cpath = join(this.engine.work, 'marvin.json');
         // write to config file
         if (this.engine.isDry) {
           console.info('[ModelsCommand.exec]', '[dry]',`would configure model "${modelId}", config persisted to ${cpath}`);

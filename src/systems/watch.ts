@@ -10,7 +10,7 @@ export default class WatchSystem extends System {
     console.debug('[WatchSystem.load]');
 
     const files = [
-      join(this.engine.home, 'marvin.json'),
+      join(this.engine.work, 'marvin.json'),
     ]
     for (const file of files) {
       try {

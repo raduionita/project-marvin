@@ -77,7 +77,7 @@ await (new class Marvin {
     config = {} as Config;
 
     // at this stage marvin.json MUST exist, but just in case
-    const cpath = join(this.engine.home, 'marvin.json');
+    const cpath = join(this.engine.work, 'marvin.json');
     if (!existsSync(cpath)) {
       console.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
       this.engine.config = constants.DEFAULT_CONFIG as Config;

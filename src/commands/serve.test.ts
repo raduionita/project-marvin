@@ -19,6 +19,7 @@ function mockConfig(channels: Config['channels'] = {}, models: Config['models'] 
 function mockEngine(isDry = false): Engine {
   const engine = new Engine();
   engine.isDry = isDry;
+  engine.state = 'exec';
   return engine;
 }
 
@@ -75,6 +76,10 @@ class TestChannel extends Channel {
   async sendMessage(message: Message): Promise<any> {
     console.debug('[TestChannel.sendMessage]', JSON.stringify(message));
     return message;
+  }
+
+  async listGroups(): Promise<{ [key: string]: string }> {
+    return {};
   }
 }
 
@@ -235,7 +240,7 @@ test('sendMessage pushes system and user messages to chat', async () => {
   // 2 system/user messages + 5 assistant replies from the AI loop
   expect(chat!.messages.length).toBe(7);
   expect(chat!.messages[0]!.role).toBe('system');
-  expect(chat!.messages[0]!.content).toBe('You are Marvin.');
+  expect(chat!.messages[0]!.content).toContain('You are Marvin.');
   expect(chat!.messages[1]!.role).toBe('user');
   expect(chat!.messages[1]!.content).toBe('hello world');
   // Verify assistant replies were persisted
@@ -416,17 +421,13 @@ test('sendMessage returns empty content when reply has no message content', asyn
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
-test('sendMessage throws when agentId does not exist', async () => {
+test('sendMessage returns null when agentId does not exist', async () => {
   const engine = buildTestEngine();
 
-  // Should throw when agentId doesn't exist
-  let threw = false;
-  try {
-    await engine.execChat('chat-1', 'nonexistent', 'hello', 'json', {"output": "text string of the answer"}, 5);
-  } catch {
-    threw = true;
-  }
-  expect(threw).toBe(true);
+  // execChat swallows internal errors and returns null for unknown agents
+  const result = await engine.execChat('chat-1', 'nonexistent', 'hello', 'json', {"output": "text string of the answer"}, 5);
+
+  expect(result).toBeNull();
 });
 
 test('sendMessage returns content and steps from model reply', async () => {
@@ -509,18 +510,14 @@ test('execChat returns empty string when reply.message is undefined', async () =
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
-// ==================== execTask tests (integration with execChat) ====================
+// ==================== execInput tests (integration with execChat) ====================
 
-// Note: In serve.ts, execTask calls execChat as:
-//   this.execChat(agentId, chatId, task.input, format, schema, maxSteps)
-// But execChat's signature is:
-//   async execChat(message, chatId, agentId, maxSteps)
-// So the 3rd and 4th params are swapped: agentId goes to chatId slot,
-// and chatId goes to agentId slot. This means sendMessage looks up
-// engine.agents[chatId] which won't exist unless we set up the agent
-// with the chatId as its key.
+// execInput prompts the LLM with task.input via execChat, sends the result
+// through the agent's channels, then reschedules itself.
 
-test('execTask calls execChat and sends result through agent channels', async () => {
+// Set up a task on the agent with an input, then call execInput('marvin', 'test-task').
+
+test('execInput calls execChat and sends result through agent channels', async () => {
   const engine = buildTestEngine();
 
   // Add a task directly to the existing agent
@@ -528,6 +525,7 @@ test('execTask calls execChat and sends result through agent channels', async ()
     'test-task': {
       id: 'test-task',
       enabled: true,
+      type: 'input',
       schedule: 0,
       maxSteps: 5,
       input: 'task input',
@@ -535,16 +533,16 @@ test('execTask calls execChat and sends result through agent channels', async ()
     },
   };
 
-  // Call execTask directly
-  await engine.execTask('marvin', 'test-task');
+  // Call execInput directly
+  await engine.execInput('marvin', 'test-task');
 
   // The mock channel was loaded, so the result should have been sent through it
   expect(engine.channels['test.channel']).toBeDefined();
-  // execChat was called by execTask
+  // execChat was called by execInput
   expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
-test('execTask skips disabled tasks', async () => {
+test('execInput skips disabled tasks', async () => {
   const engine = buildTestEngine();
 
   // Add a disabled task directly to the existing agent (identity is already set)
@@ -552,6 +550,7 @@ test('execTask skips disabled tasks', async () => {
     'disabled-task': {
       id: 'disabled-task',
       enabled: false,
+      type: 'input',
       schedule: 0,
       maxSteps: 5,
       input: 'should not run',
@@ -560,13 +559,13 @@ test('execTask skips disabled tasks', async () => {
   };
 
   // Should log and return without calling sendMessage
-  await engine.execTask('marvin', 'disabled-task');
+  await engine.execInput('marvin', 'disabled-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
-test('execTask skips disabled agents', async () => {
+test('execInput skips disabled agents', async () => {
   const engine = buildTestEngine();
 
   (engine.agents['marvin'] as any).enabled = false;
@@ -574,6 +573,7 @@ test('execTask skips disabled agents', async () => {
     'test-task': {
       id: 'test-task',
       enabled: true,
+      type: 'input',
       schedule: 0,
       maxSteps: 5,
       input: 'task input',
@@ -581,13 +581,13 @@ test('execTask skips disabled agents', async () => {
     },
   };
 
-  await engine.execTask('marvin', 'test-task');
+  await engine.execInput('marvin', 'test-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
-test('execTask warns and skips when agent channel is not loaded', async () => {
+test('execInput warns and skips when agent channel is not loaded', async () => {
   const engine = buildTestEngine({ channelEnabled: false });
 
   engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
@@ -595,6 +595,7 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
     'test-task': {
       id: 'test-task',
       enabled: true,
+      type: 'input',
       schedule: 0,
       maxSteps: 5,
       input: 'task input',
@@ -603,12 +604,12 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await engine.execTask('marvin', 'test-task');
-  // sendMessage was called (execTask tries it), but the channel send failed
+  await engine.execInput('marvin', 'test-task');
+  // sendMessage was called (execInput tries it), but the channel send failed
   expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
-test('execTask skips disabled tasks', async () => {
+test('execInput skips disabled tasks', async () => {
   const engine = buildTestEngine();
 
   // Add a disabled task directly to the existing agent (identity is already set)
@@ -616,6 +617,7 @@ test('execTask skips disabled tasks', async () => {
     'disabled-task': {
       id: 'disabled-task',
       enabled: false,
+      type: 'input',
       schedule: 0,
       maxSteps: 5,
       input: 'should not run',
@@ -624,13 +626,13 @@ test('execTask skips disabled tasks', async () => {
   };
 
   // Should log and return without calling sendMessage
-  await engine.execTask('marvin', 'disabled-task');
+  await engine.execInput('marvin', 'disabled-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
-test('execTask skips disabled agents', async () => {
+test('execInput skips disabled agents', async () => {
   const engine = buildTestEngine();
 
   (engine.agents['marvin'] as any).enabled = false;
@@ -638,6 +640,7 @@ test('execTask skips disabled agents', async () => {
     'test-task': {
       id: 'test-task',
       enabled: true,
+      type: 'input',
       schedule: 0,
       maxSteps: 5,
       input: 'task input',
@@ -645,13 +648,13 @@ test('execTask skips disabled agents', async () => {
     },
   };
 
-  await engine.execTask('marvin', 'test-task');
+  await engine.execInput('marvin', 'test-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
-test('execTask warns and skips when agent channel is not loaded', async () => {
+test('execInput warns and skips when agent channel is not loaded', async () => {
   const engine = buildTestEngine({ channelEnabled: false });
 
   engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
@@ -659,6 +662,7 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
     'test-task': {
       id: 'test-task',
       enabled: true,
+      type: 'input',
       schedule: 0,
       maxSteps: 5,
       input: 'task input',
@@ -667,14 +671,14 @@ test('execTask warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await engine.execTask('marvin', 'test-task');
-  // sendMessage was called (execTask tries it), but the channel send failed
+  await engine.execInput('marvin', 'test-task');
+  // sendMessage was called (execInput tries it), but the channel send failed
   expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
 // ==================== execReload tests ====================
 
-test('execReload sets state to running after reload', async () => {
+test('execReload drops and re-executes the engine, ending in the exec state', async () => {
   const engine = buildTestEngine({
     configAgents: {
       marvin: {
@@ -687,22 +691,25 @@ test('execReload sets state to running after reload', async () => {
     },
   });
 
-  // Set up a test home directory so loadAgents can read MARVIN.md
+  // Set up a test home directory so scanProject can find the required files
   const testHome = '/tmp/marvin-test-' + Date.now();
-  engine.home = testHome;
+  engine.work = testHome;
   engine.root = testHome;
   mkdirSync(testHome, { recursive: true });
   writeFileSync(testHome + '/MARVIN.md', 'You are Marvin.');
-  // Create subdirectories needed by loadAgents
+  writeFileSync(testHome + '/marvin.json', JSON.stringify({}));
+  // Create subdirectories needed by scanProject/loadAgents
   mkdirSync(testHome + '/agents', { recursive: true });
 
   // Pre-load some state
   engine.state = 'exec';
 
-  // Stub loadAgents to not actually try to load models from disk (which fails in tests).
-  // execReload calls loadAgents internally, so we replace it with a no-op that
-  // preserves the existing mock model.
-  const originalInitAgents = engine.loadAgents.bind(engine);
+  // Stub the heavy loaders so execReload does not start real systems (HTTP, browser,
+  // file watcher) or read models from disk during the test.
+  engine.loadSystems = async () => {};
+  engine.loadTools = async () => {};
+  engine.loadChannels = async () => {};
+  engine.loadModels = async () => {};
   engine.loadAgents = async () => {
     // Re-install the mock model so agents can use it
     const mockModelInstance = new MockModel(engine, {
@@ -725,7 +732,7 @@ test('execReload sets state to running after reload', async () => {
 
   await engine.execReload();
 
-  expect(engine.state).toBe('running');
+  expect(engine.state).toBe('exec');
 });
 
 // ==================== drop methods tests ====================
@@ -762,11 +769,16 @@ test('dropAgents clears all agents and clears their timeouts', async () => {
   engine.agents['marvin']!.tasks['test-task'] = {
     id: 'test-task',
     enabled: true,
+    type: 'input',
     schedule: 0,
     maxSteps: 5,
     input: 'input',
     timeout: setTimeout(() => {}, 0),
   };
+
+  expect(Object.keys(engine.agents)).toContain('marvin');
+
+  await engine.dropAgents();
 
   expect(Object.keys(engine.agents).length).toBe(0);
 });

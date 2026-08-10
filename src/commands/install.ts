@@ -5,12 +5,13 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { Command } from '../types';
 import * as constants from '../constants';
 
+// `marvin install` creates workspace folders, MARVIN.md, marvin.json
 export default class InstallCommand extends Command {
   async exec() {
     console.debug('[InstallCommand.exec]');
     
     // ~/.marvin
-    const hpath = this.engine.home;
+    const hpath = this.engine.work;
     if (this.engine.isDry) {
       console.info('[InstallCommand.exec]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {

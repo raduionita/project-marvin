@@ -1,11 +1,12 @@
 
 import { join } from 'path';
 import { writeFileSync } from 'fs';
-import readline, { promises } from 'readline';
+import { promises } from 'readline';
 
-import { Channel, Command, Message } from "../types";
+import { Command, Message } from "../types";
 import { listChannels, loadChannel } from '../channels';
 
+// `marvin channels [command] [--dry]` list, add, bind, chat, drop channels
 export default class ChannelsCommand extends Command {
   async exec() {
     console.debug('[ChannelsCommand.exec]');
@@ -54,7 +55,7 @@ export default class ChannelsCommand extends Command {
     console.debug('[ChannelsCommand.execList]');
     console.info('list channels:');
     // for each channel, list enabled agents
-    listChannels(this.engine).forEach(channel => {
+    listChannels(this.engine).map(c => c.replace('.ts', '')).forEach(channel => {
       console.info(`  ${channel}`);
       const channelConfig = this.engine.config.channels[channel];
       if (channelConfig) {
@@ -120,7 +121,7 @@ export default class ChannelsCommand extends Command {
     await channel.drop();
 
     // channel works - persist to marvin.json
-    const cpath = join(this.engine.home, 'marvin.json');
+    const cpath = join(this.engine.work, 'marvin.json');
 
     // write to config file
     if (this.engine.isDry) {
@@ -172,7 +173,7 @@ export default class ChannelsCommand extends Command {
       this.engine.config.agents[agentId].channels[channelId] = groupId; 
 
       // persist to marvin.json
-      const cpath = join(this.engine.home, 'marvin.json');
+      const cpath = join(this.engine.work, 'marvin.json');
       writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
       console.info('[ChannelsCommand.execBind]', `agent "${agentId}" bound to channel "${channelId}:${groupId}", config persisted to ${cpath}`);
@@ -198,14 +199,24 @@ export default class ChannelsCommand extends Command {
 
     // list available groups as a table
     const groups = await channel.listGroups();
-    console.info(' ID ', '|', 'Name');
-    console.info('----', '|' ,'----');
+    console.info(' ID        ', '|', 'Name');
+    console.info('-----------', '|' ,'----');
     for (const [id, name] of Object.entries(groups)) {
       console.info(`${id}`, '|', `${name}`);
     }
+    console.log('');
 
     // ask for groupId
     let groupId = this.args[2] || await pli.question('Enter group (optional, e.g. general): ');
+
+    // find groupId in groups
+    for (const [id, name] of Object.entries(groups)) {
+      if (name === groupId || id === groupId) {
+        groupId = id;
+        break;
+      }
+    }
+
     if (!groupId) {
       console.warn('[ChannelsCommand.execChat]', 'invalid groupId, exiting');
       return;

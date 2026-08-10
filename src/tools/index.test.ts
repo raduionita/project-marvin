@@ -37,13 +37,17 @@ test('listTools excludes index.ts', () => {
 test('listTools excludes test files', () => {
   const engine = mockEngine();
   const tools = listTools(engine);
-  expect(tools).not.toContain('getDate.test.ts');
+  expect(tools).not.toContain('get_date.test.ts');
 });
 
 test('listTools includes known tools', () => {
   const engine = mockEngine();
   const tools = listTools(engine);
-  expect(tools).toContain('getDate.ts');
-  expect(tools).toContain('webSearch.ts');
-  expect(tools).toContain('webBrowse.ts');
+  expect(tools).toContain('get_date.ts');
+  expect(tools).toContain('web_search.ts');
+  expect(tools).toContain('web_browse.ts');
+  expect(tools).toContain('read_file.ts');
+  expect(tools).toContain('edit_file.ts');
+  expect(tools).toContain('marvin_state.ts');
+  expect(tools).toContain('marvin_config.ts');
 });
