@@ -82,16 +82,16 @@ export default class EnableCommand extends Command {
         }
         console.debug('[EnableCommand.execService]', `marvin daemon is ${status}`);
       } catch {
-        console.error('[EnableCommand.execService]', 'marvin daemon is not running.');
+        console.debug('[EnableCommand.execService]', 'marvin daemon is not running.');
       }
     }
 
     // ~/.config/systemd/user/marvin.service
-    const src = join(this.engine!.root, 'marvin.service');
+    const src = join(this.engine.root, 'marvin.service');
     const dst = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
     if (this.engine.isDry) {
       console.info('[EnableCommand.execService]', '[dry]', 'would copy service file:', src, '->', dst);
-    } else if (!existsSync(src)) {
+    } else if (!existsSync(dst)) {
       console.warn('[EnableCommand.execService]', 'service file missing:', src);
       mkdirSync(join(homedir(), '.config', 'systemd', 'user'), { recursive: true });
       copyFileSync(src, dst);
