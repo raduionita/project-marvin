@@ -24,15 +24,15 @@ export default class ApiSystem extends System {
       const url = new URL(req.url || '/', `http://localhost:${this.port}`);
       const command = url.pathname.split('/')[1];
 
+      // unknown command -> 404
       if (!command) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'No command provided' }));
+        this.handleUnknown(req, res);
         return;
       }
 
-      // skip auth for health check
+      // health check 
       if (command === '_health') {
-        await this.handleHealth(req, res);
+        this.handleHealth(req, res);
         return;
       }
 
@@ -91,23 +91,11 @@ export default class ApiSystem extends System {
   }
 
   private async listen() {
-    console.info('[ApiSystem.listen]', `binding API server on ${this.host}:${this.port}`);
+    console.debug('[ApiSystem.listen]', `binding API server on ${this.host}:${this.port}`);
 
     return new Promise<void>((resolve) => {
-      this.server!.on('error', (err) => {
-        const code = (err as NodeJS.ErrnoException).code;
-        if (code === 'EADDRINUSE') {
-          console.error('[ApiSystem.listen]', `port ${this.port} already in use (check with: ss -tulpn | grep ${this.port})`);
-        } else if (code === 'EACCES') {
-          console.error('[ApiSystem.listen]', `permission denied binding to ${this.host}:${this.port}`);
-        } else {
-          console.error('[ApiSystem.listen]', 'bind error:', err);
-        }
-        resolve();
-      });
-
       this.server!.listen(this.port, this.host, () => {
-        console.info('[ApiSystem.listen]', `API server listening on ${this.host}:${this.port}`);
+        console.debug('[ApiSystem.listen]', `API server listening on ${this.host}:${this.port}`);
         resolve();
       });
     });
@@ -128,6 +116,8 @@ export default class ApiSystem extends System {
   }
 
   private handleNoAuth(res: http.ServerResponse) {
+    console.debug('[ApiSystem.handleNoAuth]');
+
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
   }
@@ -153,7 +143,7 @@ export default class ApiSystem extends System {
 
   private async handleReload(req: http.IncomingMessage, res: http.ServerResponse) {
     console.debug('[ApiSystem.handleReload]');
-    this.engine.execReload();
+    await this.engine.execReload();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, data: {} }));
   }

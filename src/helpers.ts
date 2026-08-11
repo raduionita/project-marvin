@@ -47,7 +47,73 @@ export function extractOutput(content: string): string {
   return content;
 }
 
-// Resolve `target` to an absolute path inside the workspace `home` folder.
+// Ensure LLM content is a valid JSON string: when the model appends markup
+// (e.g. a <tool_calls> block) after the JSON, keep only the leading JSON value.
+// Valid JSON and plain text are returned unchanged.
+export function cleanContent(content: string): string {
+  if (!content) return content;
+
+  try {
+    JSON.parse(content);
+    return content;
+  } catch {
+    // not valid JSON as-is: try to isolate the leading JSON value
+  }
+
+  return extractLeadingJson(content) ?? content;
+}
+
+// Pull the first JSON value (object or string) out of content that mixes JSON
+// with trailing markup (e.g. an LLM appending a <tool_calls> block). Returns
+// null when no JSON value can be isolated. Only objects and strings are
+// supported: the "output" schema always wraps the answer in an object.
+function extractLeadingJson(content: string): string | null {
+  // leading quoted string ("answer text") -> find its closing quote
+  if (content.startsWith('"')) {
+    let escaped = false;
+    for (let i = 1; i < content.length; i++) {
+      const ch = content[i]!;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        return content.slice(0, i + 1);
+      }
+    }
+    return null;
+  }
+
+  // leading object ({...}) -> match braces, ignoring braces inside strings
+  const start = content.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < content.length; i++) {
+    const ch = content[i]!;
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return content.slice(start, i + 1);
+      }
+    }
+  }
+  return null;
+}
 // Guards against escaping via `..`, absolute paths, and symlinks. Returns the
 // canonical (symlink-free) absolute path, or `null` when the target is outside
 // the workspace or is a symlink at the final path component.

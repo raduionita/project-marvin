@@ -18,7 +18,7 @@ export default class InstallCommand extends Command {
       mkdirSync(hpath, { recursive: true });
       console.info('created workspace directory:', hpath);
     } else {
-      console.info(hpath, 'exists');
+      console.info('directory', hpath, 'exists');
     }
 
     // ~/.marvin/agents
@@ -29,7 +29,7 @@ export default class InstallCommand extends Command {
       mkdirSync(apath, { recursive: true });
       console.info('created agents directory:', apath);
     } else {
-      console.info(apath, 'exists');
+      console.info('directory', apath, 'exists');
     }
 
     //  ~/.marvin/MARVIN.md
@@ -40,7 +40,7 @@ export default class InstallCommand extends Command {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
       console.info('created MARVIN.md:', mpath);
     } else {
-      console.info(mpath, 'exists');
+      console.info('marvin identity', mpath, 'exists');
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
@@ -52,7 +52,7 @@ export default class InstallCommand extends Command {
       writeFileSync(cpath, JSON.stringify(config, null, 2));
       console.info('created config file:', cpath);
     } else {
-      console.info(cpath, 'exists');
+      console.info('config file', cpath, 'exists');
     }
 
     console.info('marvin installed!');

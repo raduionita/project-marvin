@@ -44,7 +44,7 @@ export default class SlackChannel extends Channel {
     console.debug('[SlackChannel.load]', this.engine.config.channels.slack);
 
     if (this.engine.isDry) {
-      console.info('[SlackChannel.load]', '[dry] channel slack attached');
+      console.debug('[SlackChannel.load]', '[dry] channel slack attached');
       return;
     }
 
@@ -102,8 +102,8 @@ export default class SlackChannel extends Channel {
 
     await this.sok.start();
 
-    console.info('[SlackChannel.load]','channel slack started');
-    console.info('[SlackChannel.load]', 'tip: subscribe "app_mention" and "message.im" events in the Slack App (Socket Mode) to receive messages');
+    console.debug('[SlackChannel.load]','channel slack started');
+    console.debug('[SlackChannel.load]', 'tip: subscribe "app_mention" and "message.im" events in the Slack App (Socket Mode) to receive messages');
   }
 
   async drop() {
@@ -238,7 +238,7 @@ export default class SlackChannel extends Channel {
       const agentId = agent.id;
       const chatId: string = `slack-${event.channel}-${thread}`;
 
-      console.info(`processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      console.info('[SlackChannel.onMention]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await this.engine.execChat(chatId, agentId, text);

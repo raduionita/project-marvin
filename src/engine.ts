@@ -7,7 +7,7 @@ import { listTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
-import { extractOutput } from "./helpers.js";
+import { extractOutput, cleanContent } from "./helpers.js";
 
 export default class Engine {
   public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
@@ -835,7 +835,11 @@ export default class Engine {
       this.saveChat(chatId, chat);
 
       // TODO: more info here
-      return { content: reply?.message?.content || '', steps: steps };
+      // when format is json, make sure content is a valid JSON string (the LLM
+      // may append markup such as a <tool_calls> block after the JSON)
+      const rawContent = reply?.message?.content || '';
+      const content = chat.format === 'json' ? cleanContent(rawContent) : rawContent;
+      return { content: content, steps: steps };
     } catch (error) {
       console.error('[Engine.execChat]', error);
       return null;

@@ -36,7 +36,7 @@ You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI
     - `reload.ts`           # reload command
   - `systems/`              # system implementations
     - `browser.ts`          # browser system
-    - `http.ts`             # http system
+    - `api.ts`              # api system
   - `constants.ts`          # project wide constants
   - `types.ts`              # types and interfaces
   - `helpers.ts`            # helper functions
