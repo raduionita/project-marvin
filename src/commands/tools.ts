@@ -110,7 +110,7 @@ export default class ToolsCommand extends Command {
   }
 
   async dropSystems() {
-    console.log('[ToolCommand.dropSystems]');
+    console.debug('[ToolCommand.dropSystems]');
     for (const system of Object.values(this.engine.systems)) {
       try {
         await system.drop();

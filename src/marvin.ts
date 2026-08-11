@@ -8,6 +8,7 @@ import {  Command, Config } from './types.js';
 import * as constants from './constants.js';
 import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
+import { loadConsole, enablePrefix } from './logger.js';
 import Engine from './engine.js';
 
 await (new class Marvin {
@@ -15,12 +16,17 @@ await (new class Marvin {
   command: Command | undefined = undefined;
 
   async exec() {
+    
+    this.loadFlags();
+    
+    loadConsole();
+
     console.debug('[Marvin.exec]');
 
-          this.loadProcess();
-          this.loadConfig();
-          this.loadFlags();
-    await this.execCommand();
+    this.loadProcess();
+    this.loadConfig();
+          
+    return await this.execCommand();
   }
 
   loadProcess() {
@@ -38,7 +44,7 @@ await (new class Marvin {
 
     // SIGINT (Ctrl+C)
     process.on('SIGINT', async () => {
-      console.log('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
+      console.info('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
       // goto process.on('exit') instead
       await this.drop();
       process.exit(0);
@@ -46,7 +52,7 @@ await (new class Marvin {
 
     // SIGTERM (kill)
     process.on('SIGTERM', async () => {
-      console.log('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
+      console.info('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
       // goto process.on('exit')
       await this.drop();
       process.exit(0);
@@ -80,7 +86,6 @@ await (new class Marvin {
     const cpath = join(this.engine.work, 'marvin.json');
     if (!existsSync(cpath)) {
       console.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
-      this.engine.config = constants.DEFAULT_CONFIG as Config;
       return;
     }
 
@@ -90,8 +95,48 @@ await (new class Marvin {
   }
 
   loadFlags() {
-    console.debug('[Marvin.loadFlags]');
-    // const args = process.argv.slice(2);
+    const rest: string[] = [];
+    let help = false;
+
+    for (let i = 2; i < process.argv.length; i++) {
+      const arg = process.argv[i];
+      if (arg === undefined) {
+        continue;
+      }
+
+      // --help: run the help command
+      if (arg === '--help') {
+        help = true;
+        continue;
+      }
+
+      // --logLevel <level> or --logLevel=<level>: set MARVIN_LOG_LEVEL
+      if (arg === '--logLevel') {
+        const level = process.argv[i + 1];
+        if (level !== undefined) {
+          process.env.MARVIN_LOG_LEVEL = level;
+          i++;
+        }
+        continue;
+      }
+      if (arg.startsWith('--logLevel=')) {
+        process.env.MARVIN_LOG_LEVEL = arg.slice('--logLevel='.length);
+        continue;
+      }
+
+      // --useLogPrefix: prefix log lines with [LEVEL]
+      if (arg === '--useLogPrefix') {
+        enablePrefix(true);
+        continue;
+      }
+
+      rest.push(arg);
+    }
+
+    process.argv = [process.argv[0] ?? 'bun', process.argv[1] ?? 'marvin', ...rest];
+    if (help) {
+      process.argv[2] = 'help';
+    }
   }
 
   async execCommand() {

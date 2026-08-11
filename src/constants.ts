@@ -23,7 +23,6 @@ export const DEFAULT_CONFIG = {
     name: 'marvin',
     host: '127.0.0.1',
     port: 7331,
-    logLevel: 'info',
     apiToken: 'changeme',
   },
   channels: {},

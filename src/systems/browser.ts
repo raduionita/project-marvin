@@ -8,10 +8,10 @@ export default class BrowserSystem extends System {
   private browser: Browser | undefined;
 
   public async load(): Promise<void> {
-    console.log('[BrowserSystem.load]');
+    console.debug('[BrowserSystem.load]');
 
     if (this.engine.isDry) {
-      console.log('[BrowserSystem.load]', '[dry] loading chromium');
+      console.info('[BrowserSystem.load]', '[dry] loading chromium');
       return;
     }
     
@@ -61,13 +61,13 @@ export default class BrowserSystem extends System {
     if (this.browser) {
       try {
         await this.browser.close();
-        console.log('[BrowserSystem.drop]', 'closed');
+        console.debug('[BrowserSystem.drop]', 'closed');
       } catch (err) {
         console.error('[BrowserSystem.drop]', 'error:', err);
       }
       this.browser = undefined;
     } else {
-      console.log('[BrowserSystem.drop]', 'already closed');
+      console.debug('[BrowserSystem.drop]', 'already closed');
     }
   }
 

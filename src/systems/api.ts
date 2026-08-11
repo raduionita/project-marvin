@@ -66,7 +66,6 @@ export default class ApiSystem extends System {
     });
 
     this.server.on('error', this.handleError.bind(this));
-
     await this.listen();
   }
 
@@ -79,24 +78,36 @@ export default class ApiSystem extends System {
           if (error) {
             console.error('[ApiSystem.drop]', 'error:', error);
           } else {
-            console.log('[ApiSystem.drop]', 'closed');
+            console.debug('[ApiSystem.drop]', 'closed');
           }
           resolve();
         });
         this.server = undefined;
       } else {
-        console.log('[ApiSystem.drop]', 'already closed');
+        console.debug('[ApiSystem.drop]', 'already closed');
         resolve();
       }
     });
   }
 
   private async listen() {
-    console.debug('[ApiSystem.listen]');
+    console.info('[ApiSystem.listen]', `binding API server on ${this.host}:${this.port}`);
 
     return new Promise<void>((resolve) => {
+      this.server!.on('error', (err) => {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'EADDRINUSE') {
+          console.error('[ApiSystem.listen]', `port ${this.port} already in use (check with: ss -tulpn | grep ${this.port})`);
+        } else if (code === 'EACCES') {
+          console.error('[ApiSystem.listen]', `permission denied binding to ${this.host}:${this.port}`);
+        } else {
+          console.error('[ApiSystem.listen]', 'bind error:', err);
+        }
+        resolve();
+      });
+
       this.server!.listen(this.port, this.host, () => {
-        console.debug('[ApiSystem.listen]', `API server listening on port ${this.port}`);
+        console.info('[ApiSystem.listen]', `API server listening on ${this.host}:${this.port}`);
         resolve();
       });
     });

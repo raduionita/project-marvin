@@ -32,7 +32,7 @@ export default class StatusCommand extends Command {
         
         // health check
         if (this.engine.isDry) {
-          console.log('[StatusCommand.exec]', '[dry]', 'check health: fetch http://localhost:' + port + '/_health');
+          console.info('[StatusCommand.exec]', '[dry]', 'check health: fetch http://localhost:' + port + '/_health');
         } else {
           try {
             const url = new URL(`http://localhost:${port}/_health`);

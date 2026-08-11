@@ -12,7 +12,6 @@ export interface Config {
     name: string;
     host: string;
     port: number;
-    logLevel: LogLevel;
     apiToken?: string;
   };
   channels: Record<string, {

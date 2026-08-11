@@ -102,7 +102,7 @@ export default class SlackChannel extends Channel {
 
     await this.sok.start();
 
-    console.log('[SlackChannel.load]','channel slack started');
+    console.info('[SlackChannel.load]','channel slack started');
     console.info('[SlackChannel.load]', 'tip: subscribe "app_mention" and "message.im" events in the Slack App (Socket Mode) to receive messages');
   }
 
@@ -277,7 +277,7 @@ export default class SlackChannel extends Channel {
       const agentId = agent.id;
       const chatId = `slack-${event.channel}-${thread}`;
 
-      console.log('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      console.debug('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await this.engine.execChat(chatId, agentId, text);

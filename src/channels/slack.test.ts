@@ -199,7 +199,7 @@ function mockConfig(options: {
   agents?: Config['agents'];
 } = {}): Config {
   return {
-    settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
+    settings: { name: 'marvin', port: 7331, host: '127.0.0.1', apiToken: 'changeme' },
     channels: options.channels || {},
     models: {},
     agents: options.agents || {},

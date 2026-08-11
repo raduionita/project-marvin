@@ -12,7 +12,7 @@ import { extractOutput } from "./helpers.js";
 export default class Engine {
   public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
 
-  public config: Config = {} as Config;
+  public config: Config = constants.DEFAULT_CONFIG as Config;
 
   private cache: Record<string, Chat> = {}; // chatId: chat
 
@@ -33,7 +33,7 @@ export default class Engine {
   public isDry: boolean = process.argv.includes('--dry') || process.argv.includes('-dry');
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
 
-  public get isDebug() { return this.config.settings.logLevel === 'debug'; }
+  public get isDebug() { return process.env.MARVIN_LOG_LEVEL === 'debug'; }
 
   async load() {
     console.debug('[Engine.load]');
@@ -211,7 +211,7 @@ export default class Engine {
   }
 
   async loadChannels() {
-    console.log('[Engine.loadChannels]');
+    console.debug('[Engine.loadChannels]');
     
     const files = listChannels(this).map(f => f.replace('.ts', ''));
     for (const [id, config] of Object.entries(this.config.channels)) {
@@ -245,7 +245,7 @@ export default class Engine {
   }
 
   async loadModels() {
-    console.log('[Engine.loadModels]');
+    console.debug('[Engine.loadModels]');
 
     // config models
     const files = listModels(this).map(f => f.replace('.ts', ''))
@@ -478,7 +478,7 @@ export default class Engine {
 
   // will detach and delete the channel from the engine
   async dropChannel(id: string) {
-    console.log('[Engine.dropChannel]', id);
+    console.debug('[Engine.dropChannel]', id);
     if (this.channels[id]) {
       try {
         this.channels[id].drop();
@@ -549,7 +549,7 @@ export default class Engine {
 
   // prompts the LLM with the task input, sends the result through channels, then reschedules
   async execInput(agentId: string, taskId: string) {
-    console.log('[Engine.execInput]', `${agentId}/${taskId}`);
+    console.debug('[Engine.execInput]', `${agentId}/${taskId}`);
 
     // check assistant state
     if (this.state !== 'exec') {
@@ -637,7 +637,7 @@ export default class Engine {
   }
 
   async execReload() {
-    console.log('[Engine.execReload]');
+    console.debug('[Engine.execReload]');
 
     // drop in reverse order
     await this.drop();
@@ -694,7 +694,7 @@ export default class Engine {
 
   // removes cached chats idle for longer than the TTL, then reschedules itself
   async execSweep(agentId: string, taskId: string) {
-    console.log('[Engine.execSweep]', `${agentId}/${taskId}`);
+    console.debug('[Engine.execSweep]', `${agentId}/${taskId}`);
 
     // check assistant state
     if (this.state !== 'exec') {
