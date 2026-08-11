@@ -12,7 +12,7 @@ export default class ReloadCommand extends Command {
     // ~/.marvin/.env so the systemd EnvironmentFile feeds it to the daemon
     const level = process.env.MARVIN_LOG_LEVEL;
     if (level) {
-      this.setLogLevel(level);
+      this.setLogLevel(level.toLowerCase());
     }
 
     // restart (not reload): the unit has no ExecReload= and EnvironmentFile is

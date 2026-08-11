@@ -47,6 +47,7 @@ class MockWebClient implements IWebClient {
   public postMessageResult: ChatPostMessageResponse | null = null;
   public conversationListResult: any = { ok: true, channels: [] };
   public authTestResult: any = { ok: true, user_id: 'U12345678' };
+  public connectionsOpenResult: any = { ok: true, url: 'wss://example.com/conn' };
 
   setPostMessageResult(result: ChatPostMessageResponse) {
     this.postMessageResult = result;
@@ -58,6 +59,10 @@ class MockWebClient implements IWebClient {
 
   setAuthTestResult(result: any) {
     this.authTestResult = result;
+  }
+
+  setConnectionsOpenResult(result: any) {
+    this.connectionsOpenResult = result;
   }
 
   public chat = {
@@ -76,6 +81,14 @@ class MockWebClient implements IWebClient {
   public auth = {
     test: async (): Promise<any> => {
       return this.authTestResult;
+    },
+  };
+
+  public apps = {
+    connections: {
+      open: async (): Promise<any> => {
+        return this.connectionsOpenResult;
+      },
     },
   };
 }
@@ -399,6 +412,23 @@ test('checkPrereqs rejects when conversations cannot be listed', async () => {
   const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-real');
   expect(result.ok).toBe(false);
   expect(result.error).toContain('missing_scope');
+});
+
+test('checkPrereqs rejects an invalid app token (connections.open fails)', async () => {
+  const { channel } = buildEngine();
+  channel.mockWeb.setConnectionsOpenResult({ ok: false, error: 'invalid_auth' });
+  const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-real');
+  expect(result.ok).toBe(false);
+  expect(result.error).toContain('app token invalid');
+  expect(result.error).toContain('invalid_auth');
+});
+
+test('checkPrereqs passes when connections.open returns a transient error', async () => {
+  const { channel } = buildEngine();
+  channel.mockWeb.setConnectionsOpenResult({ ok: false, error: 'internal_error' });
+  const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-real');
+  expect(result.ok).toBe(true);
+  expect(result.botId).toBe('U12345678');
 });
 
 // ============================================================================

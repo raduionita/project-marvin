@@ -4,7 +4,7 @@ export default class HelpCommand extends Command {
   async exec() {
     console.debug('[HelpCommand.exec]');
 
-    console.info('usage: marvin [command] [options] [--flags]');
+    console.info('usage: marvin [command] [options] [--dry] [--log-level=level]');
     console.info('commands:');
     console.info('  help    ', 'show this help');
     console.info('  install ', 'install the project');

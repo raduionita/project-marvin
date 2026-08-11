@@ -26,6 +26,12 @@ export interface IWebClient {
   auth: {
     test: (args?: any) => Promise<any>;
   };
+  apps: {
+    connections: {
+      // validates the app token (xapp-) and returns a temporary WSS URL
+      open: (args?: any) => Promise<any>;
+    };
+  };
 }
 
 export default class SlackChannel extends Channel {
@@ -133,6 +139,24 @@ export default class SlackChannel extends Channel {
     if (!auth.ok || !auth.user_id) {
       console.error('[SlackChannel.checkPrereqs]', 'bot token invalid:', auth.error);
       return { ok: false, error: `bot token invalid: ${auth.error || 'unknown error'}` };
+    }
+
+    // verify the app token (xapp-) is valid: requesting a WSS URL exercises the
+    // same apps.connections.open call the socket-mode client uses at start()
+    try {
+      const conn = await this.web.apps.connections.open({ token: appToken });
+      if (!conn.ok) {
+        // only hard-fail on unrecoverable auth errors; transient ones
+        // (internal_error, ...) are left to the socket-mode auto-reconnect
+        const hard = ['not_authed', 'invalid_auth', 'account_inactive', 'user_removed_from_team', 'team_disabled'].includes(conn.error);
+        if (hard) {
+          console.error('[SlackChannel.checkPrereqs]', 'app token invalid:', conn.error);
+          return { ok: false, error: `app token invalid: ${conn.error || 'unknown error'}` };
+        }
+        console.warn('[SlackChannel.checkPrereqs]', 'app token check transient failure:', conn.error, '(will retry via socket-mode auto-reconnect)');
+      }
+    } catch (err) {
+      console.warn('[SlackChannel.checkPrereqs]', 'app token check failed:', (err as Error).message, '(will retry via socket-mode auto-reconnect)');
     }
 
     // verify we can list conversations (bot token scopes + bot added to channels)

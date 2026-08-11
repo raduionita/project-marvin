@@ -110,17 +110,19 @@ await (new class Marvin {
         continue;
       }
 
-      // --logLevel <level> or --logLevel=<level>: set MARVIN_LOG_LEVEL
-      if (arg === '--logLevel') {
+      // --logLevel <level> / --log-level <level> or =<level>: set MARVIN_LOG_LEVEL
+      // (value is lowercased so DEBUG == debug, as only lowercase levels are valid)
+      if (arg === '--logLevel' || arg === '--log-level') {
         const level = process.argv[i + 1];
         if (level !== undefined) {
-          process.env.MARVIN_LOG_LEVEL = level;
+          process.env.MARVIN_LOG_LEVEL = level.toLowerCase();
           i++;
         }
         continue;
       }
-      if (arg.startsWith('--logLevel=')) {
-        process.env.MARVIN_LOG_LEVEL = arg.slice('--logLevel='.length);
+      if (arg.startsWith('--logLevel=') || arg.startsWith('--log-level=')) {
+        const eq = arg.indexOf('=');
+        process.env.MARVIN_LOG_LEVEL = arg.slice(eq + 1).toLowerCase();
         continue;
       }
 
