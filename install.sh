@@ -11,7 +11,7 @@ set -euo pipefail
 GITHUB_OWNER="raduionita"
 GITHUB_REPO="project-marvin"
 INSTALL_DIR="$HOME/.local/share/marvin"
-SYMLINK_PATH="/usr/local/bin/marvin"
+WRAPPER_PATH="$HOME/.local/bin/marvin"
 MARVIN_DIR="$HOME/.marvin"
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -103,8 +103,8 @@ fi
 info "  Dependencies installed."
 
 # ── Step 4: Create shell wrapper ────────────────────────────────────────────
-# Try /usr/local/bin first (may need sudo). Fall back to ~/.local/bin
-# (already on PATH for most shells) if the system directory is unwritable.
+# Everything stays local to the user: ~/.local/bin/marvin -> bun src/marvin.ts
+# (no /usr/local/bin, so install.sh never needs sudo)
 
 WRAPPER="#!/bin/sh
 exec bun \"$INSTALL_DIR/src/marvin.ts\" \"\$@\""
@@ -117,19 +117,12 @@ install_wrapper() {
     return 1
   fi
   chmod +x "$target"
-  SYMLINK_PATH="$target"
 }
 
-if install_wrapper "$SYMLINK_PATH"; then
-  info "  Created at $SYMLINK_PATH"
+if install_wrapper "$WRAPPER_PATH"; then
+  info "  Created at $WRAPPER_PATH"
 else
-  FALLBACK="$HOME/.local/bin/marvin"
-  if install_wrapper "$FALLBACK"; then
-    warn "  Could not write to $SYMLINK_PATH (permission denied)."
-    info "  Created at $FALLBACK instead."
-  else
-    error "  Could not write to $SYMLINK_PATH or $FALLBACK. Check permissions."
-  fi
+  error "  Could not write to $WRAPPER_PATH. Check permissions."
 fi
 info "  Wrapper created."
 
@@ -142,7 +135,7 @@ info "  Agents directory:    $MARVIN_DIR/agents"
 
 # ── Step 6: Run 'marvin install' to create config & MARVIN.md ──────────────
 info "Running [marvin install] to initialise workspace files..."
-if "$SYMLINK_PATH" install 2>&1; then
+if "$WRAPPER_PATH" install 2>&1; then
   info "  Workspace files created."
 else
   warn "  [marvin install] failed - you can re-run it manually."
@@ -152,9 +145,9 @@ fi
 echo ""
 info "Marvin installed successfully!"
 echo ""
-info "  Install directory: $INSTALL_DIR"
-info "  Symlink:         $SYMLINK_PATH"
-info "  Workspace:       $MARVIN_DIR"
+info "  Install directory:   $INSTALL_DIR"
+info "  Executable path:     $WRAPPER_PATH"
+info "  Workspace directory: $MARVIN_DIR"
 echo ""
 info "Next steps:"
 info "  1. Configure ~/.marvin/marvin.json with your models and channels"

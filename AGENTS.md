@@ -99,6 +99,7 @@ Do not confuse Marvin channels with Slack channels, they are different things. I
 - No new dependencies unless necessary; explain any non-obvious tradeoffs
 - All changes must stay compatible with the current codebase
 - Avoid using `as any` or `as unknown`
+- logging: info should not be prefixed with function name ('[EnableCommand.exec]'), only debug, warn & error
 
 ## Task Backlog
 `TODO.md` file contains project's for pending taks, code that needs to be implemented, and other notes.

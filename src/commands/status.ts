@@ -16,13 +16,13 @@ export default class StatusCommand extends Command {
       default: {
         // service status
         if (this.engine.isDry) {
-          console.info('[StatusCommand.exec]', '[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
+          console.info('[dry]','check status:', ['systemctl', '--user', 'status', 'marvin'].join(' '));
         } else {
           try {
             const status = execSync(['systemctl', '--user', 'status', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
-            console.info('[StatusCommand.exec]', 'service status:', status.trim());
+            console.info('service status:', status.trim());
           } catch {
-            console.info('[StatusCommand.exec]', 'service is not running.');
+            console.info('service is not running.');
           }
         }
 
@@ -32,7 +32,7 @@ export default class StatusCommand extends Command {
         
         // health check
         if (this.engine.isDry) {
-          console.info('[StatusCommand.exec]', '[dry]', 'check health: fetch http://localhost:' + port + '/_health');
+          console.info('[dry]', 'check health: fetch http://localhost:' + port + '/_health');
         } else {
           try {
             const url = new URL(`http://localhost:${port}/_health`);
@@ -44,9 +44,9 @@ export default class StatusCommand extends Command {
               },
             });
             if (response.ok) {
-              console.info('[StatusCommand.exec]', `server is healthy (port ${port}).`);
+              console.info(`server is healthy (port ${port}).`);
             } else {
-              console.warn('[StatusCommand.exec]', `server responded with ${response.status}.`);
+              console.warn(`server responded with ${response.status}.`);
             }
           } catch (err) {
             console.error('[StatusCommand.exec]', `cannot reach server at localhost:${port}.`);

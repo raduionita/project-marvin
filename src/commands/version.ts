@@ -20,8 +20,6 @@ export default class VersionCommand extends Command {
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     const version = pkg.version || 'unknown';
     
-    console.info('');
     console.info('mArvIn version:', version);
-    console.info('');
   }
 }

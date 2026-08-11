@@ -13,16 +13,16 @@ export default class UpdateCommand extends Command {
     const root = join(homedir(), '.local', 'share', 'marvin');
 
     if (!existsSync(root)) {
-      console.error('[UpdateCommand.exec]', 'marvin is not installed. run the installer first:');
-      console.error('[UpdateCommand.exec]', '  bash install.sh');
+      console.info('marvin is not installed. run the installer first:');
+      console.info('  bash install.sh');
       return;
     }
 
     // pull project, install dependencies, restart service
     if (this.engine.isDry) {
-      console.info('[UpdateCommand.exec]', '[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
-      console.info('[UpdateCommand.exec]', '[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
-      console.info('[UpdateCommand.exec]', '[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
+      console.info('[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
+      console.info('[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
+      console.info('[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
     } else {
       // git pull from main
       console.debug('[UpdateCommand.exec]', 'pulling project...');
@@ -43,6 +43,6 @@ export default class UpdateCommand extends Command {
       execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
     }
 
-    console.debug('[UpdateCommand.exec]', 'marvin updated');
+    console.info('marvin updated');
   }
 }

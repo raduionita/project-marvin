@@ -16,9 +16,9 @@ export default class InstallCommand extends Command {
       console.info('[InstallCommand.exec]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
-      console.debug('[InstallCommand.exec]', 'created workspace directory:', hpath);
+      console.info('created workspace directory:', hpath);
     } else {
-      console.debug('[InstallCommand.exec]', '~/.marvin exists');
+      console.info(hpath, 'exists');
     }
 
     // ~/.marvin/agents
@@ -27,9 +27,9 @@ export default class InstallCommand extends Command {
       console.info('[InstallCommand.exec]', '[dry]', apath);
     } else if (!existsSync(apath)) {
       mkdirSync(apath, { recursive: true });
-      console.debug('[InstallCommand.exec]', 'created agents directory:', apath);
+      console.info('created agents directory:', apath);
     } else {
-      console.debug('[InstallCommand.exec]', '~/.marvin/agents exists');
+      console.info(apath, 'exists');
     }
 
     //  ~/.marvin/MARVIN.md
@@ -38,9 +38,9 @@ export default class InstallCommand extends Command {
       console.info('[InstallCommand.exec]', '[dry]', mpath);
     } else if (!existsSync(mpath)) {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
-      console.debug('[InstallCommand.exec]', 'created MARVIN.md:', mpath);
+      console.info('created MARVIN.md:', mpath);
     } else {
-      console.debug('[InstallCommand.exec]', '~/.marvin/MARVIN.md exists');
+      console.info(mpath, 'exists');
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
@@ -50,11 +50,11 @@ export default class InstallCommand extends Command {
     } else if (!existsSync(cpath)) {
       const config = constants.DEFAULT_CONFIG;
       writeFileSync(cpath, JSON.stringify(config, null, 2));
-      console.debug('[InstallCommand.exec]', 'created config file:', cpath);
+      console.info('created config file:', cpath);
     } else {
-      console.debug('[InstallCommand.exec]', '~/.marvin/marvin.json exists');
+      console.info(cpath, 'exists');
     }
 
-    console.debug('[InstallCommand.exec]', 'marvin installed');
+    console.info('marvin installed!');
   }
 }

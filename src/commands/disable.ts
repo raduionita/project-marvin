@@ -9,8 +9,8 @@ export default class DisableCommand extends Command {
     try {
       // stop service
       if (this.engine.isDry) {
-        console.info('[DisableCommand.exec]', '[dry]', 'stop service: systemctl --user stop marvin');
-        console.info('[DisableCommand.exec]', '[dry]', 'disable service: systemctl --user disable marvin');
+        console.info('[dry]', 'stop service: systemctl --user stop marvin');
+        console.info('[dry]', 'disable service: systemctl --user disable marvin');
       } else {
         console.debug('[DisableCommand.exec]', 'stopping service...');
         // stop and disable
@@ -21,7 +21,7 @@ export default class DisableCommand extends Command {
         console.info('marvin is', state);
       }
     } catch (err) {
-      console.info('marvin is inactive');
+      console.info('marvin is now inactive');
     }
 
     console.info('marvin disabled');

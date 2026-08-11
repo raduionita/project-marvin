@@ -1,94 +1,67 @@
 
 import { homedir } from 'os';
-import { join } from 'path';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { Command } from '../types';
 import * as constants from '../constants';
 import { delay } from '../helpers';
 
-// `marvin enable` install + start the daemon
+// `marvin enable` installs the workspace + systemd unit and starts the daemon
 export default class EnableCommand extends Command {
   async exec() {
     console.debug('[EnableCommand.exec]');
-    
-    await this.makeProject();
 
-    await this.execService();
-  }
-
-  async makeProject() {
-    console.debug('[EnableCommand.makeProject]', 'checking if project is already installed and install it if not');
+    // ── project files (~/.marvin) ─────────────────────────────────────────
+    const hpath = this.engine.work;
 
     // ~/.marvin
-    const hpath = this.engine.work;
     if (this.engine.isDry) {
-      console.info('[EnableCommand.makeProject]', '[dry]', hpath);
+      console.info('[dry]', 'mkdir', hpath);
     } else if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
-      console.info('[EnableCommand.makeProject]', 'created workspace directory:', hpath);
+      console.info('created workspace directory:', hpath);
     } else {
-      console.info('[EnableCommand.makeProject]', '~/.marvin exists');
+      console.info('~/.marvin exists');
     }
 
     // ~/.marvin/agents
     const apath = join(hpath, 'agents');
     if (this.engine.isDry) {
-      console.info('[EnableCommand.makeProject]', '[dry]', apath);
+      console.info('[dry]', 'mkdir', apath);
     } else if (!existsSync(apath)) {
       mkdirSync(apath, { recursive: true });
-      console.info('[EnableCommand.makeProject]', 'created agents directory:', apath);
+      console.info('created agents directory:', apath);
     } else {
-      console.info('[EnableCommand.makeProject]', '~/.marvin/agents exists');
+      console.info('~/.marvin/agents exists');
     }
 
-    //  ~/.marvin/MARVIN.md
+    // ~/.marvin/MARVIN.md
     const mpath = join(hpath, 'MARVIN.md');
     if (this.engine.isDry) {
-      console.info('[EnableCommand.makeProject]', '[dry]', mpath);
+      console.info('[dry]', 'write', mpath);
     } else if (!existsSync(mpath)) {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
-      console.info('[EnableCommand.makeProject]', 'created MARVIN.md:', mpath);
+      console.info('created MARVIN.md:', mpath);
     } else {
-      console.info('[EnableCommand.makeProject]', '~/.marvin/MARVIN.md exists');  
+      console.info('~/.marvin/MARVIN.md exists');
     }
 
-    // create marvin.json if missing (~/.marvin/marvin.json)
+    // ~/.marvin/marvin.json
     const cpath = join(hpath, 'marvin.json');
     if (this.engine.isDry) {
-      console.info('[EnableCommand.makeProject]', '[dry]', cpath);
+      console.info('[dry]', 'write', cpath);
     } else if (!existsSync(cpath)) {
-      const config = constants.DEFAULT_CONFIG;
-      writeFileSync(cpath, JSON.stringify(config, null, 2));
-      console.info('[EnableCommand.makeProject]', 'created config file:', cpath);
+      writeFileSync(cpath, JSON.stringify(constants.DEFAULT_CONFIG, null, 2));
+      console.info('created config file:', cpath);
     } else {
-      console.info('[EnableCommand.makeProject]', '~/.marvin/marvin.json exists');
-    }
-
-    // /var/logs/marvin.log -> ~/.marvin/marvin.log (system log access)
-    const srcLog = join(hpath, 'marvin.log');
-    const varLog = '/var/logs/marvin.log';
-    if (this.engine.isDry) {
-      console.info('[EnableCommand.makeProject]', '[dry]', 'would symlink', varLog, '->', srcLog);
-    } else {
-      try {
-        lstatSync(varLog);
-        console.info('[EnableCommand.makeProject]', 'symlink already exists:', varLog);
-      } catch {
-        try {
-          mkdirSync('/var/logs', { recursive: true });
-          symlinkSync(srcLog, varLog);
-          console.info('created symlink:', varLog, '->', srcLog);
-        } catch (err) {
-          console.warn('[EnableCommand.makeProject]', 'cannot create symlink (retry with sudo):', (err as Error).message);
-        }
-      }
+      console.info(cpath, 'exists');
     }
 
     // ~/.marvin/.env (systemd EnvironmentFile must exist or the unit will never start)
     const epath = join(hpath, '.env');
     if (this.engine.isDry) {
-      console.info('[EnableCommand.makeProject]', '[dry]', epath);
+      console.info('[dry]', 'write', epath);
     } else if (!existsSync(epath)) {
       writeFileSync(epath, [
         '# marvin environment variables (systemd EnvironmentFile)',
@@ -98,46 +71,49 @@ export default class EnableCommand extends Command {
       ].join('\n'));
       console.info('created .env file:', epath);
     } else {
-      console.info('~/.marvin/.env exists.', 'skipping');
+      console.info(epath, 'exists');
     }
 
-    console.info('marvin project installed');
-  }
-
-  async execService() {
-    console.debug('[EnableCommand.execService]');
+    // ~/.local/bin/marvin
+    const bpath = join(homedir(), '.local', 'bin', 'marvin');
+    if (this.engine.isDry) {
+      console.info('[dry]', 'would ensure wrapper:', bpath);
+    } else if (!existsSync(bpath)) {
+      mkdirSync(dirname(bpath), { recursive: true });
+      writeFileSync(bpath, `#!/bin/sh\nexec bun "${join(this.engine.root, 'src', 'marvin.ts')}" "$@"\n`, { mode: 0o755 });
+      console.info('created wrapper:', bpath);
+    } else {
+      console.info(bpath, 'exists');
+    }
 
     // ~/.config/systemd/user/marvin.service
-    const srcService = join(this.engine.root, 'marvin.service');
-    const dstService = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
+    const spath = join(this.engine.root, 'marvin.service');
+    const dpath = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
     if (this.engine.isDry) {
-      console.info('[EnableCommand.execService]', '[dry]', 'would copy service file:', srcService, '->', dstService);
+      console.info('[dry]', 'would write service file:', dpath);
+    } else if (!existsSync(spath)) {
+      console.error('[EnableCommand.exec]', 'service file missing:', spath);
     } else {
-      // always refresh the unit file, so re-running enable picks up changes
-      // (e.g. StandardOutput/StandardError now pointing at marvin.log)
-      mkdirSync(join(homedir(), '.config', 'systemd', 'user'), { recursive: true });
-      if (!existsSync(srcService)) {
-        console.warn('[EnableCommand.execService]', 'service file missing:', srcService);
-      } else {
-        copyFileSync(srcService, dstService);
-        console.debug('[EnableCommand.execService]', 'installed service file:', dstService);
-      }
+      // always refresh the unit so re-running enable picks up changes
+      mkdirSync(dirname(dpath), { recursive: true });
+      copyFileSync(spath, dpath);
+      console.info('installed service file:', dpath);
     }
 
     // start service
     if (this.engine.isDry) {
-      console.info('[EnableCommand.execService]', '[dry]', 'enable service: systemctl --user daemon-reload && systemctl --user enable marvin && systemctl --user restart marvin');
+      console.info('[dry]', 'enable service: systemctl --user daemon-reload && systemctl --user enable marvin && systemctl --user restart marvin');
     } else {
-      console.debug('[EnableCommand.execService]', 'enabling service...');
+      console.debug('[EnableCommand.exec]', 'enabling service...');
       execSync(['systemctl', '--user', 'daemon-reload'].join(' '), { stdio: 'inherit' });
       // restart (not "enable --now"): also applies a refreshed unit file to an already-running daemon
       execSync(['systemctl', '--user', 'enable', 'marvin'].join(' '), { stdio: 'inherit' });
       execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
-      // wait for service to start
+      // wait for the service to start
       await this.waitForActive();
     }
-    
-    console.debug('[EnableCommand.execService]', 'marvin enabled');
+
+    console.info('marvin service enabled!');
   }
 
   // poll the service until it settles, so we can diagnose a stuck "activating"

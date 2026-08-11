@@ -10,7 +10,7 @@ export default class ReloadCommand extends Command {
     // url.pathname = '/reload';
 
     if (this.engine.isDry) {
-      console.info('[ReloadCommand.exec]', '[dry]', 'repload service:', ['systemctl', '--user', 'reload', 'marvin'].join(' '));
+      console.info('[dry]', 'repload service:', ['systemctl', '--user', 'reload', 'marvin'].join(' '));
     } else {
       // const res = await fetch(url.toString());
       // if (!res.ok) {
@@ -20,5 +20,7 @@ export default class ReloadCommand extends Command {
 
       execSync(['systemctl', '--user', 'reload', 'marvin'].join(' '), { stdio: 'inherit' });
     }
+
+    console.info('marvin service reloaded');
   }
 }
