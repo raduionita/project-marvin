@@ -12,17 +12,15 @@ export default class EnableCommand extends Command {
   async exec() {
     console.debug('[EnableCommand.exec]');
 
-    // ── project files (~/.marvin) ─────────────────────────────────────────
-    const hpath = this.engine.work;
-
     // ~/.marvin
+    const hpath = this.engine.work;
     if (this.engine.isDry) {
       console.info('[dry]', 'mkdir', hpath);
     } else if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
       console.info('created workspace directory:', hpath);
     } else {
-      console.info('~/.marvin exists');
+      console.info('directory', hpath, 'exists');
     }
 
     // ~/.marvin/agents
@@ -33,7 +31,7 @@ export default class EnableCommand extends Command {
       mkdirSync(apath, { recursive: true });
       console.info('created agents directory:', apath);
     } else {
-      console.info('~/.marvin/agents exists');
+      console.info('directory', apath, 'exists');
     }
 
     // ~/.marvin/MARVIN.md
@@ -44,7 +42,7 @@ export default class EnableCommand extends Command {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
       console.info('created MARVIN.md:', mpath);
     } else {
-      console.info('~/.marvin/MARVIN.md exists');
+      console.info('marvin identity', mpath, 'exists');
     }
 
     // ~/.marvin/marvin.json
@@ -55,7 +53,7 @@ export default class EnableCommand extends Command {
       writeFileSync(cpath, JSON.stringify(constants.DEFAULT_CONFIG, null, 2));
       console.info('created config file:', cpath);
     } else {
-      console.info(cpath, 'exists');
+      console.info('config file', cpath, 'exists');
     }
 
     // ~/.marvin/.env (systemd EnvironmentFile must exist or the unit will never start)
@@ -71,19 +69,23 @@ export default class EnableCommand extends Command {
       ].join('\n'));
       console.info('created .env file:', epath);
     } else {
-      console.info(epath, 'exists');
+      console.info('enm file', epath, 'exists');
     }
 
+    // ~/.bun/bin/bun
+    let bpath = join(homedir(), '.bun', 'bin', 'bun');
+    try {
+      bpath = execSync('command -v bun', { encoding: 'utf8' }).trim();
+    } catch { /* not on PATH, fall back to the default bun install location */ }
+
     // ~/.local/bin/marvin
-    const bpath = join(homedir(), '.local', 'bin', 'marvin');
+    const wpath = join(homedir(), '.local', 'bin', 'marvin');
     if (this.engine.isDry) {
-      console.info('[dry]', 'would ensure wrapper:', bpath);
-    } else if (!existsSync(bpath)) {
-      mkdirSync(dirname(bpath), { recursive: true });
-      writeFileSync(bpath, `#!/bin/sh\nexec bun "${join(this.engine.root, 'src', 'marvin.ts')}" "$@"\n`, { mode: 0o755 });
-      console.info('created wrapper:', bpath);
+      console.info('[dry]', 'would ensure wrapper:', wpath);
     } else {
-      console.info(bpath, 'exists');
+      mkdirSync(dirname(wpath), { recursive: true });
+      writeFileSync(wpath, `#!/bin/sh\nexec "${bpath}" "${join(this.engine.root, 'src', 'marvin.ts')}" "$@"\n`, { mode: 0o755 });
+      console.info('created wrapper:', wpath, 'bun =', bpath);
     }
 
     // ~/.config/systemd/user/marvin.service

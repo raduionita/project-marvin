@@ -105,9 +105,19 @@ info "  Dependencies installed."
 # ── Step 4: Create shell wrapper ────────────────────────────────────────────
 # Everything stays local to the user: ~/.local/bin/marvin -> bun src/marvin.ts
 # (no /usr/local/bin, so install.sh never needs sudo)
+# The wrapper must embed bun's absolute path: systemd runs it with a minimal PATH
+
+BUN_PATH="$(command -v bun 2>/dev/null || true)"
+if [ -z "$BUN_PATH" ]; then
+  BUN_PATH="$HOME/.bun/bin/bun"
+fi
+if [ ! -x "$BUN_PATH" ]; then
+  error "  bun not found (looked at $BUN_PATH). Install it first: https://bun.sh"
+  exit 1
+fi
 
 WRAPPER="#!/bin/sh
-exec bun \"$INSTALL_DIR/src/marvin.ts\" \"\$@\""
+exec \"$BUN_PATH\" \"$INSTALL_DIR/src/marvin.ts\" \"\$@\""
 
 install_wrapper() {
   local target="$1"
