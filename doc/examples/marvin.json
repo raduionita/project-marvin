@@ -13,6 +13,15 @@
       "botToken": "xoxb-bot-token"
     }
   },
+  "integrations": {
+    "gloobeam": {
+      "enabled": true,
+      "type": "wordpress",
+      "endpoint": "https://gloobeam.com",
+      "user": "admin",
+      "appPassword": "xxxx xxxx xxxx xxxx xxxx xxxx"
+    }
+  },
   "models": {
     "deepseek/deepseek-v4-flash": {
       "provider": "deepseek",

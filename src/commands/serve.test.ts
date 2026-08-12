@@ -1,18 +1,19 @@
 import { test, expect } from 'bun:test';
-import { Channel, Config, Model, Chat, Reply, Message, Tool } from '../types.js';
+import { Channel, Config, Model, Chat, Reply, Message, Tool, Integration } from '../types.js';
 import { writeFileSync, mkdirSync } from 'fs';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
 
 // --- helpers ---
 
-function mockConfig(channels: Config['channels'] = {}, models: Config['models'] = {}, agents: Config['agents'] = {}): Config {
+function mockConfig(channels: Config['channels'] = {}, models: Config['models'] = {}, agents: Config['agents'] = {}, integrations: Config['integrations'] = {}): Config {
   return {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels,
     models,
     agents,
+    integrations,
   } as Config;
 }
 
@@ -212,6 +213,46 @@ test('execChannels stores channels in engine.channels', async () => {
 
   expect(Object.keys(engine.channels).length).toBeGreaterThan(0);
   expect(Object.keys(engine.channels)).toContain('channel.mock');
+});
+
+// ==================== loadIntegrations tests ====================
+
+test('execIntegrations loads enabled integrations with valid type', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://example.com' } });
+
+  await engine.loadIntegrations();
+
+  expect(engine.integrations['gloobeam']).toBeDefined();
+  expect(engine.integrations['gloobeam'] instanceof Integration).toBe(true);
+});
+
+test('execIntegrations skips disabled integrations', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: false, type: 'wordpress' } });
+
+  await engine.loadIntegrations();
+
+  expect(engine.integrations['gloobeam']).toBeUndefined();
+});
+
+test('execIntegrations warns on unknown type', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: true, type: 'nope' } });
+
+  await engine.loadIntegrations();
+
+  expect(engine.integrations['gloobeam']).toBeUndefined();
+});
+
+test('dropIntegrations clears all integrations', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://example.com' } });
+
+  await engine.loadIntegrations();
+  await engine.dropIntegrations();
+
+  expect(Object.keys(engine.integrations).length).toBe(0);
 });
 
 // ==================== sendMessage tests ====================

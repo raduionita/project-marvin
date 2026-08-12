@@ -54,7 +54,7 @@ export function cleanContent(content: string): string {
   if (!content) return content;
 
   try {
-    JSON.parse(content);
+    JSON.parse(content.trim());
     return content;
   } catch {
     // not valid JSON as-is: try to isolate the leading JSON value

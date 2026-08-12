@@ -89,8 +89,8 @@ export default class BrowserSystem extends System {
 
     if (!onRequest) {
       onRequest = (request: HTTPRequest) => {
-        if (['image', 'stylesheet', 'font', 'media', 'other'].includes(request.resourceType())) {
-          console.debug('[BrowserSystem.newPage]', 'blocking', request.resourceType(), request.url());
+        if (['image', 'stylesheet', 'script', 'font', 'media', 'xhr', 'other'].includes(request.resourceType())) {
+          // console.debug('[BrowserSystem.newPage]', 'blocking', request.resourceType(), request.url());
           return request.abort();
         } else {
           console.debug('[BrowserSystem.newPage]', 'allowing', request.resourceType(), request.url());

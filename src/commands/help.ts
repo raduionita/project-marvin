@@ -20,6 +20,7 @@ export default class HelpCommand extends Command {
 
     console.info('  agents  ', 'list, add, bind, chat, drop agents');
     console.info('  channels', 'list, add, bind, chat, drop channels');
+    console.info('  integrations', 'list, add, drop integrations');
     console.info('  models  ', 'list, add, bind, drop models');
     console.info('  tasks   ', 'list, add tasks for an agent');
     console.log('');

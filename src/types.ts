@@ -18,6 +18,11 @@ export interface Config {
     enabled?: boolean;
     [key: string]: any;
   }>;
+  integrations: Record<string, {
+    enabled?: boolean;
+    type: string;
+    [key: string]: any;
+  }>;
   models: Record<string, {
     enabled: boolean;
     provider: Provider;
@@ -88,6 +93,20 @@ export abstract class Channel {
   abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;
 }
 
+// integration interface: a bridge to a 3rd party endpoint (e.g. Wordpress API)
+export abstract class Integration {
+  abstract args: {[key: string]: any};
+
+  constructor(public readonly engine: Engine, public readonly config: { [key: string]: any }) {
+    console.debug(`[${this.constructor.name||'Integration'}.constructor]`);
+  }
+
+  abstract load(): Promise<void>;
+  abstract drop(): Promise<void>;
+  // run a named action on the integration (e.g. create_post, publish_post)
+  abstract call(args: {[key:string]:any}): Promise<{[key:string]:any}>;
+}
+
 // task keeps track of the setTimeout id, schedule
 export type TaskType = 'input' | 'monitor' | 'sweep';
 
@@ -120,7 +139,7 @@ export abstract class Model {
   // apiKey is the API key for the model provider
   public apiKey: string = 'NO_API_KEY';
 
-  public temperature: number = 0.7;
+  public temperature: number = 1.0;
   public topP: number = 0.95;
   public topK: number = 40;
   public maxTokens: number = 8192;

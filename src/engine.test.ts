@@ -9,6 +9,7 @@ function buildEngine(): Engine {
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },
     channels: {},
+    integrations: {},
     models: {},
     agents: {},
   } as Config;

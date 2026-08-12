@@ -22,6 +22,6 @@ export default class GetDateTool extends Tool {
   public async call(args: {timestamp?:number}) {
     console.debug('[GetDateTool.call]', args);
     
-    return {date: new Date(args.timestamp || Date.now()).toLocaleDateString()};
+    return {date: new Date(args.timestamp || Date.now()).toDateString()};
   }
 }

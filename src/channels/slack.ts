@@ -47,7 +47,7 @@ export default class SlackChannel extends Channel {
   protected botId: string = '';
 
   async load() {
-    console.debug('[SlackChannel.load]', this.engine.config.channels.slack);
+    console.debug('[SlackChannel.load]');
 
     if (this.engine.isDry) {
       console.debug('[SlackChannel.load]', '[dry] channel slack attached');
@@ -283,7 +283,7 @@ export default class SlackChannel extends Channel {
     try {
       const thread = event.thread_ts || event.ts || event.event_ts;
 
-      console.debug('[SlackChannel.onDirectMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      console.debug('[SlackChannel.onDirectMessage]', event.channel, thread);
       
       // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
       await ack();

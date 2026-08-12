@@ -11,6 +11,7 @@ function mockConfig(agents: Config['agents']): Config {
   return {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: {},
+    integrations: {},
     models: {},
     agents,
   } as Config;

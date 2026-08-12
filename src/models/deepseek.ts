@@ -44,7 +44,7 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
-    console.debug('[DeepseekModel.sendChat]', 'body:', JSON.stringify(body, null, 2));
+    console.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId, chat.format);
 
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
@@ -73,12 +73,10 @@ export default class DeepseekModel extends Model {
       return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
     }
 
-    console.debug('[DeepseekModel.sendChat]', 'json', JSON.stringify(json, null, 2));
-
     // choice 0, for now only one choice is supported
     const choice = json.choices[0];
     // llm chat output as a reply object
-    return {
+    const reply = {
       id: json.id, // as string,
       // continue the AI loop only when the model wants to make tool calls;
       // stop/stop on 'length', 'content_filter', etc. too
@@ -99,6 +97,10 @@ export default class DeepseekModel extends Model {
         prompt: json.usage?.prompt_tokens,
       }
     } as Reply;
+
+    console.debug('[DeepseekModel.sendChat]', 'response', json.id, choice.finish_reason, json.usage?.completion_tokens);
+
+    return reply;
   }
 }
 

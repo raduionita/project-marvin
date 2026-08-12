@@ -9,6 +9,7 @@ function mockEngine(config: Config = {} as Config): Engine {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: config.channels || {},
+    integrations: {},
     models: {},
     agents: {},
   } as Config;
@@ -50,4 +51,5 @@ test('listTools includes known tools', () => {
   expect(tools).toContain('edit_file.ts');
   expect(tools).toContain('marvin_state.ts');
   expect(tools).toContain('marvin_config.ts');
+  expect(tools).toContain('call_integration.ts');
 });

@@ -2,10 +2,14 @@ export const IDENTITY_MD = `# IDENTITY.md - Agent Identity
 You are a helpful assistant.`;
 
 export const MARVIN_MD = `# MARVIN.md - Orchestrator Agent Identity
-You are Marvin - the AI sidekick.`;
+You are Marvin - the AI sidekick.
+## Rules
+- Be direct and concise, do not repeat yourself, trim unnecessary words.
+- If a tool result contains the answer, use it to answer the user.`;
 
 export const JSON_MD = `## Output format
-ALWAYS respond in valid JSON format.`;
+- ALWAYS respond in valid JSON format.
+- Use EXACT keys in the JSON schema below.`;
 
 export const DEFAULT_SCHEMA = {"output": "text string of the answer"};
 
@@ -26,6 +30,7 @@ export const DEFAULT_CONFIG = {
     apiToken: 'changeme',
   },
   channels: {},
+  integrations: {},
   models: {},
   agents: {},
 };

@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from "fs";
 
 import { listSystems } from "./systems";
-import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat } from "./types";
+import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat, Integration } from "./types";
 import * as constants from './constants.js';
 import { listTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
+import { listIntegrations } from "./integrations/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
 import { extractOutput, cleanContent } from "./helpers.js";
@@ -21,6 +22,7 @@ export default class Engine {
 
   // channels, models, agents
   public channels: Record<string, Channel> = {};
+  public integrations: Record<string, Integration> = {};
   public tools   : Record<string, Tool> = {};
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
@@ -47,6 +49,7 @@ export default class Engine {
     await this.loadSystems();
     await this.loadTools();
     await this.loadChannels();
+    await this.loadIntegrations();
     await this.loadModels();
     await this.loadAgents();
 
@@ -66,6 +69,7 @@ export default class Engine {
     await this.dropAgents();
     await this.dropModels();
     await this.dropChannels();
+    await this.dropIntegrations();
     await this.dropSystems();
 
     // release all cached chats
@@ -244,6 +248,40 @@ export default class Engine {
     }
   }
 
+  async loadIntegrations() {
+    console.debug('[Engine.loadIntegrations]');
+
+    const files = listIntegrations(this).map(f => f.replace('.ts', ''));
+    for (const [id, config] of Object.entries(this.config.integrations)) {
+      if (!config.enabled) continue;
+
+      const file = files.find(f => f === config.type);
+      if (!file) {
+        console.error('[Engine.loadIntegrations]', `no file for integration "${id}" type "${config.type}", skipping`);
+        continue;
+      }
+
+      try {
+        if (this.integrations[id]) continue;
+
+        const Module = await import(`./integrations/${file}.js`);
+        const Class = Module.default;
+        // must be an Integration class
+        if (!Class || !(Class.prototype instanceof Integration)) {
+          console.error('[Engine.loadIntegrations]', `"${id}" does not export an Integration class, skipping`);
+          continue;
+        }
+        // register instance of Integration
+        const instance = new Class(this, config);
+        await instance.load();
+        this.integrations[id] = instance;
+        console.info('[Engine.loadIntegrations]', `integration "${id}" loaded`);
+      } catch (err) {
+        console.error('[Engine.loadIntegrations]', `failed to load "${id}":`, err);
+      }
+    }
+  }
+
   async loadModels() {
     console.debug('[Engine.loadModels]');
 
@@ -328,9 +366,6 @@ export default class Engine {
         console.warn('[Engine.loadAgents]', `no MARVIN.md found for agent "${marvinId}", using default`);
       }
 
-      // add format to input
-      identity += '\n\n' + constants.JSON_MD;
-      
       // add ochestrator agent
       this.agents[marvinId] = {
         id: marvinId,
@@ -462,6 +497,11 @@ export default class Engine {
     this.models = {};
   }
 
+  async dropIntegrations() {
+    console.debug('[Engine.dropIntegrations]');
+    this.integrations = {};
+  }
+
   // will detach and delete ALL channels from the engine
   async dropChannels() {
     console.debug('[Engine.dropChannels]');
@@ -487,6 +527,11 @@ export default class Engine {
       }
       delete this.channels[id];
     }
+  }
+
+  async dropIntegration(id: string) {
+    console.debug('[Engine.dropIntegration]', id);
+    delete this.integrations[id];
   }
 
   async dropSystems() {
@@ -753,7 +798,7 @@ export default class Engine {
         if (format === 'json') {
           chat.format = 'json';
           system += '\n\n' + constants.JSON_MD;
-          system += '\n' + JSON.stringify(schema);
+          system += '\n' +'- JSON schema: ' + JSON.stringify(schema);
         }
 
         // load agent IDENTITY.md as system message
@@ -789,7 +834,7 @@ export default class Engine {
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
         // trim result, this can be really big
-        console.debug('[Engine.execChat]', `step=${steps}`, JSON.stringify(reply));
+        console.debug('[Engine.execChat]', `step=${steps}`, `tools={${reply.message.tools?.length}}`);
 
         // force stop
         if (reply.stop) {

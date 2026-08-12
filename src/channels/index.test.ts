@@ -9,6 +9,7 @@ function mockEngine(config: Config = {} as Config): Engine {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: config.channels || {},
+    integrations: {},
     models: {},
     agents: {},
   } as Config;

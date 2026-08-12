@@ -48,7 +48,7 @@ export default class WebSearchTool extends Tool {
       if (type === 'script' && !url.includes('links.duckduckgo.com/d.js')) {
         // console.debug('[WebSearchTool.newPage]', 'blocking', type, url);
         return request.abort();
-      } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest'].includes(type)) {
+      } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
         // console.debug('[WebSearchTool.newPage]', 'blocking', type, url);
         return request.abort();
       } else {

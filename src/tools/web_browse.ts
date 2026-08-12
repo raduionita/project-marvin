@@ -13,7 +13,7 @@ export default class WebBrowseTool extends Tool {
           url: {
             type: 'string',
             description: 'URL to browse',
-          }
+          },
         },
         required: ['url'],
       }
