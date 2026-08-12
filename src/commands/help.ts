@@ -11,7 +11,7 @@ export default class HelpCommand extends Command {
     console.info('  enable  ', 'load the project and service');
     console.info('  disable ', 'stop the app service');
     console.info('  serve   ', 'start the app service');
-    console.info('  tool    ', 'call a tool');
+    console.info('  tools   ', 'list, add, edit, call tools');
     console.info('  update  ', 'update Marvin to the latest version');
     console.info('  version ', 'show the current version');
     console.info('  reload  ', 'reload the daemon');
@@ -21,6 +21,7 @@ export default class HelpCommand extends Command {
     console.info('  agents  ', 'list, add, bind, chat, drop agents');
     console.info('  channels', 'list, add, bind, chat, drop channels');
     console.info('  integrations', 'list, add, drop integrations');
+    console.info('  skills  ', 'list, add skills');
     console.info('  models  ', 'list, add, bind, drop models');
     console.info('  tasks   ', 'list, add tasks for an agent');
     console.log('');

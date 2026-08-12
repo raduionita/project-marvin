@@ -1,6 +1,9 @@
 import { test, expect } from 'bun:test';
+import { mkdirSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import Engine from '../engine.js';
-import { listTools } from './index.js';
+import { listTools, listCustomTools } from './index.js';
 import { Config } from '../types.js';
 
 function mockEngine(config: Config = {} as Config): Engine {
@@ -52,4 +55,22 @@ test('listTools includes known tools', () => {
   expect(tools).toContain('marvin_state.ts');
   expect(tools).toContain('marvin_config.ts');
   expect(tools).toContain('call_integration.ts');
+});
+
+test('listCustomTools returns [] when the workspace tools folder is missing', () => {
+  const engine = mockEngine();
+  engine.work = join(tmpdir(), 'marvin-no-tools-' + Date.now());
+  expect(listCustomTools(engine)).toEqual([]);
+});
+
+test('listCustomTools returns workspace tool files when present', () => {
+  const engine = mockEngine();
+  engine.work = join(tmpdir(), 'marvin-tools-' + Date.now());
+  mkdirSync(join(engine.work, 'tools'), { recursive: true });
+  writeFileSync(join(engine.work, 'tools', 'my_tool.ts'), 'export default class MyTool {}');
+  writeFileSync(join(engine.work, 'tools', 'index.ts'), 'export {};');
+  writeFileSync(join(engine.work, 'tools', 'my_tool.test.ts'), 'export {};');
+
+  const tools = listCustomTools(engine);
+  expect(tools).toEqual(['my_tool.ts']);
 });

@@ -1,11 +1,12 @@
 import { existsSync, readFileSync } from "fs";
 
 import { listSystems } from "./systems";
-import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat, Integration } from "./types";
+import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat, Integration, Skill } from "./types";
 import * as constants from './constants.js';
-import { listTools } from "./tools/index.js";
+import { listTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
 import { listIntegrations } from "./integrations/index.js";
+import { listSkills, listCustomSkills, parseSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
 import { extractOutput, cleanContent } from "./helpers.js";
@@ -23,6 +24,7 @@ export default class Engine {
   // channels, models, agents
   public channels: Record<string, Channel> = {};
   public integrations: Record<string, Integration> = {};
+  public skills: Record<string, Skill> = {};
   public tools   : Record<string, Tool> = {};
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
@@ -50,6 +52,7 @@ export default class Engine {
     await this.loadTools();
     await this.loadChannels();
     await this.loadIntegrations();
+    await this.loadSkills();
     await this.loadModels();
     await this.loadAgents();
 
@@ -70,6 +73,7 @@ export default class Engine {
     await this.dropModels();
     await this.dropChannels();
     await this.dropIntegrations();
+    await this.dropSkills();
     await this.dropSystems();
 
     // release all cached chats
@@ -212,6 +216,30 @@ export default class Engine {
         console.error('[Engine.loadTools]', `failed to load "${file}":`, err);
       }
     }
+
+    // custom tools in the workspace (~/.marvin/tools)
+    const cdir = join(this.work, 'tools');
+    const cfiles = listCustomTools(this);
+    for (const file of cfiles) {
+      const name = file.replace('.ts', '');
+      try {
+        if (this.tools[name]) continue;
+
+        const Module = await import(join(cdir, file));
+        const Class = Module.default;
+        if (!Class || !(Class.prototype instanceof Tool)) {
+          console.error('[Engine.loadTools]', `"${file}" does not export a Tool class, skipping`);
+          continue;
+        }
+        // register instance of Tool
+        const instance = new Class(this);
+        const meta = instance.meta as ToolMeta;
+        this.tools[meta.function.name] = instance;
+        console.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded (custom)`);
+      } catch (err) {
+        console.error('[Engine.loadTools]', `failed to load custom tool "${file}":`, err);
+      }
+    }
   }
 
   async loadChannels() {
@@ -278,6 +306,38 @@ export default class Engine {
         console.info('[Engine.loadIntegrations]', `integration "${id}" loaded`);
       } catch (err) {
         console.error('[Engine.loadIntegrations]', `failed to load "${id}":`, err);
+      }
+    }
+  }
+
+  async loadSkills() {
+    console.debug('[Engine.loadSkills]');
+
+    // default skills shipped with marvin (src/skills)
+    const files = listSkills(this);
+    for (const file of files) {
+      const id = file.replace('.md', '').toLowerCase();
+      if (this.skills[id]) continue;
+      try {
+        const skill = parseSkill(join(import.meta.dirname, 'skills', file), 'default');
+        this.skills[id] = skill;
+        console.info('[Engine.loadSkills]', `skill "${id}" loaded (default)`);
+      } catch (err) {
+        console.error('[Engine.loadSkills]', `failed to load "${file}":`, err);
+      }
+    }
+
+    // custom skills in the workspace (~/.marvin/skills), override defaults
+    const cdir = join(this.work, 'skills');
+    const cfiles = listCustomSkills(this);
+    for (const file of cfiles) {
+      const id = file.replace('.md', '').toLowerCase();
+      try {
+        const skill = parseSkill(join(cdir, file), 'custom');
+        this.skills[id] = skill;
+        console.info('[Engine.loadSkills]', `skill "${id}" loaded (custom)`);
+      } catch (err) {
+        console.error('[Engine.loadSkills]', `failed to load custom skill "${file}":`, err);
       }
     }
   }
@@ -495,6 +555,11 @@ export default class Engine {
   async dropModels() {
     console.debug('[Engine.dropModels]');
     this.models = {};
+  }
+
+  async dropSkills() {
+    console.debug('[Engine.dropSkills]');
+    this.skills = {};
   }
 
   async dropIntegrations() {

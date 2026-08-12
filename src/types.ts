@@ -107,6 +107,21 @@ export abstract class Integration {
   abstract call(args: {[key:string]:any}): Promise<{[key:string]:any}>;
 }
 
+// skill meta data, populated on engine load. The .md content itself is loaded
+// dynamically (see skills/readSkill) and not kept in memory.
+export interface Skill {
+  // skill name = file name without extension (e.g. "meta", "tools")
+  id: string;
+  // human readable title (first # heading, falls back to id)
+  title: string;
+  // short description (first paragraph, falls back to "")
+  description: string;
+  // absolute path to the SKILL-NAME.md file
+  file: string;
+  // default: shipped in src/skills, custom: user created in ~/.marvin/skills
+  source: 'default' | 'custom';
+}
+
 // task keeps track of the setTimeout id, schedule
 export type TaskType = 'input' | 'monitor' | 'sweep';
 

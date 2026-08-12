@@ -33,6 +33,10 @@ You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI
     - `status.ts`           # status command
     - `agents.ts`           # agents command
     - `channels.ts`         # channels command
+    - `integrations.ts`     # integrations command
+    - `skills.ts`           # skills command (list/add/use)
+    - `tools.ts`            # tools command (list/add/edit/call)
+    - `tasks.ts`            # tasks command
     - `reload.ts`           # reload command
   - `systems/`              # system implementations
     - `browser.ts`          # browser system
@@ -60,6 +64,8 @@ Loaded from `~/.marvin/` at runtime (created on first run):
       - `tasks/`        # task prompts
         - `task-1/`     # task-1 folder
           - `TASK.md`   # task prompt - seeds the AI loop
+  - `skills/`           # user-defined skills (mirrors src/skills/)
+    - `SKILL-NAME.md`
   - `tools/`            # user-defined tools (mirrors src/tools/)
     - `index.ts`
     - `doSomething.ts`

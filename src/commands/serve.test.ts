@@ -1,6 +1,8 @@
 import { test, expect } from 'bun:test';
 import { Channel, Config, Model, Chat, Reply, Message, Tool, Integration } from '../types.js';
 import { writeFileSync, mkdirSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
 
@@ -253,6 +255,104 @@ test('dropIntegrations clears all integrations', async () => {
   await engine.dropIntegrations();
 
   expect(Object.keys(engine.integrations).length).toBe(0);
+});
+
+// ==================== loadSkills tests ====================
+
+test('execSkills loads default skills shipped with marvin', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig();
+
+  await engine.loadSkills();
+
+  expect(engine.skills['meta']).toBeDefined();
+  expect(engine.skills['tools-create']).toBeDefined();
+  expect(engine.skills['tools-edit']).toBeDefined();
+  expect(engine.skills['meta']!.source).toBe('default');
+});
+
+test('execSkills loads custom skills from the workspace', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig();
+  engine.work = join(tmpdir(), 'marvin-skills-' + Date.now());
+  mkdirSync(join(engine.work, 'skills'), { recursive: true });
+  writeFileSync(join(engine.work, 'skills', 'my-skill.md'), '# My Skill\n\nDoes something.');
+
+  await engine.loadSkills();
+
+  expect(engine.skills['my-skill']).toBeDefined();
+  expect(engine.skills['my-skill']!.source).toBe('custom');
+  expect(engine.skills['meta']).toBeDefined();
+});
+
+test('custom skills override default skills with the same id', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig();
+  engine.work = join(tmpdir(), 'marvin-skills-' + Date.now());
+  mkdirSync(join(engine.work, 'skills'), { recursive: true });
+  writeFileSync(join(engine.work, 'skills', 'tools-create.md'), '# Custom Tools\n\nOverrides the default.');
+
+  await engine.loadSkills();
+
+  expect(engine.skills['tools-create']!.source).toBe('custom');
+  expect(engine.skills['tools-create']!.title).toBe('Custom Tools');
+});
+
+test('dropSkills clears all skills', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig();
+
+  await engine.loadSkills();
+  await engine.dropSkills();
+
+  expect(Object.keys(engine.skills).length).toBe(0);
+});
+
+// ==================== loadTools / custom tools tests ====================
+
+test('loadTools loads custom tools from the workspace', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig();
+  engine.work = join(tmpdir(), 'marvin-tools-' + Date.now());
+  mkdirSync(join(engine.work, 'tools'), { recursive: true });
+
+  const toolFile = [
+    `import { Tool, ToolMeta } from '${engine.root.replace(/\/$/, '')}/src/types.js';`,
+    '',
+    'export default class CustomPingTool extends Tool {',
+    '  public meta: ToolMeta = {',
+    "    type: 'function',",
+    '    function: {',
+    "      name: 'custom_ping',",
+    "      description: 'pings the custom tool loader',",
+    "      parameters: { type: 'object', properties: {}, required: [] },",
+    '    },',
+    '  };',
+    '',
+    '  public async call(args: any) {',
+    "    return { pong: true };",
+    '  }',
+    '}',
+  ].join('\n');
+  writeFileSync(join(engine.work, 'tools', 'custom_ping.ts'), toolFile);
+
+  await engine.loadTools();
+
+  expect(engine.tools['custom_ping']).toBeDefined();
+  const instance = engine.tools['custom_ping'];
+  expect(instance?.meta.function.name).toBe('custom_ping');
+});
+
+test('loadTools skips workspace files that do not export a Tool', async () => {
+  const engine = mockEngine();
+  engine.config = mockConfig();
+  engine.work = join(tmpdir(), 'marvin-badtool-' + Date.now());
+  mkdirSync(join(engine.work, 'tools'), { recursive: true });
+  writeFileSync(join(engine.work, 'tools', 'broken_tool.ts'), 'export default class NotATool {}');
+
+  await engine.loadTools();
+
+  expect(engine.tools['broken_tool']).toBeUndefined();
 });
 
 // ==================== sendMessage tests ====================

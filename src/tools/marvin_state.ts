@@ -5,13 +5,13 @@ export default class MarvinStateTool extends Tool {
     type: 'function',
     function: {
       name: 'marvin_state',
-      description: 'Read the current Marvin runtime state. Omit "area" for a full summary, or filter to "agents", "tasks", "models", "channels", "integrations", or "settings"',
+      description: 'Read the current Marvin runtime state. Omit "area" for a full summary, or filter to "agents", "tasks", "models", "channels", "integrations", "skills", or "settings"',
       parameters: {
         type: 'object',
         properties: {
           area: {
             type: 'string',
-            description: 'Optional filter: "agents", "tasks", "models", "channels", "integrations", or "settings"',
+            description: 'Optional filter: "agents", "tasks", "models", "channels", "integrations", "skills", or "settings"',
           },
         },
         required: [],
@@ -68,14 +68,19 @@ export default class MarvinStateTool extends Tool {
       integrations[integrationId] = { type: config.type, enabled: !!config.enabled };
     }
 
+    const skills: Record<string, any> = {};
+    for (const [skillId, skill] of Object.entries(this.engine.skills)) {
+      skills[skillId] = { title: skill.title, description: skill.description, source: skill.source };
+    }
+
     const settings = this.engine.config.settings || {};
 
-    const all: Record<string, any> = { agents, tasks, models, channels, integrations, settings };
+    const all: Record<string, any> = { agents, tasks, models, channels, integrations, skills, settings };
 
     const area = args?.area;
     if (area) {
       if (!(area in all)) {
-        return { error: `marvin_state: unknown area "${area}", use agents, tasks, models, channels, integrations or settings` };
+        return { error: `marvin_state: unknown area "${area}", use agents, tasks, models, channels, integrations, skills or settings` };
       }
       return { [area]: all[area] };
     }
