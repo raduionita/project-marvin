@@ -1,10 +1,11 @@
 import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import CallIntegrationTool from './call_integration.js';
 import { Integration } from '../types.js';
 
 function mockEngine(integrations: Record<string, Integration> = {}): Engine {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.integrations = integrations;
   engine.state = 'exec';
   return engine;
@@ -22,9 +23,9 @@ class FakeIntegration extends Integration {
 }
 
 test('call_integration executes an action on the configured integration', async () => {
-  const fake = new FakeIntegration(new Engine(), { type: 'fake', endpoint: 'https://example.com' });
+  const fake = new FakeIntegration(new Engine(new Logger()), new Logger(), { type: 'fake', endpoint: 'https://example.com' });
   const engine = mockEngine({ gloobeam: fake });
-  const tool = new CallIntegrationTool(engine);
+  const tool = new CallIntegrationTool(engine, new Logger());
 
   const result = await tool.call({ integration: 'gloobeam', action: 'create_post', params: { title: 'Hello' } });
 
@@ -33,9 +34,9 @@ test('call_integration executes an action on the configured integration', async 
 });
 
 test('call_integration works without params', async () => {
-  const fake = new FakeIntegration(new Engine(), { type: 'fake' });
+  const fake = new FakeIntegration(new Engine(new Logger()), new Logger(), { type: 'fake' });
   const engine = mockEngine({ gloobeam: fake });
-  const tool = new CallIntegrationTool(engine);
+  const tool = new CallIntegrationTool(engine, new Logger());
 
   const result = await tool.call({ integration: 'gloobeam', action: 'list_posts' });
 
@@ -44,7 +45,7 @@ test('call_integration works without params', async () => {
 
 test('call_integration returns an error for an unknown integration', async () => {
   const engine = mockEngine();
-  const tool = new CallIntegrationTool(engine);
+  const tool = new CallIntegrationTool(engine, new Logger());
 
   const result = await tool.call({ integration: 'nope', action: 'create_post' });
 

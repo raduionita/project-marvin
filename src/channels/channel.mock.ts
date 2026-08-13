@@ -5,19 +5,19 @@ export default class MockChannel extends Channel {
   public args = {}
 
   async load(): Promise<void> {
-    console.debug('[MockChannel.load]', 'loaded');
+    this.logger.debug('[MockChannel.load]', 'loaded');
   }
 
   async sendMessage(message: Message): Promise<any> {
-    console.debug('[MockChannel.send]', JSON.stringify(message));
+    this.logger.debug('[MockChannel.send]', JSON.stringify(message));
   }
 
   async drop(): Promise<void> {
-    console.debug('[MockChannel.detach]', 'dropped');
+    this.logger.debug('[MockChannel.detach]', 'dropped');
   }
 
   async listGroups(): Promise<{ [key: string]: string }> {
-    console.debug('[MockChannel.listGroups]', 'no groups');
+    this.logger.debug('[MockChannel.listGroups]', 'no groups');
     return {};
   }
 }

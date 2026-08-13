@@ -22,7 +22,7 @@ export default class ReadFileTool extends Tool {
   }
 
   public async call(args: { path: string }) {
-    console.debug('[ReadFileTool.call]', args);
+    this.logger.debug('[ReadFileTool.call]', args);
 
     if (!args?.path) {
       return { error: 'read_file: no path provided' };
@@ -37,7 +37,7 @@ export default class ReadFileTool extends Tool {
       const content = readFileSync(path, 'utf-8');
       return { path: args.path, content };
     } catch (err) {
-      console.error('[ReadFileTool.call]', 'error:', err);
+      this.logger.error('[ReadFileTool.call]', 'error:', err);
       return { path: args.path, error: (err as Error).message };
     }
   }

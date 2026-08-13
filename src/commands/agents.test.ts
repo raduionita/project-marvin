@@ -5,6 +5,7 @@ import { join } from 'path';
 import { Config } from '../types.js';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import AgentsCommand from './agents.js';
 
 function mockConfig(models: Config['models'], channels: Config['channels']): Config {
@@ -23,14 +24,14 @@ function scriptedAsk(answers: string[]) {
 }
 
 test('agents add writes IDENTITY.md and persists config', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     { slack: { enabled: true } },
   );
 
-  const cmd = new AgentsCommand(engine, []);
+  const cmd = new AgentsCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['my-agent', '', 'slack', 'general', 'I am a test agent']);
   await cmd.execAdd();
 
@@ -53,14 +54,14 @@ test('agents add writes IDENTITY.md and persists config', async () => {
 });
 
 test('agents add refuses unknown model', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     {},
   );
 
-  const cmd = new AgentsCommand(engine, []);
+  const cmd = new AgentsCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['my-agent', 'gpt-4']);
   await cmd.execAdd();
 
@@ -69,7 +70,7 @@ test('agents add refuses unknown model', async () => {
 });
 
 test('agents add refuses existing agent', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
@@ -77,7 +78,7 @@ test('agents add refuses existing agent', async () => {
   );
   engine.config.agents['my-agent'] = { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} };
 
-  const cmd = new AgentsCommand(engine, []);
+  const cmd = new AgentsCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['my-agent']);
   await cmd.execAdd();
 
@@ -87,14 +88,14 @@ test('agents add refuses existing agent', async () => {
 });
 
 test('agents add uses default identity when blank', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     {},
   );
 
-  const cmd = new AgentsCommand(engine, []);
+  const cmd = new AgentsCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['my-agent', '', '', '']);
   await cmd.execAdd();
 

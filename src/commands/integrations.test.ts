@@ -5,10 +5,11 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Config } from '../types.js';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import IntegrationsCommand from './integrations.js';
 
 function buildEngine(...integrations: [string, { [key: string]: any }][]): Engine {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   const config = {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
@@ -26,26 +27,28 @@ function readConfig(engine: Engine): { [key: string]: any } {
   return JSON.parse(readFileSync(join(engine.work, 'marvin.json'), 'utf8'));
 }
 
+// a logger that captures every emitted line (info-level and up), so tests can
+// assert on command output without patching console.*
+function captureLogger(): { logger: Logger; lines: string[] } {
+  const lines: string[] = [];
+  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
+  return { logger, lines };
+}
+
 test('execList lists configured integrations', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, type: 'wordpress', endpoint: 'https://example.com' }]);
-  const cmd = new IntegrationsCommand(engine, ['list']);
+  const { logger, lines } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, logger, ['list']);
 
-  const infoLogs: string[] = [];
-  const orig = console.info;
-  console.info = (...args: any[]) => infoLogs.push(args.join(' '));
-  try {
-    await cmd.exec();
-  } finally {
-    console.info = orig;
-  }
+  await cmd.exec();
 
-  expect(infoLogs.join('\n')).toContain('gloobeam');
-  expect(infoLogs.join('\n')).toContain('wordpress');
+  expect(lines.join('\n')).toContain('gloobeam');
+  expect(lines.join('\n')).toContain('wordpress');
 });
 
 test('execDrop removes an integration and persists to marvin.json', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, type: 'wordpress', endpoint: 'https://example.com' }]);
-  const cmd = new IntegrationsCommand(engine, ['drop', 'gloobeam']);
+  const cmd = new IntegrationsCommand(engine, new Logger(), ['drop', 'gloobeam']);
 
   await cmd.exec();
 
@@ -55,17 +58,11 @@ test('execDrop removes an integration and persists to marvin.json', async () => 
 
 test('execDrop warns for unknown integration', async () => {
   const engine = buildEngine();
-  const cmd = new IntegrationsCommand(engine, ['drop', 'nope']);
+  const { logger, lines } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, logger, ['drop', 'nope']);
 
-  const errorLogs: string[] = [];
-  const orig = console.error;
-  console.error = (...args: any[]) => errorLogs.push(args.join(' '));
-  try {
-    await cmd.exec();
-  } finally {
-    console.error = orig;
-  }
+  await cmd.exec();
 
-  expect(errorLogs.join('\n')).toContain('not found');
+  expect(lines.join('\n')).toContain('not found');
   expect(readConfig(engine).integrations).toEqual({});
 });

@@ -24,7 +24,7 @@ export async function loadIntegration(engine: Engine, type: string, config: { [k
     if (!Class || !(Class.prototype instanceof Integration)) {
       return null;
     }
-    return new Class(engine, config);
+    return new Class(engine, engine.logger, config);
   } catch {
     return null;
   }

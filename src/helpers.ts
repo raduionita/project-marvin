@@ -2,11 +2,13 @@ import { existsSync, lstatSync, realpathSync } from 'fs';
 import { basename, dirname, resolve, sep } from 'path';
 import { readdirSync } from 'fs';
 
+import logger from './logger.js';
+
 export function tryJsonParse<T>(str: string): T {
   try {
     return JSON.parse(str) as T;
   } catch (error) {
-    console.warn('[tryJsonParse]', `"${str}"`, error);
+    logger.warn('[tryJsonParse]', `"${str}"`, error);
     return {} as T;
   }
 }

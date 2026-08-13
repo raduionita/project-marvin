@@ -6,7 +6,7 @@ import { Command } from "../types";
 // `marvin reload` reloads the daemon
 export default class ReloadCommand extends Command {
   async exec() {
-    console.debug('[ReloadCommand.exec]');
+    this.logger.debug('[ReloadCommand.exec]');
 
     // --logLevel (parsed by loadFlags in marvin.ts -> MARVIN_LOG_LEVEL) updates
     // ~/.marvin/.env so the systemd EnvironmentFile feeds it to the daemon
@@ -18,12 +18,12 @@ export default class ReloadCommand extends Command {
     // restart (not reload): the unit has no ExecReload= and EnvironmentFile is
     // only re-read at process start, so reload cannot apply a new log level
     if (this.engine.isDry) {
-      console.info('[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
+      this.logger.info('[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
     } else {
       execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
     }
 
-    console.info('marvin service reloaded');
+    this.logger.info('marvin service reloaded');
   }
 
   // set MARVIN_LOG_LEVEL in ~/.marvin/.env, keeping comments/other entries
@@ -42,6 +42,6 @@ export default class ReloadCommand extends Command {
     }
 
     writeFileSync(envPath, content);
-    console.info('MARVIN_LOG_LEVEL set to:', level, 'in', envPath);
+    this.logger.info('MARVIN_LOG_LEVEL set to:', level, 'in', envPath);
   }
 }

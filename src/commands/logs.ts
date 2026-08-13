@@ -6,11 +6,11 @@ import { delay } from '../helpers';
 // `marvin logs [-f|--follow] [-n|--lines <n>]` tail the daemon log file
 export default class LogsCommand extends Command {
   async exec() {
-    console.debug('[LogsCommand.exec]');
+    this.logger.debug('[LogsCommand.exec]');
 
     const lpath = join(this.engine.work, 'marvin.log');
     if (!existsSync(lpath)) {
-      console.error('[LogsCommand.exec]', 'no log file found at', lpath, 'run "marvin enable" first');
+      this.logger.error('[LogsCommand.exec]', 'no log file found at', lpath, 'run "marvin enable" first');
       return;
     }
 
@@ -20,7 +20,7 @@ export default class LogsCommand extends Command {
     // print the last `lines` lines of the file
     const tail = this.readTail(lpath, lines);
     for (const line of tail) {
-      console.log(line);
+      this.logger.log(line);
     }
 
     if (!follow) {
@@ -28,7 +28,7 @@ export default class LogsCommand extends Command {
     }
 
     // follow mode: stream newly appended lines, one poll per second
-    console.error('[LogsCommand.exec]', 'following', lpath, '(ctrl+c to stop)');
+    this.logger.error('[LogsCommand.exec]', 'following', lpath, '(ctrl+c to stop)');
     let offset = statSync(lpath).size;
     while (true) {
       await delay(1000);

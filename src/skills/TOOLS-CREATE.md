@@ -33,7 +33,7 @@ export default class MyTool extends Tool {
   }
 
   public async call(args: { paramName: string }) {
-    console.debug('[MyTool.call]', args);
+    this.logger.debug('[MyTool.call]', args);
 
     // validate args
     if (!args.paramName) {
@@ -60,7 +60,7 @@ literally in the import; the `marvin tools add` command replaces it for you.
 - The `call(args)` method MUST:
   - validate the inputs and return `{ error: '...' }` on bad input
   - return a plain JSON object (never throw to the agent)
-- Log with `console.debug('[ToolName.call]', args)`.
+- Log with `this.logger.debug('[ToolName.call]', args)`.
 - Use the engine only when needed: `this.engine` (e.g. `this.engine.isDry`,
   `this.engine.work`, `this.engine.integrations`, `this.engine.skills`).
 - Respect the workspace: paths must stay inside `~/.marvin` (see

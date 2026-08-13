@@ -9,21 +9,21 @@ import InstallCommand from './install';
 // `marvin enable` installs the workspace + systemd unit and starts the daemon
 export default class EnableCommand extends InstallCommand {
   async exec() {
-    console.debug('[EnableCommand.exec]');
+    this.logger.debug('[EnableCommand.exec]');
 
     await this.makeProject();
     await this.execSystemd();
   }
 
   async execSystemd() {
-    console.debug('[EnableCommand.execSystemd]');
+    this.logger.debug('[EnableCommand.execSystemd]');
 
     const hpath = this.engine.work;
 
     // ~/.marvin/.env (systemd EnvironmentFile must exist or the unit will never start)
     const epath = join(hpath, '.env');
     if (this.engine.isDry) {
-      console.info('[dry]', 'write', epath);
+      this.logger.info('[dry]', 'write', epath);
     } else if (!existsSync(epath)) {
       writeFileSync(epath, [
         '# marvin environment variables (systemd EnvironmentFile)',
@@ -31,9 +31,9 @@ export default class EnableCommand extends InstallCommand {
         '# MARVIN_LOG_LEVEL=debug',
         '',
       ].join('\n'));
-      console.info('created .env file:', epath);
+      this.logger.info('created .env file:', epath);
     } else {
-      console.info('enm file', epath, 'exists');
+      this.logger.info('enm file', epath, 'exists');
     }
 
     // ~/.bun/bin/bun
@@ -45,32 +45,32 @@ export default class EnableCommand extends InstallCommand {
     // ~/.local/bin/marvin
     const wpath = join(homedir(), '.local', 'bin', 'marvin');
     if (this.engine.isDry) {
-      console.info('[dry]', 'would ensure wrapper:', wpath);
+      this.logger.info('[dry]', 'would ensure wrapper:', wpath);
     } else {
       mkdirSync(dirname(wpath), { recursive: true });
       writeFileSync(wpath, `#!/bin/sh\nexec "${bpath}" "${join(this.engine.root, 'src', 'marvin.ts')}" "$@"\n`, { mode: 0o755 });
-      console.info('created wrapper:', wpath, 'bun =', bpath);
+      this.logger.info('created wrapper:', wpath, 'bun =', bpath);
     }
 
     // ~/.config/systemd/user/marvin.service
     const spath = join(this.engine.root, 'marvin.service');
     const dpath = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
     if (this.engine.isDry) {
-      console.info('[dry]', 'would write service file:', dpath);
+      this.logger.info('[dry]', 'would write service file:', dpath);
     } else if (!existsSync(spath)) {
-      console.error('[EnableCommand.execSystemd]', 'service file missing:', spath);
+      this.logger.error('[EnableCommand.execSystemd]', 'service file missing:', spath);
     } else {
       // always refresh the unit so re-running enable picks up changes
       mkdirSync(dirname(dpath), { recursive: true });
       copyFileSync(spath, dpath);
-      console.info('installed service file:', dpath);
+      this.logger.info('installed service file:', dpath);
     }
 
     // start service
     if (this.engine.isDry) {
-      console.info('[dry]', 'enable service: systemctl --user daemon-reload && systemctl --user enable marvin && systemctl --user restart marvin');
+      this.logger.info('[dry]', 'enable service: systemctl --user daemon-reload && systemctl --user enable marvin && systemctl --user restart marvin');
     } else {
-      console.debug('[EnableCommand.execSystemd]', 'enabling service...');
+      this.logger.debug('[EnableCommand.execSystemd]', 'enabling service...');
       execSync(['systemctl', '--user', 'daemon-reload'].join(' '), { stdio: 'inherit' });
       // restart (not "enable --now"): also applies a refreshed unit file to an already-running daemon
       execSync(['systemctl', '--user', 'enable', 'marvin'].join(' '), { stdio: 'inherit' });
@@ -79,12 +79,12 @@ export default class EnableCommand extends InstallCommand {
       await this.waitForActive();
     }
 
-    console.info('marvin enabled!');
+    this.logger.info('marvin enabled!');
   }
 
   // poll the service until it settles, so we can diagnose a stuck "activating"
   async waitForActive(timeout = 15000) {
-    console.debug('[EnableCommand.waitForActive]');
+    this.logger.debug('[EnableCommand.waitForActive]');
 
     for (let waited = 0; waited < timeout; waited += 1000) {
       let state = '';
@@ -98,13 +98,13 @@ export default class EnableCommand extends InstallCommand {
         await delay(1000);
         continue;
       } else if (state === 'active') {
-        console.info('marvin service is:', state);
+        this.logger.info('marvin service is:', state);
       } else {
-        console.error('[EnableCommand.waitForActive]', 'marvin service is stuck in state:', state, 'run "journalctl --user -u marvin -e" for details');
+        this.logger.error('[EnableCommand.waitForActive]', 'marvin service is stuck in state:', state, 'run "journalctl --user -u marvin -e" for details');
       }
       return;
     }
 
-    console.error('[EnableCommand.waitForActive]', 'marvin service still "activating" after', timeout, 'ms,', 'run "journalctl --user -u marvin -e" for details');
+    this.logger.error('[EnableCommand.waitForActive]', 'marvin service still "activating" after', timeout, 'ms,', 'run "journalctl --user -u marvin -e" for details');
   }
 }

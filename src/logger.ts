@@ -9,7 +9,7 @@ export const LOG_LEVELS: Record<LogLevel, number> = {
 
 export const DEFAULT_LOG_LEVEL: LogLevel = 'info';
 
-// prefix used when console.enablePrefix(true) is set
+// prefix used when logger.enablePrefix(true) is set
 export const LEVEL_PREFIXES: Record<LogLevel, string> = {
   debug: '[DEBUG]',
   info: '[INFO]',
@@ -17,35 +17,11 @@ export const LEVEL_PREFIXES: Record<LogLevel, string> = {
   error: '[ERROR]',
 };
 
-let currentLevel: LogLevel = DEFAULT_LOG_LEVEL;
-let prefixEnabled = false;
+// the levels a Logger can emit, including raw (unfiltered) log lines
+export type LogMethod = 'log' | LogLevel;
 
-// keep the native console methods for passthrough
-const native = {
-  debug: console.debug.bind(console),
-  info: console.info.bind(console),
-  log: console.log.bind(console),
-  warn: console.warn.bind(console),
-  error: console.error.bind(console),
-};
-
-export function getLogLevel(): LogLevel {
-  return currentLevel;
-}
-
-export function setLogLevel(level: LogLevel): void {
-  if (LOG_LEVELS[level] !== undefined) {
-    currentLevel = level;
-  }
-}
-
-export function enablePrefix(enabled: boolean = true): void {
-  prefixEnabled = enabled;
-}
-
-export function isPrefixEnabled(): boolean {
-  return prefixEnabled;
-}
+// intercepts every emitted line instead of writing to the console
+export type LogOutput = (level: LogMethod, args: unknown[]) => void;
 
 // would a message at `level` be emitted when the logger is at `current`?
 export function shouldLog(level: LogLevel, current: LogLevel): boolean {
@@ -61,43 +37,72 @@ export function resolveLogLevel(): LogLevel {
   return DEFAULT_LOG_LEVEL;
 }
 
-// emit one log line through the native console, honoring level + prefix
-function emit(level: LogLevel, args: unknown[]) {
-  if (!shouldLog(level, currentLevel)) {
-    return;
+// instance logger: debug/info/warn/error are level-filtered (and optionally
+// prefixed with [LEVEL]); log is raw/unfiltered output (e.g. `marvin logs`).
+// an `output` override (e.g. Slack) can capture lines instead of printing.
+export class Logger {
+  // undefined = resolve from MARVIN_LOG_LEVEL on every emit, so `--log-level`
+  // (set at runtime in marvin.loadFlags) is honored without extra wiring
+  private level: LogLevel | undefined;
+  private prefixEnabled: boolean;
+  private output: LogOutput;
+
+  constructor(opts: { level?: LogLevel; prefix?: boolean; output?: LogOutput } = {}) {
+    this.level = opts.level;
+    this.prefixEnabled = opts.prefix ?? false;
+    this.output = opts.output ?? ((level, args) => {
+      console[level](...args);
+    });
   }
-  const out = prefixEnabled ? [LEVEL_PREFIXES[level], ...args] : args;
-  native[level](...out);
-}
 
-// replace console.debug/info/warn/error with level-filtered (and optionally
-// prefixed) versions, and expose runtime controls on console.
-// console.log is left untouched (used for raw output, e.g. marvin logs).
-export function loadConsole(): LogLevel {
-  currentLevel = resolveLogLevel();
+  getLevel(): LogLevel {
+    return this.level ?? resolveLogLevel();
+  }
 
-  console.debug = (...args: unknown[]) => emit('debug', args);
-  console.info = (...args: unknown[]) => emit('info', args);
-  console.warn = (...args: unknown[]) => emit('warn', args);
-  console.error = (...args: unknown[]) => emit('error', args);
+  setLevel(level: LogLevel): void {
+    if (LOG_LEVELS[level] !== undefined) {
+      this.level = level;
+    }
+  }
 
-  // runtime controls
-  console.setLogLevel = (level: LogLevel) => setLogLevel(level);
-  console.getLogLevel = () => getLogLevel();
-  console.enablePrefix = (enabled: boolean = true) => enablePrefix(enabled);
+  enablePrefix(enabled: boolean = true): void {
+    this.prefixEnabled = enabled;
+  }
 
-  return currentLevel;
-}
+  isPrefixEnabled(): boolean {
+    return this.prefixEnabled;
+  }
 
-// programmatic logging that honors level + prefix (bypasses the console wrappers)
-export function log(level: LogLevel, ...args: unknown[]): void {
-  emit(level, args);
-}
+  // raw output, never filtered (mirrors console.log)
+  log(...args: unknown[]): void {
+    this.output('log', args);
+  }
 
-declare global {
-  interface Console {
-    setLogLevel(level: LogLevel): void;
-    getLogLevel(): LogLevel;
-    enablePrefix(enabled?: boolean): void;
+  debug(...args: unknown[]): void {
+    this.emit('debug', args);
+  }
+
+  info(...args: unknown[]): void {
+    this.emit('info', args);
+  }
+
+  warn(...args: unknown[]): void {
+    this.emit('warn', args);
+  }
+
+  error(...args: unknown[]): void {
+    this.emit('error', args);
+  }
+
+  private emit(level: LogLevel, args: unknown[]) {
+    if (!shouldLog(level, this.getLevel())) {
+      return;
+    }
+    const out = this.prefixEnabled ? [LEVEL_PREFIXES[level], ...args] : args;
+    this.output(level, out);
   }
 }
+
+// module-level logger for code without a class instance (e.g. helpers)
+export const logger = new Logger();
+export default logger;

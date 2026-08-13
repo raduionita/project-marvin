@@ -28,7 +28,7 @@ export default class CallIntegrationTool extends Tool {
   }
 
   public async call(args: { integration: string, action: string, params?: { [key: string]: any } }) {
-    console.debug('[CallIntegrationTool.call]', args);
+    this.logger.debug('[CallIntegrationTool.call]', args);
 
     const integration = this.engine.integrations[args.integration];
     if (!integration) {

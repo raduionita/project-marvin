@@ -16,7 +16,7 @@ export default class EndChatTool extends Tool {
   }
 
   async call(args?: any) {
-    console.debug('[FinalAnswerTool.call]', args);
+    this.logger.debug('[FinalAnswerTool.call]', args);
     return {};
   }
 }

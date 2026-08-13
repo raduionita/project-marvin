@@ -30,7 +30,7 @@ export default class EditFileTool extends Tool {
   }
 
   public async call(args: { path: string; newString?: string; oldString?: string }) {
-    console.debug('[EditFileTool.call]', args);
+    this.logger.debug('[EditFileTool.call]', args);
 
     if (!args?.path) {
       return { error: 'edit_file: no path provided' };
@@ -61,7 +61,7 @@ export default class EditFileTool extends Tool {
 
       return { path: args.path, ok: true };
     } catch (err) {
-      console.error('[EditFileTool.call]', 'error:', err);
+      this.logger.error('[EditFileTool.call]', 'error:', err);
       return { path: args.path, error: (err as Error).message };
     }
   }

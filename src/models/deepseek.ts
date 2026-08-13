@@ -44,7 +44,7 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
-    console.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId, chat.format);
+    this.logger.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId, chat.format);
 
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
@@ -59,7 +59,7 @@ export default class DeepseekModel extends Model {
 
     // check if response is ok
     if (!response.ok) {
-      console.error('[DeepseekModel.sendChat]', 'response NOT ok:', response);
+      this.logger.error('[DeepseekModel.sendChat]', 'response NOT ok:', response);
       const body = await response.json();
       throw new Error(`[DeepseekModel.sendChat] ERROR ${body.error?.message || body.message || response.statusText}`);
     }
@@ -69,7 +69,7 @@ export default class DeepseekModel extends Model {
 
     // no choices, no reply
     if (!json.choices || json.choices.length === 0) {
-      console.warn('[DeepseekModel.sendChat]', 'no choices, no reply');
+      this.logger.warn('[DeepseekModel.sendChat]', 'no choices, no reply');
       return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
     }
 
@@ -98,7 +98,7 @@ export default class DeepseekModel extends Model {
       }
     } as Reply;
 
-    console.debug('[DeepseekModel.sendChat]', 'response', json.id, choice.finish_reason, json.usage?.completion_tokens);
+    this.logger.debug('[DeepseekModel.sendChat]', 'response', json.id, choice.finish_reason, json.usage?.completion_tokens);
 
     return reply;
   }

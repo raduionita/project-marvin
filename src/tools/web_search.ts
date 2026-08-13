@@ -26,10 +26,10 @@ export default class WebSearchTool extends Tool {
   }
 
   public async call(args: { query: string }) {
-    console.debug('[WebSearchTool.call]', JSON.stringify(args));
+    this.logger.debug('[WebSearchTool.call]', JSON.stringify(args));
 
     if (this.engine.isDry) {
-      console.info('[WebSearchTool.call]', '[dry] search:', args.query);
+      this.logger.info('[WebSearchTool.call]', '[dry] search:', args.query);
       return { results: [] };
     }
 
@@ -46,13 +46,13 @@ export default class WebSearchTool extends Tool {
       const type = request.resourceType();
       const url = request.url();
       if (type === 'script' && !url.includes('links.duckduckgo.com/d.js')) {
-        // console.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+        // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
         return request.abort();
       } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
-        // console.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+        // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
         return request.abort();
       } else {
-        console.debug('[WebSearchTool.newPage]', 'allowing', type, url);
+        this.logger.debug('[WebSearchTool.newPage]', 'allowing', type, url);
         return request.continue();
       }
     });
@@ -81,10 +81,10 @@ export default class WebSearchTool extends Tool {
         link: o.c
       })) };
     } catch (error) {
-      console.error('[WebSearchTool.call]', 'error:', error);
+      this.logger.error('[WebSearchTool.call]', 'error:', error);
     } finally {
       if (!page.isClosed()) {
-        console.debug('[WebSearchTool.call]', 'closing page');
+        this.logger.debug('[WebSearchTool.call]', 'closing page');
         await page.close();
       }
     }

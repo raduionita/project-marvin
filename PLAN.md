@@ -74,7 +74,7 @@ Current reality (from code):
 - [x] 4.1 Slack (`slack.ts`) — socket-mode, `app_mention` + `message` (DMs routed via `channel_type: "im"`), `sendMessage`
 - [x] 4.2 Slack **threads** reply (`thread_ts` + persistent `slack-<channel>-<thread>` chatId)
 - [x] 4.3 Channel coverage — Slack implemented & tested; `telegram.ts` / `whatsapp.ts` are **stubs**
-  (`sendMessage` is a `console.debug` no-op, `listGroups` throws). Server->channel tested via `slack.test.ts`.
+  (`sendMessage` is a `this.logger.debug` no-op, `listGroups` throws). Server->channel tested via `slack.test.ts`.
 - [x] 4.4 **End-to-end ingress tested (Slack -> Marvin -> LLM -> Slack)** — `src/channels/slack.test.ts`
   runs the real handlers (`onMention`, `onDirectMessage`) with mocked Slack SocketMode/Web clients and a
   mocked LLM. Covers: app_mention round-trip, DM round-trip (via the real `message` event +

@@ -7,7 +7,7 @@ export default class WatchSystem extends System {
   watchers: FSWatcher[] = [];
 
   async load(): Promise<void> {
-    console.debug('[WatchSystem.load]');
+    this.logger.debug('[WatchSystem.load]');
 
     const files = [
       join(this.engine.work, 'marvin.json'),
@@ -20,21 +20,21 @@ export default class WatchSystem extends System {
               this.handleChange(filename!);
               break;
             default:
-              console.debug(`[WatchSystem.load]`, `eventType=${eventType} filename=${filename}`);
+              this.logger.debug(`[WatchSystem.load]`, `eventType=${eventType} filename=${filename}`);
               break;
           }
         });
         watcher.on('error', this.handleError.bind(this));
-        console.debug(`[WatchSystem.load]`, `watching ${file}`);
+        this.logger.debug(`[WatchSystem.load]`, `watching ${file}`);
         this.watchers.push(watcher);
       } catch (err) {
-        console.error('[WatchSystem.load]', 'error:', err);
+        this.logger.error('[WatchSystem.load]', 'error:', err);
       } 
     }
   }
 
   async drop(): Promise<void> {
-    console.debug('[WatchSystem.drop]');
+    this.logger.debug('[WatchSystem.drop]');
     for (const watcher of this.watchers) {
       watcher.close();
     }
@@ -42,11 +42,11 @@ export default class WatchSystem extends System {
   }
 
   handleChange(filename: string) {
-    console.debug(`[WatchSystem.handleChange]`, filename);
+    this.logger.debug(`[WatchSystem.handleChange]`, filename);
     this.engine.execReload();
   }
 
   handleError(err: Error) {
-    console.error('[WatchSystem.handleError]', err);
+    this.logger.error('[WatchSystem.handleError]', err);
   }
 }

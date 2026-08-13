@@ -3,11 +3,12 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import { listTools, listCustomTools } from './index.js';
 import { Config } from '../types.js';
 
 function mockEngine(config: Config = {} as Config): Engine {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.config = {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },

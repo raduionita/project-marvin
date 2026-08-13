@@ -1,10 +1,11 @@
 import { test, expect } from 'bun:test';
 import Engine from './engine.js';
+import { Logger } from './logger.js';
 import { Chat, Config, Agent } from './types.js';
 import * as constants from './constants.js';
 
 function buildEngine(): Engine {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.state = 'load';
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },

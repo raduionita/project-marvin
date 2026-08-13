@@ -3,10 +3,11 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { basename, join } from 'path';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import { listSkills, listCustomSkills, parseSkill, readSkill } from './index.js';
 
 function buildEngine(customSkills?: Record<string, string>): Engine {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = join(tmpdir(), 'marvin-skills-test-' + Date.now() + Math.random().toString(36).slice(2, 8));
   if (customSkills) {
     mkdirSync(join(engine.work, 'skills'), { recursive: true });

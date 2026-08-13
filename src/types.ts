@@ -1,4 +1,5 @@
 import type Engine from "./engine";
+import type { Logger } from "./logger.js";
 
 export type Mode = 'client' | 'server';
 
@@ -49,17 +50,17 @@ export interface Config {
 }
 
 export class Command {
-  constructor(public engine: Engine, public args: string[], public readonly deamon: boolean = false) {
-    console.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
+  constructor(public engine: Engine, public logger: Logger, public args: string[], public readonly deamon: boolean = false) {
+    this.logger.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
   }
 
-  async exec(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.exec]`); }
-  async drop(): Promise<void> { console.debug(`[${this.constructor.name||'Command'}.drop]`); }
+  async exec(): Promise<void> { this.logger.debug(`[${this.constructor.name||'Command'}.exec]`); }
+  async drop(): Promise<void> { this.logger.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 
 export abstract class System {
-  constructor(public readonly engine: Engine) {
-    console.debug(`[${this.constructor.name||'System'}.constructor]`);
+  constructor(public readonly engine: Engine, public readonly logger: Logger) {
+    this.logger.debug(`[${this.constructor.name||'System'}.constructor]`);
   }
 
   abstract load(): Promise<void>;
@@ -69,8 +70,8 @@ export abstract class System {
 export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string}}, required?:string[]}} };
 
 export abstract class Tool {
-  constructor(public readonly engine: Engine) {
-    console.debug(`[${this.constructor.name||'Tool'}.constructor]`);
+  constructor(public engine: Engine, public logger: Logger) {
+    this.logger.debug(`[${this.constructor.name||'Tool'}.constructor]`);
   }
 
   public abstract readonly meta: ToolMeta;
@@ -82,8 +83,8 @@ export abstract class Tool {
 export abstract class Channel {
   abstract args: {[key: string]: any};
 
-  constructor(public readonly engine: Engine) {
-    console.debug(`[${this.constructor.name||'Channel'}.constructor]`);
+  constructor(public engine: Engine, public logger: Logger) {
+    this.logger.debug(`[${this.constructor.name||'Channel'}.constructor]`);
   }
 
   abstract load(): Promise<void>;
@@ -97,8 +98,8 @@ export abstract class Channel {
 export abstract class Integration {
   abstract args: {[key: string]: any};
 
-  constructor(public readonly engine: Engine, public readonly config: { [key: string]: any }) {
-    console.debug(`[${this.constructor.name||'Integration'}.constructor]`);
+  constructor(public engine: Engine, public logger: Logger, public config: { [key: string]: any }) {
+    this.logger.debug(`[${this.constructor.name||'Integration'}.constructor]`);
   }
 
   abstract load(): Promise<void>;
@@ -164,7 +165,7 @@ export abstract class Model {
   public format: 'text' | 'json' = 'text';
   public tools: ToolMeta[]; // 
 
-  constructor(public readonly engine: Engine, config: { [key: string]: any }) {
+  constructor(public readonly engine: Engine, public readonly logger: Logger, config: { [key: string]: any }) {
     Object.assign(this, config);
     this.tools = Object.values(this.engine.tools).map(tool => tool.meta);
   }

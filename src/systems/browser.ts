@@ -8,10 +8,10 @@ export default class BrowserSystem extends System {
   private browser: Browser | undefined;
 
   public async load(): Promise<void> {
-    console.debug('[BrowserSystem.load]');
+    this.logger.debug('[BrowserSystem.load]');
 
     if (this.engine.isDry) {
-      console.info('[BrowserSystem.load]', '[dry] loading chromium');
+      this.logger.info('[BrowserSystem.load]', '[dry] loading chromium');
       return;
     }
     
@@ -53,29 +53,29 @@ export default class BrowserSystem extends System {
       // todo: proxies
     });
 
-    console.debug('[BrowserSystem.load]', 'browser:', await puppeteer.executablePath());
+    this.logger.debug('[BrowserSystem.load]', 'browser:', await puppeteer.executablePath());
   }
 
   public async drop(): Promise<void> {
-    console.debug('[BrowserSystem.drop]');
+    this.logger.debug('[BrowserSystem.drop]');
     if (this.browser) {
       try {
         await this.browser.close();
-        console.debug('[BrowserSystem.drop]', 'closed');
+        this.logger.debug('[BrowserSystem.drop]', 'closed');
       } catch (err) {
-        console.error('[BrowserSystem.drop]', 'error:', err);
+        this.logger.error('[BrowserSystem.drop]', 'error:', err);
       }
       this.browser = undefined;
     } else {
-      console.debug('[BrowserSystem.drop]', 'already closed');
+      this.logger.debug('[BrowserSystem.drop]', 'already closed');
     }
   }
 
   public async newPage(onRequest?: (request: HTTPRequest) => void) : Promise<Page> {
-    console.debug('[BrowserSystem.newPage]');
+    this.logger.debug('[BrowserSystem.newPage]');
 
     if (!this.browser) {
-      console.error('[BrowserSystem.newPage]', 'browser not loaded');
+      this.logger.error('[BrowserSystem.newPage]', 'browser not loaded');
       throw new Error('[BrowserSystem.newPage] ERROR - browser not loaded');
     }
 
@@ -90,10 +90,10 @@ export default class BrowserSystem extends System {
     if (!onRequest) {
       onRequest = (request: HTTPRequest) => {
         if (['image', 'stylesheet', 'script', 'font', 'media', 'xhr', 'other'].includes(request.resourceType())) {
-          // console.debug('[BrowserSystem.newPage]', 'blocking', request.resourceType(), request.url());
+          // this.logger.debug('[BrowserSystem.newPage]', 'blocking', request.resourceType(), request.url());
           return request.abort();
         } else {
-          console.debug('[BrowserSystem.newPage]', 'allowing', request.resourceType(), request.url());
+          this.logger.debug('[BrowserSystem.newPage]', 'allowing', request.resourceType(), request.url());
           return request.continue();
         }
       };

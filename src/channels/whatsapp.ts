@@ -6,15 +6,15 @@ export default class WhatsAppChannel extends Channel {
   }
 
   async load() : Promise<void> {
-    console.debug('[WhatsAppChannel.load]', 'attached', this.engine.config.settings);
+    this.logger.debug('[WhatsAppChannel.load]', 'attached', this.engine.config.settings);
   }
 
   async drop() {
-    console.debug('[WhatsAppChannel.drop]', 'detached');
+    this.logger.debug('[WhatsAppChannel.drop]', 'detached');
   }
 
   async sendMessage(message: Message) : Promise<any> {
-    console.debug('[WhatsAppChannel.sendMessage]', JSON.stringify(message));
+    this.logger.debug('[WhatsAppChannel.sendMessage]', JSON.stringify(message));
   }
 
   async listGroups(): Promise<{ [key: string]: string; }> {

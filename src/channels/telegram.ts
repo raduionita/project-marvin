@@ -6,15 +6,15 @@ export default class TelegramChannel extends Channel {
   }
 
   async load() : Promise<void> {
-    console.debug('[TelegramChannel.load]', 'attached', this.engine.config.settings);
+    this.logger.debug('[TelegramChannel.load]', 'attached', this.engine.config.settings);
   }
   
   async drop() {
-    console.debug('[TelegramChannel.drop]', 'detached');
+    this.logger.debug('[TelegramChannel.drop]', 'detached');
   }
   
   async sendMessage(message: Message) : Promise<any> {
-    console.debug('[TelegramChannel.sendMessage]', 'submit:', JSON.stringify(message));
+    this.logger.debug('[TelegramChannel.sendMessage]', 'submit:', JSON.stringify(message));
   }
 
   async listGroups(): Promise<{ [key: string]: string; }> {

@@ -53,7 +53,7 @@ literally in the import; the `marvin tools edit` command replaces it for you.
 - The `call(args)` method MUST:
   - validate the inputs and return `{ error: '...' }` on bad input
   - return a plain JSON object (never throw to the agent)
-- Log with `console.debug('[ToolName.call]', args)`.
+- Log with `this.logger.debug('[ToolName.call]', args)`.
 - Respect the workspace: paths must stay inside `~/.marvin` (see
   `resolveInsideHome` from `helpers.js` in `read_file.ts`/`edit_file.ts`).
 

@@ -9,12 +9,12 @@ import { listChannels, loadChannel } from '../channels';
 // `marvin channels [command] [--dry]` list, add, bind, chat, drop channels
 export default class ChannelsCommand extends Command {
   async exec() {
-    console.debug('[ChannelsCommand.exec]');
+    this.logger.debug('[ChannelsCommand.exec]');
 
     const cmd = this.args[0] || 'help';
     switch (cmd) {
       default: 
-        console.warn('[ChannelsCommand.exec]', 'unknown command: channels', cmd); 
+        this.logger.warn('[ChannelsCommand.exec]', 'unknown command: channels', cmd); 
       case 'help'   : // default = empty = help 
         await this.execHelp();
       break;
@@ -35,70 +35,70 @@ export default class ChannelsCommand extends Command {
       // case 'drop' : break;
     }
 
-    console.debug('[ChannelsCommand.exec]', `done`);
+    this.logger.debug('[ChannelsCommand.exec]', `done`);
   }
 
   // `marvin channels help`
   async execHelp() {
-    console.info('usage: marvin channels [command]');
-    console.info('commands:');
-    console.info('  help    ', 'show this help');
-    console.info('  list    ', 'list available channels, for each one, it\'s connected agents');
-    console.info('  add     ', 'add a channel');
-    console.info('  bind <agentId> <channelId> <groupId>', 'bind a channel to an agent');
-    console.info('  chat [channelId] [groupId]', 'send a message to a channel');
-    console.info('  drop <channelId>', 'drop a channel');
+    this.logger.info('usage: marvin channels [command]');
+    this.logger.info('commands:');
+    this.logger.info('  help    ', 'show this help');
+    this.logger.info('  list    ', 'list available channels, for each one, it\'s connected agents');
+    this.logger.info('  add     ', 'add a channel');
+    this.logger.info('  bind <agentId> <channelId> <groupId>', 'bind a channel to an agent');
+    this.logger.info('  chat [channelId] [groupId]', 'send a message to a channel');
+    this.logger.info('  drop <channelId>', 'drop a channel');
   }
 
   // `marvin channels list`
   async execList() {
-    console.debug('[ChannelsCommand.execList]');
-    console.info('list channels:');
+    this.logger.debug('[ChannelsCommand.execList]');
+    this.logger.info('list channels:');
     // for each channel, list enabled agents
     listChannels(this.engine).map(c => c.replace('.ts', '')).forEach(channel => {
-      console.info(`  ${channel}`);
+      this.logger.info(`  ${channel}`);
       const channelConfig = this.engine.config.channels[channel];
       if (channelConfig) {
-        console.info('  - enabled:', channelConfig.enabled);
+        this.logger.info('  - enabled:', channelConfig.enabled);
       }
-      console.info('  - agents:');
+      this.logger.info('  - agents:');
       for (const [agentId, agent] of Object.entries(this.engine.config.agents)) {
         if (!agent.enabled) continue;
         if (!agent.channels[channel]) continue;
-        console.info('    -', agentId, ':', `@${agent.channels[channel]}`);
+        this.logger.info('    -', agentId, ':', `@${agent.channels[channel]}`);
       }
     });
   }
 
   // `marvin channels add [channelId]`
   async execAdd() {
-    console.info('[ChannelsCommand.execAdd]', 'adding a channel...');
+    this.logger.info('[ChannelsCommand.execAdd]', 'adding a channel...');
 
     const channels = listChannels(this.engine).map(c => c.replace('.ts', ''));
 
-    console.log('');
+    this.logger.log('');
     const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
 
     // ask for channelId
     const channelId = this.args[1] || await pli.question('Enter channel name (e.g. slack): ');
     
     if (!channels.includes(channelId)) {
-      console.error('[ChannelsCommand.execAdd]', `unknown channel "${channelId}"`);
-      console.error('[ChannelsCommand.execAdd]', 'available channels:', channels.join(', '));
+      this.logger.error('[ChannelsCommand.execAdd]', `unknown channel "${channelId}"`);
+      this.logger.error('[ChannelsCommand.execAdd]', 'available channels:', channels.join(', '));
       pli.close();
       return;
     }
 
     // check if channel is already loaded
     if (this.engine.config.channels[channelId]) {
-      console.warn('[ChannelsCommand.execAdd]', `channel "${channelId}" is already loaded`);
+      this.logger.warn('[ChannelsCommand.execAdd]', `channel "${channelId}" is already loaded`);
       pli.close();
       return;
     }
 
     const channel = await loadChannel(this.engine, channelId);
     if (!channel) {
-      console.error('[ChannelsCommand.execAdd]', `channel "${channelId}" not found`);
+      this.logger.error('[ChannelsCommand.execAdd]', `channel "${channelId}" not found`);
       pli.close();
       return;
     }
@@ -111,7 +111,7 @@ export default class ChannelsCommand extends Command {
     }
 
     pli.close();
-    console.log('');
+    this.logger.log('');
 
     // register the channel in config
     this.engine.config.channels[channelId] = { enabled: true, ...config };
@@ -125,19 +125,19 @@ export default class ChannelsCommand extends Command {
 
     // write to config file
     if (this.engine.isDry) {
-      console.info('[ChannelsCommand.execAdd]', '[dry]',`would configure channel ${channelId}, config persisted to ${cpath}`);
+      this.logger.info('[ChannelsCommand.execAdd]', '[dry]',`would configure channel ${channelId}, config persisted to ${cpath}`);
     } else {
       writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
     }
     
-    console.info('[ChannelsCommand.execAdd]', `channel "${channelId}" configured, config persisted to ${cpath}`);
+    this.logger.info('[ChannelsCommand.execAdd]', `channel "${channelId}" configured, config persisted to ${cpath}`);
   }
 
   // `marvin channels bind [agentId] [channelId] [groupId]`
   async execBind() {
-    console.info('[ChannelsCommand.execBind]', 'binding a channel:group to an agent...');
+    this.logger.info('[ChannelsCommand.execBind]', 'binding a channel:group to an agent...');
 
-    console.log('');
+    this.logger.log('');
     const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
     // ask for agentId
     const agentId = this.args[1] || await pli.question('Enter agent (e.g. my-agent): ');
@@ -148,25 +148,25 @@ export default class ChannelsCommand extends Command {
     pli.close();
 
     if (!channelId || !agentId) {
-      console.warn('[ChannelsCommand.execBind]', 'invalid inputs, exiting');
+      this.logger.warn('[ChannelsCommand.execBind]', 'invalid inputs, exiting');
       return;
     }
 
     // validate channel exists
     if (!this.engine.config.channels[channelId]) {
-      console.error('[ChannelsCommand.execBind]', `channel "${channelId}" not found in config`);
+      this.logger.error('[ChannelsCommand.execBind]', `channel "${channelId}" not found in config`);
       return;
     }
 
     // validate agent exists
     if (!this.engine.config.agents[agentId]) {
-      console.error('[ChannelsCommand.execBind]', `agent "${agentId}" not found in config`);
-      console.error('[ChannelsCommand.execBind]', 'available agents:', Object.keys(this.engine.config.agents).join(', '));
+      this.logger.error('[ChannelsCommand.execBind]', `agent "${agentId}" not found in config`);
+      this.logger.error('[ChannelsCommand.execBind]', 'available agents:', Object.keys(this.engine.config.agents).join(', '));
       return;
     }
 
     if (this.engine.isDry) {
-      console.info('[ChannelsCommand.execBind]', '[dry]', `would bind channel ${channelId}:${groupId} to agent ${agentId}`);
+      this.logger.info('[ChannelsCommand.execBind]', '[dry]', `would bind channel ${channelId}:${groupId} to agent ${agentId}`);
     } else {
       // add the binding (overwrites if already bound to this channel)
       this.engine.config.agents[agentId].channels = this.engine.config.agents[agentId].channels || {};
@@ -176,22 +176,22 @@ export default class ChannelsCommand extends Command {
       const cpath = join(this.engine.work, 'marvin.json');
       writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
-      console.info('[ChannelsCommand.execBind]', `agent "${agentId}" bound to channel "${channelId}:${groupId}", config persisted to ${cpath}`);
+      this.logger.info('[ChannelsCommand.execBind]', `agent "${agentId}" bound to channel "${channelId}:${groupId}", config persisted to ${cpath}`);
     }
   }
 
   // `marvin channels chat [channelId] [groupId]`
   async execChat() {
-    console.info('[ChannelsCommand.execChat]', 'sending a message to a channel...');
+    this.logger.info('[ChannelsCommand.execChat]', 'sending a message to a channel...');
     
-    console.log('');
+    this.logger.log('');
     const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
     
     // ask for channelId
     let channelId = this.args[1] || await pli.question('Enter channel (e.g. slack): ');
     const channel = await loadChannel(this.engine, channelId);
     if (!channel) {
-      console.error('[ChannelsCommand.execChat]', `channel "${channelId}" not found`);
+      this.logger.error('[ChannelsCommand.execChat]', `channel "${channelId}" not found`);
       return;
     }
 
@@ -199,12 +199,12 @@ export default class ChannelsCommand extends Command {
 
     // list available groups as a table
     const groups = await channel.listGroups();
-    console.info(' ID        ', '|', 'Name');
-    console.info('-----------', '|' ,'----');
+    this.logger.info(' ID        ', '|', 'Name');
+    this.logger.info('-----------', '|' ,'----');
     for (const [id, name] of Object.entries(groups)) {
-      console.info(`${id}`, '|', `${name}`);
+      this.logger.info(`${id}`, '|', `${name}`);
     }
-    console.log('');
+    this.logger.log('');
 
     // ask for groupId
     let groupId = this.args[2] || await pli.question('Enter group (optional, e.g. general): ');
@@ -218,7 +218,7 @@ export default class ChannelsCommand extends Command {
     }
 
     if (!groupId) {
-      console.warn('[ChannelsCommand.execChat]', 'invalid groupId, exiting');
+      this.logger.warn('[ChannelsCommand.execChat]', 'invalid groupId, exiting');
       return;
     }
 
@@ -226,16 +226,16 @@ export default class ChannelsCommand extends Command {
     const message = await pli.question('Message: ');
 
     pli.close();
-    console.log('');
+    this.logger.log('');
 
     const result = await channel.sendMessage({ role: 'assistant', content: message, channel: groupId } as Message);
     if (!result.ok) {
-      console.error('[ChannelsCommand.execChat]', `channel "${channelId}" send failed:`, result.error);
+      this.logger.error('[ChannelsCommand.execChat]', `channel "${channelId}" send failed:`, result.error);
       return;
     }
 
     await channel.drop();
 
-    console.info(`${channelId}:${groupId}: ${message}`);
+    this.logger.info(`${channelId}:${groupId}: ${message}`);
   }
 }

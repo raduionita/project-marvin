@@ -5,6 +5,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 
 // --- helpers ---
 
@@ -20,7 +21,7 @@ function mockConfig(channels: Config['channels'] = {}, models: Config['models'] 
 }
 
 function mockEngine(isDry = false): Engine {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.isDry = isDry;
   engine.state = 'exec';
   return engine;
@@ -49,7 +50,7 @@ class MockModel extends Model {
   private _reply: Reply;
 
   constructor(engine: Engine, reply: Reply) {
-    super(engine, {});
+    super(engine, new Logger(), {});
     this._reply = reply;
   }
 
@@ -77,7 +78,7 @@ class TestChannel extends Channel {
   async load(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
-    console.debug('[TestChannel.sendMessage]', JSON.stringify(message));
+    this.logger.debug('[TestChannel.sendMessage]', JSON.stringify(message));
     return message;
   }
 
@@ -153,12 +154,12 @@ function buildTestEngine(opts?: {
 
   // Install a mock channel
   if (channelEnabled) {
-    const ch = new TestChannel(engine);
+    const ch = new TestChannel(engine, new Logger());
     engine.channels[channelName] = ch;
   }
 
   // Install a mock tool (needed if tool calls are sent)
-  engine.tools['mock_tool'] = new MockTool(engine);
+  engine.tools['mock_tool'] = new MockTool(engine, new Logger());
 
   return engine;
 }

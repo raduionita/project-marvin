@@ -3,11 +3,12 @@ import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'f
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import EditFileTool from './edit_file.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = home;
   return { engine, home };
 }
@@ -24,7 +25,7 @@ function mockFile(home: string, name: string, contents: string): string {
 
 test('editFile tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const meta = tool.meta;
   expect(meta.function.name).toBe('edit_file');
   expect(meta.function.parameters.required).toContain('path');
@@ -33,7 +34,7 @@ test('editFile tool metadata', () => {
 
 test('editFile replaces a snippet with oldString/newString', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const path = mockFile(home, 'notes.txt', 'hello world');
 
   const result = await tool.call({ path, oldString: 'world', newString: 'there' });
@@ -45,7 +46,7 @@ test('editFile replaces a snippet with oldString/newString', async () => {
 
 test('editFile replaces all occurrences of oldString', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const path = mockFile(home, 'notes.txt', 'red blue red blue');
 
   await tool.call({ path, oldString: 'red', newString: 'green' });
@@ -56,7 +57,7 @@ test('editFile replaces all occurrences of oldString', async () => {
 
 test('editFile reports when oldString is not found', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const path = mockFile(home, 'notes.txt', 'hello world');
 
   const result = await tool.call({ path, oldString: 'nope', newString: 'there' });
@@ -69,7 +70,7 @@ test('editFile reports when oldString is not found', async () => {
 
 test('editFile creates a new file when only newString is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const path = join(home, 'created.txt');
 
   const result = await tool.call({ path, newString: 'brand new file' });
@@ -81,7 +82,7 @@ test('editFile creates a new file when only newString is provided', async () => 
 
 test('editFile overwrites the whole file when oldString is omitted', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const path = mockFile(home, 'notes.txt', 'old content');
 
   await tool.call({ path, newString: 'new content' });
@@ -92,7 +93,7 @@ test('editFile overwrites the whole file when oldString is omitted', async () =>
 
 test('editFile rejects absolute paths outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const outside = join(tmpdir(), 'marvin-outside-' + Date.now() + '.txt');
 
   const result = await tool.call({ path: outside, newString: 'nope' });
@@ -104,7 +105,7 @@ test('editFile rejects absolute paths outside the workspace', async () => {
 
 test('editFile rejects paths that escape via ..', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
 
   const result = await tool.call({ path: join(home, '..', 'escaped.txt'), newString: 'nope' });
 
@@ -115,7 +116,7 @@ test('editFile rejects paths that escape via ..', async () => {
 
 test('editFile rejects a symlink that points outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
   const link = join(home, 'escape-link.txt');
   const outside = join(tmpdir(), 'marvin-symlink-target-' + Date.now() + '.txt');
   writeFileSync(outside, 'target');
@@ -132,7 +133,7 @@ test('editFile rejects a symlink that points outside the workspace', async () =>
 
 test('editFile returns an error when no path is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
 
   const result = await tool.call({ path: '', newString: 'nope' });
 
@@ -142,7 +143,7 @@ test('editFile returns an error when no path is provided', async () => {
 
 test('editFile returns an error when no newString is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new EditFileTool(engine);
+  const tool = new EditFileTool(engine, new Logger());
 
   const result = await tool.call({ path: 'x.txt' } as { path: string; newString?: string; oldString?: string });
 

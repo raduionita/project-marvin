@@ -21,10 +21,10 @@ export default class WebBrowseTool extends Tool {
   }
 
   public async call(args: { url: string }) {
-    console.debug('[WebBrowseTool.call]', args);
+    this.logger.debug('[WebBrowseTool.call]', args);
 
     if (this.engine.isDry) {
-      console.info('[WebBrowseTool.call]', '[dry] browse:', args.url);
+      this.logger.info('[WebBrowseTool.call]', '[dry] browse:', args.url);
       return { title: '', body: '', error: '' };
     }
 
@@ -45,7 +45,7 @@ export default class WebBrowseTool extends Tool {
       const text = await page.$eval('body', el => el.innerText);
       return { title, body: text.split('\n').map((line: string) => line.trim()).filter((line: string) => line.length > 0).join('\n') };
     } catch (error) {
-      console.error('[WebBrowseTool.call]', 'error:', error);
+      this.logger.error('[WebBrowseTool.call]', 'error:', error);
     } finally {
       await page.close();
     }

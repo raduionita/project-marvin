@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 
+import type { Logger } from './logger.js';
 import { listSystems } from "./systems";
 import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat, Integration, Skill } from "./types";
 import * as constants from './constants.js';
@@ -39,11 +40,15 @@ export default class Engine {
 
   public get isDebug() { return process.env.MARVIN_LOG_LEVEL === 'debug'; }
 
+  constructor(public logger: Logger) {
+    this.logger.debug('[Engine.constructor]');
+  }
+
   async load() {
-    console.debug('[Engine.load]');
+    this.logger.debug('[Engine.load]');
 
     if (this.state === 'load' || this.state === 'exec') {
-      console.error('[Engine.load]', 'engine, already loaded');
+      this.logger.error('[Engine.load]', 'engine, already loaded');
       return;
     }
 
@@ -60,10 +65,10 @@ export default class Engine {
   }
 
   async drop() {
-    console.debug('[Engine.drop]');
+    this.logger.debug('[Engine.drop]');
 
     if (this.state !== 'load' && this.state !== 'exec') {
-      console.error('[Engine.drop]', 'engine is not in the "exec" state, cannot stop');
+      this.logger.error('[Engine.drop]', 'engine is not in the "exec" state, cannot stop');
       return;
     }
 
@@ -83,7 +88,7 @@ export default class Engine {
   }
 
   async exec() {
-    console.debug('[Engine.exec]');
+    this.logger.debug('[Engine.exec]');
 
     // force load if not loaded
     if (this.state === 'none') {
@@ -92,7 +97,7 @@ export default class Engine {
 
     // continue only if loaded
     if (this.state !== 'load') {
-      console.error('[Engine.exec]', 'engine is not in the "load" state, cannot exec');
+      this.logger.error('[Engine.exec]', 'engine is not in the "load" state, cannot exec');
       return;
     }
 
@@ -100,7 +105,7 @@ export default class Engine {
     for (const [agentId, agent] of Object.entries(this.agents)) {
       for (const [taskId, task] of Object.entries(agent.tasks)) {
         if (this.isDry) {
-          console.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
+          this.logger.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
           continue;
         }
 
@@ -120,7 +125,7 @@ export default class Engine {
         }
 
         task.timeout = setTimeout(run, task.schedule, agentId, taskId);
-        console.debug('[Engine.execAgents]', `task [${taskId}] (${task.type}) scheduled (${task.schedule}ms) (agent ${agentId})`);
+        this.logger.debug('[Engine.execAgents]', `task [${taskId}] (${task.type}) scheduled (${task.schedule}ms) (agent ${agentId})`);
       }
     }
 
@@ -128,47 +133,47 @@ export default class Engine {
   }
 
   async scanProject() {
-    console.debug('[Engine.scanProject]');
+    this.logger.debug('[Engine.scanProject]');
 
     // create project/workspace folder (~/.marvin)
     const hpath = this.work;
     if (this.isDry) {
-      console.info('[Engine.scanProject]', '[dry]', hpath);
+      this.logger.info('[Engine.scanProject]', '[dry]', hpath);
     } else if (!existsSync(hpath)) {
-      console.error('[Engine.scanProject]', `missing ${hpath} folder`, 'please run "marvin install" again');
+      this.logger.error('[Engine.scanProject]', `missing ${hpath} folder`, 'please run "marvin install" again');
       return;
     }
 
     // agents folder (~/.marvin/agents)
     const apath = join(hpath, 'agents');
     if (this.isDry) {
-      console.info('[Engine.scanProject]', '[dry]', apath);
+      this.logger.info('[Engine.scanProject]', '[dry]', apath);
     } else if (!existsSync(apath)) {
-      console.error('[Engine.scanProject]', `missing ${apath} folder`, 'please run "marvin install" again');
+      this.logger.error('[Engine.scanProject]', `missing ${apath} folder`, 'please run "marvin install" again');
       return;
     }
 
     // create ~/.marvin/MARVIN.md from constants (orchestrator identity)
     const mpath = join(hpath, 'MARVIN.md');
     if (this.isDry) {
-      console.info('[Engine.scanProject]', '[dry]', mpath);
+      this.logger.info('[Engine.scanProject]', '[dry]', mpath);
     } else if (!existsSync(mpath)) {
-      console.error('[Engine.scanProject]', `missing ${mpath} file`, 'please run "marvin install" again');
+      this.logger.error('[Engine.scanProject]', `missing ${mpath} file`, 'please run "marvin install" again');
       return;
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
     const cpath = join(hpath, 'marvin.json');
     if (this.isDry) {
-      console.info('[Engine.scanProject]', '[dry]', cpath);
+      this.logger.info('[Engine.scanProject]', '[dry]', cpath);
     } else if (!existsSync(cpath)) {
-      console.error('[Engine.scanProject]', `missing ${cpath} file`, 'please run "marvin install" again');
+      this.logger.error('[Engine.scanProject]', `missing ${cpath} file`, 'please run "marvin install" again');
       return;
     }
   }
 
   async loadSystems() {
-    console.debug('[Engine.loadSystems]');
+    this.logger.debug('[Engine.loadSystems]');
 
     const files = listSystems(this).map(f => f.replace('.ts', ''));
     for (const name of files) {
@@ -178,22 +183,22 @@ export default class Engine {
         const Module = await import(`./systems/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof System)) {
-          console.error('[Engine.loadSystems]', `"${name}" does not export a System class, skipping`);
+          this.logger.error('[Engine.loadSystems]', `"${name}" does not export a System class, skipping`);
           continue;
         }
         // register instance of System
-        const instance = new Class(this);
+        const instance = new Class(this, this.logger);
         await instance.load();
         this.systems[name] = instance;
-        console.info('[Engine.loadSystems]', `system "${name}" loaded`);
+        this.logger.info('[Engine.loadSystems]', `system "${name}" loaded`);
       } catch (err) {
-        console.error('[Engine.loadSystems]', `failed to load "${name}":`, err);
+        this.logger.error('[Engine.loadSystems]', `failed to load "${name}":`, err);
       }
     }
   }
 
   async loadTools() {
-    console.debug('[Engine.loadTools]');
+    this.logger.debug('[Engine.loadTools]');
 
     const files = listTools(this).map(f => f.replace('.ts', ''));
     for (const file of files) {
@@ -204,16 +209,16 @@ export default class Engine {
         const Module = await import(`./tools/${name}.js`);
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
-          console.error('[Engine.loadTools]', `"${file}" does not export a Tool class, skipping`);
+          this.logger.error('[Engine.loadTools]', `"${file}" does not export a Tool class, skipping`);
           continue;
         }
         // register instance of Tool
-        const instance = new Class(this);
+        const instance = new Class(this, this.logger);
         const meta = instance.meta as ToolMeta;
         this.tools[meta.function.name] = instance;
-        console.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded`);
+        this.logger.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded`);
       } catch (err) {
-        console.error('[Engine.loadTools]', `failed to load "${file}":`, err);
+        this.logger.error('[Engine.loadTools]', `failed to load "${file}":`, err);
       }
     }
 
@@ -228,22 +233,22 @@ export default class Engine {
         const Module = await import(join(cdir, file));
         const Class = Module.default;
         if (!Class || !(Class.prototype instanceof Tool)) {
-          console.error('[Engine.loadTools]', `"${file}" does not export a Tool class, skipping`);
+          this.logger.error('[Engine.loadTools]', `"${file}" does not export a Tool class, skipping`);
           continue;
         }
         // register instance of Tool
-        const instance = new Class(this);
+        const instance = new Class(this, this.logger);
         const meta = instance.meta as ToolMeta;
         this.tools[meta.function.name] = instance;
-        console.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded (custom)`);
+        this.logger.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded (custom)`);
       } catch (err) {
-        console.error('[Engine.loadTools]', `failed to load custom tool "${file}":`, err);
+        this.logger.error('[Engine.loadTools]', `failed to load custom tool "${file}":`, err);
       }
     }
   }
 
   async loadChannels() {
-    console.debug('[Engine.loadChannels]');
+    this.logger.debug('[Engine.loadChannels]');
     
     const files = listChannels(this).map(f => f.replace('.ts', ''));
     for (const [id, config] of Object.entries(this.config.channels)) {
@@ -251,7 +256,7 @@ export default class Engine {
 
       const file = files.find(f => f === id);
       if (!file) {
-        console.error('[Engine.loadChannels]', `no file for channel "${id}", skipping`);
+        this.logger.error('[Engine.loadChannels]', `no file for channel "${id}", skipping`);
         continue;
       }
 
@@ -262,22 +267,22 @@ export default class Engine {
         const Class = Module.default;
         // must be a Channel class
         if (!Class || !(Class.prototype instanceof Channel)) {
-          console.error('[Engine.loadChannels]', `"${file}" does not export a Channel class, skipping ${id}`);
+          this.logger.error('[Engine.loadChannels]', `"${file}" does not export a Channel class, skipping ${id}`);
           continue;
         }
         // register instance of Channel 
-        const instance = new Class(this);
+        const instance = new Class(this, this.logger);
         await instance.load();
         this.channels[id] = instance;
-        console.info('[Engine.loadChannels]', `channel "${id}" loaded`);
+        this.logger.info('[Engine.loadChannels]', `channel "${id}" loaded`);
       } catch (err) {
-        console.error('[Engine.loadChannels]', `failed to load "${id}":`, err);
+        this.logger.error('[Engine.loadChannels]', `failed to load "${id}":`, err);
       }
     }
   }
 
   async loadIntegrations() {
-    console.debug('[Engine.loadIntegrations]');
+    this.logger.debug('[Engine.loadIntegrations]');
 
     const files = listIntegrations(this).map(f => f.replace('.ts', ''));
     for (const [id, config] of Object.entries(this.config.integrations)) {
@@ -285,7 +290,7 @@ export default class Engine {
 
       const file = files.find(f => f === config.type);
       if (!file) {
-        console.error('[Engine.loadIntegrations]', `no file for integration "${id}" type "${config.type}", skipping`);
+        this.logger.error('[Engine.loadIntegrations]', `no file for integration "${id}" type "${config.type}", skipping`);
         continue;
       }
 
@@ -296,22 +301,22 @@ export default class Engine {
         const Class = Module.default;
         // must be an Integration class
         if (!Class || !(Class.prototype instanceof Integration)) {
-          console.error('[Engine.loadIntegrations]', `"${id}" does not export an Integration class, skipping`);
+          this.logger.error('[Engine.loadIntegrations]', `"${id}" does not export an Integration class, skipping`);
           continue;
         }
         // register instance of Integration
-        const instance = new Class(this, config);
+        const instance = new Class(this, this.logger, config);
         await instance.load();
         this.integrations[id] = instance;
-        console.info('[Engine.loadIntegrations]', `integration "${id}" loaded`);
+        this.logger.info('[Engine.loadIntegrations]', `integration "${id}" loaded`);
       } catch (err) {
-        console.error('[Engine.loadIntegrations]', `failed to load "${id}":`, err);
+        this.logger.error('[Engine.loadIntegrations]', `failed to load "${id}":`, err);
       }
     }
   }
 
   async loadSkills() {
-    console.debug('[Engine.loadSkills]');
+    this.logger.debug('[Engine.loadSkills]');
 
     // default skills shipped with marvin (src/skills)
     const files = listSkills(this);
@@ -321,9 +326,9 @@ export default class Engine {
       try {
         const skill = parseSkill(join(import.meta.dirname, 'skills', file), 'default');
         this.skills[id] = skill;
-        console.info('[Engine.loadSkills]', `skill "${id}" loaded (default)`);
+        this.logger.info('[Engine.loadSkills]', `skill "${id}" loaded (default)`);
       } catch (err) {
-        console.error('[Engine.loadSkills]', `failed to load "${file}":`, err);
+        this.logger.error('[Engine.loadSkills]', `failed to load "${file}":`, err);
       }
     }
 
@@ -335,15 +340,15 @@ export default class Engine {
       try {
         const skill = parseSkill(join(cdir, file), 'custom');
         this.skills[id] = skill;
-        console.info('[Engine.loadSkills]', `skill "${id}" loaded (custom)`);
+        this.logger.info('[Engine.loadSkills]', `skill "${id}" loaded (custom)`);
       } catch (err) {
-        console.error('[Engine.loadSkills]', `failed to load custom skill "${file}":`, err);
+        this.logger.error('[Engine.loadSkills]', `failed to load custom skill "${file}":`, err);
       }
     }
   }
 
   async loadModels() {
-    console.debug('[Engine.loadModels]');
+    this.logger.debug('[Engine.loadModels]');
 
     // config models
     const files = listModels(this).map(f => f.replace('.ts', ''))
@@ -352,13 +357,13 @@ export default class Engine {
         if (this.models[modelId]) continue;
 
         if (!config.enabled) {
-          console.warn('[Engine.loadModels]', `model "${modelId}" is disabled, skipping`);
+          this.logger.warn('[Engine.loadModels]', `model "${modelId}" is disabled, skipping`);
           continue;
         }
 
         const file = files.find(f => f === config.provider);
         if (!file) {
-          console.error('[Engine.loadModels]', `no file for provider ${config.provider}, skipping "${modelId}"`);
+          this.logger.error('[Engine.loadModels]', `no file for provider ${config.provider}, skipping "${modelId}"`);
           continue;
         }
 
@@ -368,17 +373,17 @@ export default class Engine {
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[Engine.loadModels]', `"${modelId}" does not export a Model class, skipping`);
+          this.logger.error('[Engine.loadModels]', `"${modelId}" does not export a Model class, skipping`);
           continue;
         }
         
         // save instance (needed by agents)
-        const instance = new Class(this, config);
+        const instance = new Class(this, this.logger, config);
         this.models[modelId] = instance;
 
-        console.info('[Engine.loadModels]', `model "${modelId}" loaded (${config.provider} ${config.model})`);
+        this.logger.info('[Engine.loadModels]', `model "${modelId}" loaded (${config.provider} ${config.model})`);
       } catch (err) {
-        console.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
+        this.logger.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
       }
     }
 
@@ -393,23 +398,23 @@ export default class Engine {
 
         // must be a Model class
         if (!Class || !(Class.prototype instanceof Model)) {
-          console.error('[Engine.loadModels]', `"${modelId}" does not export a Model class!`);
+          this.logger.error('[Engine.loadModels]', `"${modelId}" does not export a Model class!`);
           process.exit(1);
         }
 
-        const instance = new Class(this, {provider: 'fallback', model: 'fallback'});
+        const instance = new Class(this, this.logger, {provider: 'fallback', model: 'fallback'});
         this.models[modelId] = instance;
 
         // warn because fallback model is not a good idea, and does NOTHING
-        console.info('[Engine.loadModels]', `model "${modelId}" fallback`);
+        this.logger.info('[Engine.loadModels]', `model "${modelId}" fallback`);
       } catch (err) {
-        console.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
+        this.logger.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
       }
     }
   }
 
   async loadAgents() {
-    console.debug('[Engine.loadAgents]');
+    this.logger.debug('[Engine.loadAgents]');
 
     // type: orchestrator/supervisor
     if (!this.agents[this.config.settings.name]) {
@@ -423,7 +428,7 @@ export default class Engine {
       if (existsSync(join(this.work, 'MARVIN.md'))) {
         identity = readFileSync(join(this.work, 'MARVIN.md'), 'utf8').trim();
       } else {
-        console.warn('[Engine.loadAgents]', `no MARVIN.md found for agent "${marvinId}", using default`);
+        this.logger.warn('[Engine.loadAgents]', `no MARVIN.md found for agent "${marvinId}", using default`);
       }
 
       // add ochestrator agent
@@ -446,7 +451,7 @@ export default class Engine {
         maxSteps: 0,
       } as Task;
 
-      console.info('[Engine.loadAgents]', `task "monitor" created (agent ${marvinId})`);
+      this.logger.info('[Engine.loadAgents]', `task "monitor" created (agent ${marvinId})`);
 
       // add sweep task (evict idle cached chats) to the orchestrator agent
       this.agents[marvinId].tasks['sweep'] = {
@@ -458,9 +463,9 @@ export default class Engine {
         maxSteps: 0,
       } as Task;
 
-      console.info('[Engine.loadAgents]', `task "sweep" created (agent ${marvinId})`);
+      this.logger.info('[Engine.loadAgents]', `task "sweep" created (agent ${marvinId})`);
 
-      console.info('[Engine.loadAgents]',`agent "${marvinId}" loaded`);
+      this.logger.info('[Engine.loadAgents]',`agent "${marvinId}" loaded`);
     }
 
     // type: agent
@@ -469,7 +474,7 @@ export default class Engine {
 
       const model = this.models[agent.model || ''];
       if (!model) {
-        console.error('[Engine.loadAgents]', `model not found for agent "${agentId}": ${agent.model}`);
+        this.logger.error('[Engine.loadAgents]', `model not found for agent "${agentId}": ${agent.model}`);
         continue;
       }
 
@@ -491,12 +496,12 @@ export default class Engine {
         }
 
         if (!input) {
-          console.warn('[Engine.loadAgents]', `no input found for task "${taskId}", disabling`);
+          this.logger.warn('[Engine.loadAgents]', `no input found for task "${taskId}", disabling`);
           enabled = false;
         }
 
         if (this.isDry) {
-          console.info('[Engine.loadAgents]', `[dry] task "${taskId}" created (agent ${agentId})`);
+          this.logger.info('[Engine.loadAgents]', `[dry] task "${taskId}" created (agent ${agentId})`);
           continue;
         }
 
@@ -513,7 +518,7 @@ export default class Engine {
           input: input,
         } as Task;
 
-        console.info('[Engine.loadAgents]', `task "${taskId}" created (agent ${agentId})`);
+        this.logger.info('[Engine.loadAgents]', `task "${taskId}" created (agent ${agentId})`);
       }
 
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
@@ -521,7 +526,7 @@ export default class Engine {
       if (existsSync(join(this.work, 'agents', agentId, 'IDENTITY.md'))) {
         identity = readFileSync(join(this.work, 'agents', agentId, 'IDENTITY.md'), 'utf8').trim();
       } else {
-        console.warn('[Engine.loadAgents]', `no IDENTITY.md found for agent "${agentId}", using default`);
+        this.logger.warn('[Engine.loadAgents]', `no IDENTITY.md found for agent "${agentId}", using default`);
       }
 
       this.agents[agentId] = {
@@ -533,19 +538,19 @@ export default class Engine {
         tasks: tasks,
       } as Agent;
 
-      console.info('[Engine.loadAgents]',`agent [${agentId}] loaded`);
+      this.logger.info('[Engine.loadAgents]',`agent [${agentId}] loaded`);
     }
   }
 
   async dropAgents() {
-    console.debug('[Engine.dropAgents]');
+    this.logger.debug('[Engine.dropAgents]');
     for (const [agentId, agent] of Object.entries(this.agents)) {
       for (const [taskId, task] of Object.entries(agent.tasks)) {
         if (task.timeout) { 
-          console.debug('[Engine.dropAgents]', `stopping task ${taskId}`);
+          this.logger.debug('[Engine.dropAgents]', `stopping task ${taskId}`);
           clearTimeout(task.timeout);
         } else {
-          console.debug('[Engine.dropAgents]', `task ${taskId} not running, continuing`);
+          this.logger.debug('[Engine.dropAgents]', `task ${taskId} not running, continuing`);
         }
       }
     }
@@ -553,29 +558,29 @@ export default class Engine {
   }
 
   async dropModels() {
-    console.debug('[Engine.dropModels]');
+    this.logger.debug('[Engine.dropModels]');
     this.models = {};
   }
 
   async dropSkills() {
-    console.debug('[Engine.dropSkills]');
+    this.logger.debug('[Engine.dropSkills]');
     this.skills = {};
   }
 
   async dropIntegrations() {
-    console.debug('[Engine.dropIntegrations]');
+    this.logger.debug('[Engine.dropIntegrations]');
     this.integrations = {};
   }
 
   // will detach and delete ALL channels from the engine
   async dropChannels() {
-    console.debug('[Engine.dropChannels]');
+    this.logger.debug('[Engine.dropChannels]');
     for (const [channelId, channel] of Object.entries(this.channels)) {
       try {
-        console.debug('[Engine.dropChannels]', `detaching channel ${channelId}`);
+        this.logger.debug('[Engine.dropChannels]', `detaching channel ${channelId}`);
         await channel.drop();
       } catch (err) {
-        console.error('[Engine.dropChannels]', `error detaching channel:`, err);
+        this.logger.error('[Engine.dropChannels]', `error detaching channel:`, err);
       }
     }
     this.channels = {};
@@ -583,30 +588,30 @@ export default class Engine {
 
   // will detach and delete the channel from the engine
   async dropChannel(id: string) {
-    console.debug('[Engine.dropChannel]', id);
+    this.logger.debug('[Engine.dropChannel]', id);
     if (this.channels[id]) {
       try {
         this.channels[id].drop();
       } catch (err) {
-        console.error('[Engine.dropChannel]', `error detaching channel:`, err);
+        this.logger.error('[Engine.dropChannel]', `error detaching channel:`, err);
       }
       delete this.channels[id];
     }
   }
 
   async dropIntegration(id: string) {
-    console.debug('[Engine.dropIntegration]', id);
+    this.logger.debug('[Engine.dropIntegration]', id);
     delete this.integrations[id];
   }
 
   async dropSystems() {
-    console.debug('[Engine.dropSystems]');
+    this.logger.debug('[Engine.dropSystems]');
     for (const [name, system] of Object.entries(this.systems)) {
       try {
-        console.debug('[Engine.dropSystems]', `detaching system ${name}`);
+        this.logger.debug('[Engine.dropSystems]', `detaching system ${name}`);
         await system.drop();
       } catch (err) {
-        console.error('[Engine.dropSystems]', `error detaching system:`, err);
+        this.logger.error('[Engine.dropSystems]', `error detaching system:`, err);
       }
     }
     this.systems = {};
@@ -616,40 +621,40 @@ export default class Engine {
 
   // monitors the state: checks agents and tasks, then reschedules itself
   async execMonitor(agentId: string, taskId: string) {
-    console.debug('[Engine.execMonitor]', agentId, taskId);
+    this.logger.debug('[Engine.execMonitor]', agentId, taskId);
 
     // check assistant state
     if (this.state  !== 'exec') {
-      console.info('[Engine.execMonitor]', `task ${taskId} skipped (assistant NOT running)`);
+      this.logger.info('[Engine.execMonitor]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
 
     // check if agent exists
     const agent = this.agents[agentId];
     if (!agent) {
-      console.error('[Engine.execMonitor]', `agent ${agentId} NOT found`);
+      this.logger.error('[Engine.execMonitor]', `agent ${agentId} NOT found`);
       return;
     }
     // check if task exists
     const task = agent.tasks[taskId]!;
     if (!task) {
-      console.error('[Engine.execMonitor]', `task ${taskId} NOT found`);
+      this.logger.error('[Engine.execMonitor]', `task ${taskId} NOT found`);
       return;
     }
     
     // log agents and their tasks
-    console.info('[Engine.execMonitor]', `marvin agents:`);
+    this.logger.info('[Engine.execMonitor]', `marvin agents:`);
     for (const [agentId, agent] of Object.entries(this.agents)) {
-      console.info('[Engine.execMonitor]', `  agent ${agentId}:`);
-      console.info('[Engine.execMonitor]', `    enabled: ${agent.enabled?'yes':'no'}`);
-      console.info('[Engine.execMonitor]', `    model: ${agent.model.model}`);
-      console.info('[Engine.execMonitor]', `    channels:`);
+      this.logger.info('[Engine.execMonitor]', `  agent ${agentId}:`);
+      this.logger.info('[Engine.execMonitor]', `    enabled: ${agent.enabled?'yes':'no'}`);
+      this.logger.info('[Engine.execMonitor]', `    model: ${agent.model.model}`);
+      this.logger.info('[Engine.execMonitor]', `    channels:`);
       for (const [channelId, channel] of Object.entries(agent.channels)) {
-        console.info('[Engine.execMonitor]', `      channel: ${channelId} ${channel}`);
+        this.logger.info('[Engine.execMonitor]', `      channel: ${channelId} ${channel}`);
       }
-      console.info('[Engine.execMonitor]', `    tasks:`);
+      this.logger.info('[Engine.execMonitor]', `    tasks:`);
       for (const [taskId, task] of Object.entries(agent.tasks)) {
-        console.info('[Engine.execMonitor]', `      task ${taskId}: ${task.schedule}ms ${task.enabled?'enabled':'disabled'}`);
+        this.logger.info('[Engine.execMonitor]', `      task ${taskId}: ${task.schedule}ms ${task.enabled?'enabled':'disabled'}`);
       }
     }
     
@@ -659,40 +664,40 @@ export default class Engine {
 
   // prompts the LLM with the task input, sends the result through channels, then reschedules
   async execInput(agentId: string, taskId: string) {
-    console.debug('[Engine.execInput]', `${agentId}/${taskId}`);
+    this.logger.debug('[Engine.execInput]', `${agentId}/${taskId}`);
 
     // check assistant state
     if (this.state !== 'exec') {
-      console.warn('[Engine.execInput]', `task ${taskId} skipped (assistant NOT running)`);
+      this.logger.warn('[Engine.execInput]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
 
     // check if agent exists
     const agent = this.agents[agentId];
     if (!agent) {
-      console.info('[Engine.execInput]', `task ${taskId} skipped (agent not found)`);
+      this.logger.info('[Engine.execInput]', `task ${taskId} skipped (agent not found)`);
       return;
     }
     // check if agent is enabled
     if (!agent.enabled) {
-      console.info('[Engine.execInput]', `task ${taskId} skipped (agent disabled)`);
+      this.logger.info('[Engine.execInput]', `task ${taskId} skipped (agent disabled)`);
       return;
     }
 
     // check if task exists
     const task = agent.tasks[taskId]!;
     if (!task) {
-      console.info('[Engine.execInput]', `task ${taskId} skipped (task not found)`);
+      this.logger.info('[Engine.execInput]', `task ${taskId} skipped (task not found)`);
       return;
     }
     // check if task is enabled
     if (!task.enabled) {
-      console.info('[Engine.execInput]', `task ${taskId} skipped (task disabled)`);
+      this.logger.info('[Engine.execInput]', `task ${taskId} skipped (task disabled)`);
       return;
     }
 
     if (!task.input) {
-      console.info('[Engine.execInput]', `task ${taskId} skipped (no input)`);
+      this.logger.info('[Engine.execInput]', `task ${taskId} skipped (no input)`);
       return;
     }
 
@@ -707,7 +712,7 @@ export default class Engine {
     // set task input as user message to LLM
     const result = await this.execChat(chatId, agentId, task.input, format, schema, maxSteps);
     if (!result) {
-      console.error('[Engine.execInput]', `no result from sendMessage for agent ${agentId}`);
+      this.logger.error('[Engine.execInput]', `no result from sendMessage for agent ${agentId}`);
       return;
     }
 
@@ -720,25 +725,25 @@ export default class Engine {
 
         // verify channel exists, warn if not, then skip
         if (!channel) {
-          console.warn('[Engine.execInput]', `channel ${channelId} not found, skipping`);
+          this.logger.warn('[Engine.execInput]', `channel ${channelId} not found, skipping`);
           continue;
         }
 
         const reply = await channel.sendMessage({ role: 'assistant', content, channel: groupId } as Message);
         if (!reply.ok) {
-          console.warn('[Engine.execInput]', `channel ${channelId} send failed, skipping`);
+          this.logger.warn('[Engine.execInput]', `channel ${channelId} send failed, skipping`);
           continue;
         }
 
         // try to send, log error if failed, continue
-        console.info('[Engine.execInput]', `message sent to channel ${channelId}:${groupId}`);
+        this.logger.info('[Engine.execInput]', `message sent to channel ${channelId}:${groupId}`);
       } catch (err) {
-        console.error('[Engine.execInput]', `channel ${channelId} send failed:`, err);
+        this.logger.error('[Engine.execInput]', `channel ${channelId} send failed:`, err);
       }
     }
 
     if (this.isDry) {
-      console.info('[Engine.execInput]', '[dry]', 'task executed (once)');
+      this.logger.info('[Engine.execInput]', '[dry]', 'task executed (once)');
       return;
     }
 
@@ -747,7 +752,7 @@ export default class Engine {
   }
 
   async execReload() {
-    console.debug('[Engine.execReload]');
+    this.logger.debug('[Engine.execReload]');
 
     // drop in reverse order
     await this.drop();
@@ -757,11 +762,11 @@ export default class Engine {
 
   // tool call
   async  execTool(tool: string, args: {[key:string]:any}) : Promise<{[key:string]:any}> {
-    console.debug('[Engine.execTool]', tool);
+    this.logger.debug('[Engine.execTool]', tool);
 
     const instance = this.tools[tool];
     if (!instance) {
-      console.error('[Engine.execTool]', `tool ${tool} not found`);
+      this.logger.error('[Engine.execTool]', `tool ${tool} not found`);
       return {tool: tool, error: `tool ${tool} does NOT exist`};
     }
 
@@ -769,7 +774,7 @@ export default class Engine {
       // ! tool call
       return await instance.call(args);
     } catch (err) {
-      console.error('[Engine.execTool]', `tool ${tool} failed:`, err);
+      this.logger.error('[Engine.execTool]', `tool ${tool} failed:`, err);
       return {tool: tool, error: (err as Error).message};
     }
   }
@@ -804,24 +809,24 @@ export default class Engine {
 
   // removes cached chats idle for longer than the TTL, then reschedules itself
   async execSweep(agentId: string, taskId: string) {
-    console.debug('[Engine.execSweep]', `${agentId}/${taskId}`);
+    this.logger.debug('[Engine.execSweep]', `${agentId}/${taskId}`);
 
     // check assistant state
     if (this.state !== 'exec') {
-      console.info('[Engine.execSweep]', `task ${taskId} skipped (assistant NOT running)`);
+      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
 
     // check if agent exists
     const agent = this.agents[agentId];
     if (!agent) {
-      console.info('[Engine.execSweep]', `task ${taskId} skipped (agent not found)`);
+      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (agent not found)`);
       return;
     }
     // check if task exists
     const task = agent.tasks[taskId]!;
     if (!task) {
-      console.info('[Engine.execSweep]', `task ${taskId} skipped (task not found)`);
+      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (task not found)`);
       return;
     }
 
@@ -830,15 +835,15 @@ export default class Engine {
     let removed = 0;
     for (const [chatId, chat] of Object.entries(this.cache)) {
       if (now - (chat.updatedAt || 0) > constants.CHAT_TTL_MS) {
-        console.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
+        this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
         delete this.cache[chatId];
         removed++;
       }
     }
-    console.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
+    this.logger.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
 
     if (this.isDry) {
-      console.info('[Engine.execSweep]', '[dry]', 'task executed (once)');
+      this.logger.info('[Engine.execSweep]', '[dry]', 'task executed (once)');
       return;
     }
 
@@ -849,7 +854,7 @@ export default class Engine {
   // agent loop
   async execChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
     try {
-      console.debug('[Engine.execChat]', chatId, agentId, message.slice(0, 100));
+      this.logger.debug('[Engine.execChat]', chatId, agentId, message.slice(0, 100));
 
       const agent = this.agents[agentId]!;
 
@@ -875,7 +880,7 @@ export default class Engine {
 
       // return early
       if (this.isDry) {
-        console.info('[Engine.execChat]', '[dry]', 'send messages to:', agent.model.model);
+        this.logger.info('[Engine.execChat]', '[dry]', 'send messages to:', agent.model.model);
         this.saveChat(chatId, chat);
         return { content: '(dry)', steps: 0 };
       }
@@ -899,17 +904,17 @@ export default class Engine {
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
         // trim result, this can be really big
-        console.debug('[Engine.execChat]', `step=${steps}`, `tools={${reply.message.tools?.length}}`);
+        this.logger.debug('[Engine.execChat]', `step=${steps}`, `tools={${reply.message.tools?.length}}`);
 
         // force stop
         if (reply.stop) {
-          console.debug('[Engine.execChat]', `response force stop at step ${steps}`);
+          this.logger.debug('[Engine.execChat]', `response force stop at step ${steps}`);
           break;
         }
 
         // execute any tool calls
         for (const tool of reply.message.tools || []) {
-          console.debug('[Engine.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+          this.logger.debug('[Engine.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
           if (tool.name === constants.END_CHAT_NAME) {
             ender = true;
@@ -925,20 +930,20 @@ export default class Engine {
 
         // if model produced content without pending tool calls, we're done
         // if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
-        //   console.info('[Engine.execChat]', `response without tool calls, stopping the AI loop`);
+        //   this.logger.info('[Engine.execChat]', `response without tool calls, stopping the AI loop`);
         //   break;
         // }
 
         // if end_chat tool call is found, we're done
         if (ender) {
-          console.info('[Engine.execChat]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
+          this.logger.info('[Engine.execChat]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
           break;
         }
       } while (steps < maxSteps - 1);
 
       // warn if max steps reached
       if (steps >= maxSteps) {
-        console.warn('[Engine.execChat]', `max steps (${maxSteps}) reached for ${agentId}`);
+        this.logger.warn('[Engine.execChat]', `max steps (${maxSteps}) reached for ${agentId}`);
       }
 
       // save chat to cache
@@ -951,7 +956,7 @@ export default class Engine {
       const content = chat.format === 'json' ? cleanContent(rawContent) : rawContent;
       return { content: content, steps: steps };
     } catch (error) {
-      console.error('[Engine.execChat]', error);
+      this.logger.error('[Engine.execChat]', error);
       return null;
     } 
   }

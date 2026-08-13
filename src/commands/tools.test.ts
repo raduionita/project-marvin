@@ -3,11 +3,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import ToolsCommand from './tools.js';
 import { Skill, Config } from '../types.js';
 
 function mockEngine(isDry = false): Engine {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.isDry = isDry;
   engine.work = join(tmpdir(), 'marvin-tools-cmd-' + Date.now() + Math.random().toString(36).slice(2, 8));
   mkdirSync(join(engine.work, 'skills'), { recursive: true });
@@ -52,9 +53,17 @@ function scriptedAsk(answers: string[]) {
   return async () => queue.shift() || '';
 }
 
+// a logger that captures every emitted line (info-level and up), so tests can
+// assert on command output without patching console.*
+function captureLogger(): { logger: Logger; lines: string[] } {
+  const lines: string[] = [];
+  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
+  return { logger, lines };
+}
+
 test('tools add writes a custom tool to ~/.marvin/tools', async () => {
   const engine = mockEngine();
-  const cmd = new ToolsCommand(engine, ['add', 'my_tool', 'does something']);
+  const cmd = new ToolsCommand(engine, new Logger(), ['add', 'my_tool', 'does something']);
   cmd.ask = scriptedAsk([]);
 
   // stub the LLM call to return generated tool source
@@ -69,7 +78,7 @@ test('tools add writes a custom tool to ~/.marvin/tools', async () => {
 
 test('tools add prompts for tool name and description when missing', async () => {
   const engine = mockEngine();
-  const cmd = new ToolsCommand(engine, []);
+  const cmd = new ToolsCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['prompted_tool', 'prompted purpose']);
   engine.execChat = async () => ({ content: 'export default class PromptedTool extends Tool {}', steps: 1 });
 
@@ -81,24 +90,18 @@ test('tools add prompts for tool name and description when missing', async () =>
 test('tools add refuses an existing tool', async () => {
   const engine = mockEngine();
   writeFileSync(join(engine.work, 'tools', 'existing.ts'), '# Existing\n\nAlready here.');
-  const cmd = new ToolsCommand(engine, ['add', 'existing', 'desc']);
+  const { logger, lines } = captureLogger();
+  const cmd = new ToolsCommand(engine, logger, ['add', 'existing', 'desc']);
   cmd.ask = scriptedAsk([]);
 
-  const warnLogs: string[] = [];
-  const orig = console.warn;
-  console.warn = (...args: any[]) => warnLogs.push(args.join(' '));
-  try {
-    await cmd.execAdd();
-  } finally {
-    console.warn = orig;
-  }
+  await cmd.execAdd();
 
-  expect(warnLogs.join('\n')).toContain('already exists');
+  expect(lines.join('\n')).toContain('already exists');
 });
 
 test('tools add works in dry mode without calling the LLM', async () => {
   const engine = mockEngine(true);
-  const cmd = new ToolsCommand(engine, ['add', 'dry_tool', 'desc']);
+  const cmd = new ToolsCommand(engine, new Logger(), ['add', 'dry_tool', 'desc']);
   cmd.ask = scriptedAsk([]);
   let called = false;
   engine.execChat = async () => { called = true; return null; };
@@ -111,7 +114,7 @@ test('tools add works in dry mode without calling the LLM', async () => {
 
 test('tools add replaces the MARVIN_ROOT placeholder in generated code', async () => {
   const engine = mockEngine();
-  const cmd = new ToolsCommand(engine, ['add', 'rooted_tool', 'desc']);
+  const cmd = new ToolsCommand(engine, new Logger(), ['add', 'rooted_tool', 'desc']);
   cmd.ask = scriptedAsk([]);
   engine.execChat = async () => ({ content: "import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class RootedTool extends Tool {}", steps: 1 });
 
@@ -127,7 +130,7 @@ test('tools edit rewrites an existing custom tool', async () => {
   const tpath = join(engine.work, 'tools', 'my_tool.ts');
   writeFileSync(tpath, "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = false }");
 
-  const cmd = new ToolsCommand(engine, ['edit', 'my_tool', 'add a ping parameter']);
+  const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'add a ping parameter']);
   cmd.ask = scriptedAsk([]);
   engine.execChat = async () => ({ content: "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = true }", steps: 1 });
 
@@ -141,7 +144,7 @@ test('tools edit sends the current tool code to the LLM', async () => {
   const tpath = join(engine.work, 'tools', 'my_tool.ts');
   writeFileSync(tpath, 'export default class MyTool extends Tool { original = true }');
 
-  const cmd = new ToolsCommand(engine, ['edit', 'my_tool', 'make it better']);
+  const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'make it better']);
   cmd.ask = scriptedAsk([]);
   let prompt = '';
   engine.execChat = async (_a: any, _b: any, p: string) => { prompt = p; return { content: 'updated', steps: 1 }; };
@@ -154,26 +157,20 @@ test('tools edit sends the current tool code to the LLM', async () => {
 
 test('tools edit errors when the tool does not exist', async () => {
   const engine = mockEngine();
-  const cmd = new ToolsCommand(engine, ['edit', 'nope', 'change']);
+  const { logger, lines } = captureLogger();
+  const cmd = new ToolsCommand(engine, logger, ['edit', 'nope', 'change']);
   cmd.ask = scriptedAsk([]);
 
-  const errLogs: string[] = [];
-  const orig = console.error;
-  console.error = (...args: any[]) => errLogs.push(args.join(' '));
-  try {
-    await cmd.execEdit();
-  } finally {
-    console.error = orig;
-  }
+  await cmd.execEdit();
 
-  expect(errLogs.join('\n')).toContain('not found');
+  expect(lines.join('\n')).toContain('not found');
 });
 
 test('tools edit works in dry mode without calling the LLM', async () => {
   const engine = mockEngine(true);
   const tpath = join(engine.work, 'tools', 'dry_tool.ts');
   writeFileSync(tpath, 'old code');
-  const cmd = new ToolsCommand(engine, ['edit', 'dry_tool', 'update']);
+  const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'dry_tool', 'update']);
   cmd.ask = scriptedAsk([]);
   let called = false;
   engine.execChat = async () => { called = true; return null; };

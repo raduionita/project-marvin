@@ -59,7 +59,7 @@ export default class MarvinConfigTool extends Tool {
   }
 
   public async call(args: { operation?: string; key?: string; value?: any }) {
-    console.debug('[MarvinConfigTool.call]', args);
+    this.logger.debug('[MarvinConfigTool.call]', args);
 
     const path = resolveInsideHome(this.engine.work, 'marvin.json');
     if (!path) {

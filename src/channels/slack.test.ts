@@ -1,6 +1,7 @@
 import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import { Config, Message, Agent, Model, Chat, Reply } from '../types.js';
 import SlackChannel from './slack.js';
 import { type HandlerParams, type ISocketModeClient, type IWebClient } from './slack.js'
@@ -99,8 +100,8 @@ class MockSlackChannel extends SlackChannel {
   public mockSok: MockSocketModeClient;
   public mockWeb: MockWebClient;
 
-  constructor(engine: Engine) {
-    super(engine);
+  constructor(engine: Engine, logger?: Logger) {
+    super(engine, logger);
     this.mockSok = new MockSocketModeClient();
     this.mockWeb = new MockWebClient();
   }
@@ -172,7 +173,7 @@ class MockModel extends Model {
   private replies: Reply[];
 
   constructor(engine: Engine, replies: Reply[] = []) {
-    super(engine, {});
+    super(engine, new Logger(), {});
     this.replies = replies;
   }
 
@@ -221,10 +222,10 @@ function mockConfig(options: {
 }
 
 function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine: Engine; model: MockModel; channel: MockSlackChannel } {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.isDry = false;
   engine.state = 'exec';
-  engine.tools['get_date'] = new GetDateTool(engine);
+  engine.tools['get_date'] = new GetDateTool(engine, new Logger());
 
   engine.config = mockConfig({
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xbot-test' } },
@@ -246,6 +247,20 @@ function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine
 
   const channel = new MockSlackChannel(engine);
   return { engine, model, channel };
+}
+
+// a logger that captures every emitted line (info-level and up), so tests can
+// assert on command output without patching console.*
+function captureLogger(): { logger: Logger; lines: string[] } {
+  const lines: string[] = [];
+  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
+  return { logger, lines };
+}
+
+// build a channel wired to the mock Slack SDK clients with an injected logger
+function buildChannel(logger: Logger = new Logger()): MockSlackChannel {
+  const channel = new MockSlackChannel(new Engine(new Logger()), logger);
+  return channel;
 }
 
 function mentionEvent(overrides: { [key: string]: any } = {}): { event: any; body: any; ack: () => Promise<void> } {
@@ -313,7 +328,7 @@ test('extractText preserves links and formatting', () => {
 // ============================================================================
 
 test('findAgent returns agent whose channels.slack matches the passed channel', () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.agents['agent-1'] = { id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {}, model: {} as never } as Agent;
   engine.agents['agent-2'] = { id: 'agent-2', enabled: true, identity: '', channels: { slack: 'C456' }, tasks: {}, model: {} as never } as Agent;
 
@@ -322,7 +337,7 @@ test('findAgent returns agent whose channels.slack matches the passed channel', 
 });
 
 test('findAgent returns default agent when no channel is passed', () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.config = mockConfig();
   engine.agents['marvin'] = { id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never } as Agent;
 
@@ -331,7 +346,7 @@ test('findAgent returns default agent when no channel is passed', () => {
 });
 
 test('findAgent skips disabled agents', () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.config = mockConfig();
   engine.agents['disabled-agent'] = { id: 'disabled-agent', enabled: false, identity: '', channels: { slack: 'C999' }, tasks: {}, model: {} as never } as Agent;
   engine.agents['active-agent'] = { id: 'active-agent', enabled: true, identity: '', channels: { slack: 'C789' }, tasks: {}, model: {} as never } as Agent;
@@ -341,7 +356,7 @@ test('findAgent skips disabled agents', () => {
 });
 
 test('findAgent falls back to the default agent when no channel matches', () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.config = mockConfig();
   engine.agents['marvin'] = { id: 'marvin', enabled: true, identity: '', channels: { slack: 'CDEFAULT' }, tasks: {}, model: {} as never } as Agent;
 
@@ -713,74 +728,136 @@ test('E2E: non-JSON LLM output is posted unchanged', async () => {
 // onSlashCommand + connection state handler tests
 // ============================================================================
 
-test('onSlashCommand acknowledges with a stub response', async () => {
+test('onSlashCommand acks then posts the help output to the channel', async () => {
   const { channel } = buildEngine();
   await channel.load();
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.020', channel: 'C123',
+    message: { text: 'help text', ts: '1700000000.020' },
+  } as ChatPostMessageResponse);
 
-  let acked = false;
+  let ackText = '';
   await channel.mockSok.emit('slash_commands', {
-    event: { callback_id: 'doSomething' },
-    body: { callback_id: 'doSomething' },
-    ack: async () => { acked = true; },
+    event: { channel_id: 'C123' },
+    body: { command: '/marvin', text: 'help', channel_id: 'C123' },
+    ack: async (response: any) => { ackText = response?.text || ''; },
   });
 
-  expect(acked).toBe(true);
+  expect(ackText).toContain('running /marvin help');
+  expect(channel.mockWeb.postMessageCalls.length).toBe(1);
+  const posted = channel.mockWeb.postMessageCalls[0]!;
+  expect(posted.channel).toBe('C123');
+  expect(posted.text).toContain('usage: marvin [command]');
+  expect(posted.text).toContain('version');
 });
 
-test('onError logs error to console.error', async () => {
+test('onSlashCommand forwards command args and posts the result', async () => {
   const { channel } = buildEngine();
   await channel.load();
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.021', channel: 'C123',
+    message: { text: 'skills list', ts: '1700000000.021' },
+  } as ChatPostMessageResponse);
 
-  const originalError = console.error;
-  const captured: unknown[][] = [];
-  console.error = (...args: unknown[]) => { captured.push(args); };
+  await channel.mockSok.emit('slash_commands', {
+    event: { channel_id: 'C123' },
+    body: { command: '/marvin', text: 'skills list', channel_id: 'C123' },
+    ack: async () => {},
+  });
+
+  const posted = channel.mockWeb.postMessageCalls[0]!;
+  // the "list" arg was forwarded to SkillsCommand (without it, help would run)
+  expect(posted.text).toContain('default skills:');
+  expect(posted.text).toContain('custom skills:');
+});
+
+test('onSlashCommand replies with an error for an unknown command', async () => {
+  const { channel } = buildEngine();
+  await channel.load();
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.022', channel: 'C123',
+    message: { text: 'error', ts: '1700000000.022' },
+  } as ChatPostMessageResponse);
+
+  await channel.mockSok.emit('slash_commands', {
+    event: { channel_id: 'C123' },
+    body: { command: '/marvin', text: 'foobar', channel_id: 'C123' },
+    ack: async () => {},
+  });
+
+  const posted = channel.mockWeb.postMessageCalls[0]!;
+  expect(posted.text).toContain('unknown command: foobar');
+  expect(posted.text).toContain('available commands');
+});
+
+test('onSlashCommand does not expose blocked commands', async () => {
+  const { channel } = buildEngine();
+  await channel.load();
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.023', channel: 'C123',
+    message: { text: 'error', ts: '1700000000.023' },
+  } as ChatPostMessageResponse);
+
+  await channel.mockSok.emit('slash_commands', {
+    event: { channel_id: 'C123' },
+    body: { command: '/marvin', text: 'serve', channel_id: 'C123' },
+    ack: async () => {},
+  });
+
+  const posted = channel.mockWeb.postMessageCalls[0]!;
+  expect(posted.text).toContain('serve cannot be run from slack');
+  // serve must not be listed among the available commands
+  const list = (posted.text || '').split('available commands: ')[1] || '';
+  expect(list).not.toContain('serve');
+
+  await channel.mockSok.emit('slash_commands', {
+    event: { channel_id: 'C123' },
+    body: { command: '/marvin', text: 'disable', channel_id: 'C123' },
+    ack: async () => {},
+  });
+
+  const second = channel.mockWeb.postMessageCalls[1]!;
+  expect(second.text).toContain('disable cannot be run from slack');
+});
+
+test('onError logs error to its logger', async () => {
+  const { logger, lines } = captureLogger();
+  const channel = buildChannel(logger);
+  await channel.load();
 
   await channel.onError(new Error('test error'));
 
-  console.error = originalError;
-  expect(captured.length).toBe(1);
-  expect(captured[0]![0]).toBe('[SlackChannel.onError]');
+  expect(lines.length).toBe(1);
+  expect(lines[0]).toContain('[SlackChannel.onError]');
 });
 
 test('onConnected logs connected message', async () => {
-  const { channel } = buildEngine();
+  const { logger, lines } = captureLogger();
+  const channel = buildChannel(logger);
   await channel.load();
-
-  const originalInfo = console.info;
-  const captured: string[] = [];
-  console.info = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
   await channel.onConnected();
 
-  console.info = originalInfo;
-  expect(captured[0]).toContain('connected');
+  expect(lines[0]).toContain('connected');
 });
 
 test('onReconnecting logs warning with attempt number', async () => {
-  const { channel } = buildEngine();
+  const { logger, lines } = captureLogger();
+  const channel = buildChannel(logger);
   await channel.load();
-
-  const originalWarn = console.warn;
-  const captured: string[] = [];
-  console.warn = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
   await channel.onReconnecting(3);
 
-  console.warn = originalWarn;
-  expect(captured[0]).toContain('reconnecting');
-  expect(captured[0]).toContain('3');
+  expect(lines[0]).toContain('reconnecting');
+  expect(lines[0]).toContain('3');
 });
 
 test('onDisconnected logs warning with error', async () => {
-  const { channel } = buildEngine();
+  const { logger, lines } = captureLogger();
+  const channel = buildChannel(logger);
   await channel.load();
-
-  const originalWarn = console.warn;
-  const captured: string[] = [];
-  console.warn = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
   await channel.onDisconnected(new Error('network error'));
 
-  console.warn = originalWarn;
-  expect(captured[0]).toContain('disconnected');
+  expect(lines[0]).toContain('disconnected');
 });

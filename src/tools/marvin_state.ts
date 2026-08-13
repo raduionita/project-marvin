@@ -20,7 +20,7 @@ export default class MarvinStateTool extends Tool {
   }
 
   public async call(args: { area?: string }) {
-    console.debug('[MarvinStateTool.call]', args);
+    this.logger.debug('[MarvinStateTool.call]', args);
 
     const agents: Record<string, any> = {};
     const tasks: Record<string, any> = {};

@@ -5,6 +5,7 @@ import { join } from 'path';
 import { Config } from '../types.js';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 import TasksCommand from './tasks.js';
 
 function mockConfig(agents: Config['agents']): Config {
@@ -23,13 +24,13 @@ function scriptedAsk(answers: string[]) {
 }
 
 test('tasks add writes TASK.md and persists config', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
     'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} },
   });
 
-  const cmd = new TasksCommand(engine, []);
+  const cmd = new TasksCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['', 'my-task', 'do the thing every hour', '7200', '5', 'text']);
   await cmd.execAdd();
 
@@ -53,11 +54,11 @@ test('tasks add writes TASK.md and persists config', async () => {
 });
 
 test('tasks add refuses unknown agent', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({});
 
-  const cmd = new TasksCommand(engine, []);
+  const cmd = new TasksCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['ghost-agent']);
   await cmd.execAdd();
 
@@ -65,13 +66,13 @@ test('tasks add refuses unknown agent', async () => {
 });
 
 test('tasks add refuses existing task', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
     'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: { 'my-task': { enabled: true, schedule: 3600, maxSteps: 20, format: 'json' } } },
   });
 
-  const cmd = new TasksCommand(engine, []);
+  const cmd = new TasksCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['my-agent', 'my-task']);
   await cmd.execAdd();
 
@@ -80,13 +81,13 @@ test('tasks add refuses existing task', async () => {
 });
 
 test('tasks add skips TASK.md when prompt is blank', async () => {
-  const engine = new Engine();
+  const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
     'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} },
   });
 
-  const cmd = new TasksCommand(engine, []);
+  const cmd = new TasksCommand(engine, new Logger(), []);
   cmd.ask = scriptedAsk(['', 'empty-task', '', '60', '', '']);
   await cmd.execAdd();
 

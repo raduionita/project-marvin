@@ -8,41 +8,41 @@ import { Command } from '../types';
 // `marvin update [--dry]` pull latest changes, reinstall dependencies, restart service
 export default class UpdateCommand extends Command {
   async exec() {
-    console.debug('[UpdateCommand.exec]');
+    this.logger.debug('[UpdateCommand.exec]');
 
     const root = join(homedir(), '.local', 'share', 'marvin');
 
     if (!existsSync(root)) {
-      console.info('marvin is not installed. run the installer first:');
-      console.info('  bash install.sh');
+      this.logger.info('marvin is not installed. run the installer first:');
+      this.logger.info('  bash install.sh');
       return;
     }
 
     // pull project, install dependencies, restart service
     if (this.engine.isDry) {
-      console.info('[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
-      console.info('[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
-      console.info('[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
+      this.logger.info('[dry]', 'pull project:', ['git', '-C', root, 'pull', 'origin', 'main'].join(' '));
+      this.logger.info('[dry]', 'install dependencies:', ['bun', 'install'].join(' '));
+      this.logger.info('[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
     } else {
       // git pull from main
-      console.debug('[UpdateCommand.exec]', 'pulling project...');
+      this.logger.debug('[UpdateCommand.exec]', 'pulling project...');
       execSync(['git', '-C', root, 'pull', 'origin', 'main'].join(' '), { stdio: 'inherit' });
 
       // Reinstall dependencies
-      console.debug('[UpdateCommand.exec]', 'reinstalling dependencies...');
+      this.logger.debug('[UpdateCommand.exec]', 'reinstalling dependencies...');
       execSync(['bun', 'install'].join(' '), { cwd: root, stdio: 'inherit' });
 
       // update service file by copy
-      console.debug('[UpdateCommand.exec]', 'updating service file...');
+      this.logger.debug('[UpdateCommand.exec]', 'updating service file...');
       const src = join(root, 'marvin.service');
       const dst = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
       copyFileSync(src, dst);
 
       // Restart service
-      console.debug('[UpdateCommand.exec]', 'restarting service...');
+      this.logger.debug('[UpdateCommand.exec]', 'restarting service...');
       execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
     }
 
-    console.info('marvin updated');
+    this.logger.info('marvin updated');
   }
 }

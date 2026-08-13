@@ -10,13 +10,13 @@ export default class ApiSystem extends System {
   private server: http.Server | undefined;
 
   public async load(): Promise<void> {
-    console.debug('[ApiSystem.load]');
+    this.logger.debug('[ApiSystem.load]');
 
     this.port = this.engine.config.settings.port || 7331;
     this.host = this.engine.config.settings.host || '127.0.0.1';
 
     if (this.engine.isDry) {
-      console.info('[ApiSystem.load]', '[dry] loading server', this.host, this.port);
+      this.logger.info('[ApiSystem.load]', '[dry] loading server', this.host, this.port);
       return;
     }
 
@@ -42,7 +42,7 @@ export default class ApiSystem extends System {
         return;
       }
 
-      console.debug('[ApiSystem.load]', `command: ${command}`);
+      this.logger.debug('[ApiSystem.load]', `command: ${command}`);
 
       try {
         switch (command) {
@@ -70,32 +70,32 @@ export default class ApiSystem extends System {
   }
 
   public drop(): Promise<void> {
-    console.debug('[ApiSystem.drop]');
+    this.logger.debug('[ApiSystem.drop]');
 
     return new Promise<void>((resolve) => {
       if (this.server) {
-        this.server.close(function (error?: Error|undefined) {
+        this.server.close((error?: Error|undefined) => {
           if (error) {
-            console.error('[ApiSystem.drop]', 'error:', error);
+            this.logger.error('[ApiSystem.drop]', 'error:', error);
           } else {
-            console.debug('[ApiSystem.drop]', 'closed');
+            this.logger.debug('[ApiSystem.drop]', 'closed');
           }
           resolve();
         });
         this.server = undefined;
       } else {
-        console.debug('[ApiSystem.drop]', 'already closed');
+        this.logger.debug('[ApiSystem.drop]', 'already closed');
         resolve();
       }
     });
   }
 
   private async listen() {
-    console.debug('[ApiSystem.listen]', `binding API server on ${this.host}:${this.port}`);
+    this.logger.debug('[ApiSystem.listen]', `binding API server on ${this.host}:${this.port}`);
 
     return new Promise<void>((resolve) => {
       this.server!.listen(this.port, this.host, () => {
-        console.debug('[ApiSystem.listen]', `API server listening on ${this.host}:${this.port}`);
+        this.logger.debug('[ApiSystem.listen]', `API server listening on ${this.host}:${this.port}`);
         resolve();
       });
     });
@@ -116,25 +116,25 @@ export default class ApiSystem extends System {
   }
 
   private handleNoAuth(res: http.ServerResponse) {
-    console.debug('[ApiSystem.handleNoAuth]');
+    this.logger.debug('[ApiSystem.handleNoAuth]');
 
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
   }
 
   private async handleError(err: Error) {
-    console.error('[ApiSystem.load]', 'error:', err);
+    this.logger.error('[ApiSystem.load]', 'error:', err);
   }
 
   private async handleHealth(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[ApiSystem.handleHealth]');
+    this.logger.debug('[ApiSystem.handleHealth]');
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, data: {} }));
   }
 
   private async handleStatus(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[ApiSystem.handleStatus]');
+    this.logger.debug('[ApiSystem.handleStatus]');
 
     // TODO: add more info: models, channels, agents, tools
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -142,14 +142,14 @@ export default class ApiSystem extends System {
   }
 
   private async handleReload(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[ApiSystem.handleReload]');
+    this.logger.debug('[ApiSystem.handleReload]');
     await this.engine.execReload();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, data: {} }));
   }
 
   private async handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[ApiSystem.handleChat]', 'body:', req.url);
+    this.logger.debug('[ApiSystem.handleChat]', 'body:', req.url);
     
     try {
       // read body as JSON
@@ -196,14 +196,14 @@ export default class ApiSystem extends System {
         },
       }));
     } catch (err) {
-      console.error('[ApiSystem.handleChat]', 'error:', err);
+      this.logger.error('[ApiSystem.handleChat]', 'error:', err);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
     }
   }
 
   private async handleUnknown(req: http.IncomingMessage, res: http.ServerResponse) {
-    console.debug('[ApiSystem.handleUnknown]');
+    this.logger.debug('[ApiSystem.handleUnknown]');
 
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Unknown command' }));

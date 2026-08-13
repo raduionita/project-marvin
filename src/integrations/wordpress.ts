@@ -11,19 +11,19 @@ export default class WordpressIntegration extends Integration {
   }
 
   async load(): Promise<void> {
-    console.debug('[WordpressIntegration.load]');
+    this.logger.debug('[WordpressIntegration.load]');
     if (this.engine.isDry) {
-      console.debug('[WordpressIntegration.load]', '[dry] integration wordpress attached');
+      this.logger.debug('[WordpressIntegration.load]', '[dry] integration wordpress attached');
       return;
     }
 
     if (!this.config.endpoint) {
-      console.error('[WordpressIntegration.load]', 'no endpoint found, skipping');
+      this.logger.error('[WordpressIntegration.load]', 'no endpoint found, skipping');
     }
   }
 
   async drop(): Promise<void> {
-    console.debug('[WordpressIntegration.drop]');
+    this.logger.debug('[WordpressIntegration.drop]');
   }
 
   // build the full REST (…/wp-json) or (…/wp-json/wp/v2);
@@ -52,7 +52,7 @@ export default class WordpressIntegration extends Integration {
 
   // low-level generic request to the Wordpress REST API
   async request(method: string, path: string, body?: { [key: string]: any }): Promise<{ [key: string]: any }> {
-    console.debug('[WordpressIntegration.request]', method, path);
+    this.logger.debug('[WordpressIntegration.request]', method, path);
 
     const url = this.api(path);
     const res = await fetch(url, {
@@ -69,7 +69,7 @@ export default class WordpressIntegration extends Integration {
   }
 
   async call(args: { [key: string]: any }): Promise<{ [key: string]: any }> {
-    console.debug('[WordpressIntegration.call]', JSON.stringify(args));
+    this.logger.debug('[WordpressIntegration.call]', JSON.stringify(args));
 
     const action = args.action || 'request';
     switch (action) {

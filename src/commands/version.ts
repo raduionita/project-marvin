@@ -7,19 +7,19 @@ import { Command } from '../types';
 // `marvin version` prints the current version
 export default class VersionCommand extends Command {
   async exec() {
-    console.debug('[VersionCommand.exec]');
+    this.logger.debug('[VersionCommand.exec]');
 
     const root = join(homedir(), '.local', 'share', 'marvin');
     const pkgPath = join(root, 'package.json');
 
     if (!existsSync(pkgPath)) {
-      console.error('[VersionCommand.exec]', 'package.json not found.');
+      this.logger.error('[VersionCommand.exec]', 'package.json not found.');
       return;
     }
 
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     const version = pkg.version || 'unknown';
     
-    console.info('mArvIn version:', version);
+    this.logger.info('mArvIn version:', version);
   }
 }

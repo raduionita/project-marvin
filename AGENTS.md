@@ -11,40 +11,36 @@ You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI
 - `src/`
   - `channels/`             # where all channels are being loaded from
     - `index.ts`            # lists channels
-    - `slack.ts`            # channel implementation
+    - `*.ts`                # channel implementation
+    - `*.test.ts`           # channel tests
   - `models/`               # where all models are being loaded from
     - `index.ts`            # lists models
-    - `lmstudio.ts`         # local lmstudio model-provider implementation
-    - `openai.ts`           # openai model-provider implementation
-    - `anthropic.ts`        # anthropic model-provider implementation
-    - `deepseek.ts`         # deepseek model-provider implementation
+    - `*.ts`                # model implementation
+    - `*.ts.ts`             # model tests
   - `tools/`                # internal tools folder
     - `index.ts`            # lists tools
-    - `get_date.ts`          # tool implementation
-    - `web_browse.ts`        # tool implementation
-    - `web_search.ts`        # tool implementation
-  - `commands/`             # command line interface
-    - `help.ts`             # help command
-    - `load.ts`             # load command
-    - `drop.ts`             # drop command
-    - `serve.ts`            # serve command, runs the agents
-    - `update.ts`           # update command
-    - `version.ts`          # version command
-    - `status.ts`           # status command
-    - `agents.ts`           # agents command
-    - `channels.ts`         # channels command
-    - `integrations.ts`     # integrations command
-    - `skills.ts`           # skills command (list/add/use)
-    - `tools.ts`            # tools command (list/add/edit/call)
-    - `tasks.ts`            # tasks command
-    - `reload.ts`           # reload command
-  - `systems/`              # system implementations
-    - `browser.ts`          # browser system
-    - `api.ts`              # api system
-  - `constants.ts`          # project wide constants
+    - `*.ts`                # tool implementation
+    - `*.test.ts`           # tool tests
+  - `commands/`             # commands folder
+    - `*.ts`                # command implementation
+    - `*.test.ts`           # command tests
+  - `systems/`              # internal systems
+    - `index.ts`            # lists systems
+    - `*.ts`                # system implementation
+    - `*.test.ts`           # system tests
+  - `skills/`               # internal skills
+    - `index.ts`            # lists skills
+    - `*.md`                # skill implementation
+  - `integrations/`         # internal integrations
+    - `index.ts`            # lists integrations
+    - `*.ts`                # integration implementation
+    - `*.test.ts`           # integration tests
+  - `marvin.ts`             # entry point
+  - `engine.ts`             # core of marvin, AI loop, agent/task scheduling,
   - `types.ts`              # types and interfaces
+  - `logger.ts`             # logger
+  - `constants.ts`          # project wide constants
   - `helpers.ts`            # helper functions
-  - `marvin.ts`             # entry point, runs client or server
   - `declare.d.ts`          # declares modules (i.e. bun:test)
   - `**/*.test.ts`          # test files
   - `**/*.mock.ts`          # mock files
@@ -58,6 +54,7 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 - `~/.marvin/`
   - `marvin.json`       # config: settings, channels, models, agents
   - `MARVIN.md`         # assistant identity file
+  - `marvin.service`    # systemd service file
   - `agents/`
     - `agent-1/`
       - `IDENTITY.md`   # agent identity file
@@ -67,8 +64,7 @@ Loaded from `~/.marvin/` at runtime (created on first run):
   - `skills/`           # user-defined skills (mirrors src/skills/)
     - `SKILL-NAME.md`
   - `tools/`            # user-defined tools (mirrors src/tools/)
-    - `index.ts`
-    - `doSomething.ts`
+    - `do_something.ts` # tool implementation (snake case)
 
 ---
 
@@ -81,7 +77,7 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 - `Tool` - executable action: `webSearch`, `webBrowse`, `getDate`, …
 - `Agent` - runs scheduled tasks; communicates via configured channels
 - `Task` - periodic prompt or `.md` file that starts the AI loop
-- `execInput` - engine: prompts the LLM with task input, then reschedules itself (`execMonitor`/`execSweep` handle monitor/sweep tasks)
+- `execChat` - engine: prompts the LLM with task input, then reschedules itself (`execMonitor`/`execSweep` handle monitor/sweep tasks)
 
 Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-contained entry points for their respective modes.
 Do not confuse Marvin channels with Slack channels, they are different things. In Marvin they are communication channels between the client and the server.
@@ -115,4 +111,4 @@ Completed items in `TODO.md` should be removed, ask before removing it.
 
 ## Goal
 
-Build an AI assistant similar to **OpenClaw**.
+Build a general purpose AI assistant (that runs on agents that schedule tasks).

@@ -8,20 +8,19 @@ import {  Command, Config } from './types.js';
 import * as constants from './constants.js';
 import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
-import { loadConsole, enablePrefix } from './logger.js';
+import { Logger } from './logger.js';
 import Engine from './engine.js';
 
 await (new class Marvin {
-  engine : Engine = new Engine();
+  logger: Logger = new Logger();
+  engine : Engine = new Engine(this.logger);
   command: Command | undefined = undefined;
 
   async exec() {
     
     this.loadFlags();
     
-    loadConsole();
-
-    console.debug('[Marvin.exec]');
+    this.logger.debug('[Marvin.exec]');
 
     this.loadProcess();
     this.loadConfig();
@@ -30,21 +29,21 @@ await (new class Marvin {
   }
 
   loadProcess() {
-    console.debug('[Marvin.loadProcess]');
+    this.logger.debug('[Marvin.loadProcess]');
 
     process.on('beforeExit', async (code) => {
-      console.debug('[Marvin.loadProcess]', 'beforeExit', `${code}`);
+      this.logger.debug('[Marvin.loadProcess]', 'beforeExit', `${code}`);
       await this.drop();
     });
 
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
-      console.debug('[Marvin.loadProcess]', 'exit', `${code}`);
+      this.logger.debug('[Marvin.loadProcess]', 'exit', `${code}`);
     });
 
     // SIGINT (Ctrl+C)
     process.on('SIGINT', async () => {
-      console.info('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
+      this.logger.info('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
       // goto process.on('exit') instead
       await this.drop();
       process.exit(0);
@@ -52,7 +51,7 @@ await (new class Marvin {
 
     // SIGTERM (kill)
     process.on('SIGTERM', async () => {
-      console.info('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
+      this.logger.info('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
       // goto process.on('exit')
       await this.drop();
       process.exit(0);
@@ -60,19 +59,19 @@ await (new class Marvin {
 
     // unhandled rejection from promise
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('[Marvin.loadProcess]', 'unhandledRejection:', promise, 'reason:', reason);
+      this.logger.error('[Marvin.loadProcess]', 'unhandledRejection:', promise, 'reason:', reason);
       // TODO: decide if the rejection should trigger a shutdown
     });
 
     // uncaught exception
     process.on('uncaughtException', (err) => {
-      console.error('[Marvin.loadProcess]', 'uncaughtException:', err);
+      this.logger.error('[Marvin.loadProcess]', 'uncaughtException:', err);
       // TODO: decide if the exception should trigger a shutdown
     });
   }  
 
   loadConfig(config?: Config | undefined) {
-    console.debug('[Marvin.loadConfig]');
+    this.logger.debug('[Marvin.loadConfig]');
     if (config) {
       this.engine.config = config;
       return;
@@ -85,7 +84,7 @@ await (new class Marvin {
     // at this stage marvin.json MUST exist, but just in case
     const cpath = join(this.engine.work, 'marvin.json');
     if (!existsSync(cpath)) {
-      console.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
+      this.logger.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
       return;
     }
 
@@ -128,7 +127,7 @@ await (new class Marvin {
 
       // --useLogPrefix: prefix log lines with [LEVEL]
       if (arg === '--useLogPrefix') {
-        enablePrefix(true);
+        this.logger.enablePrefix(true);
         continue;
       }
 
@@ -142,14 +141,14 @@ await (new class Marvin {
   }
 
   async execCommand() {
-    console.debug('[Marvin.execCommand]');
+    this.logger.debug('[Marvin.execCommand]');
 
     const args = process.argv.slice(2);
     let   cmd  = args[0] || 'help';
     const cmds = listCommands(this.engine).map(f => f.replace('.ts', ''));
 
     if (!cmds.includes(cmd)) {
-      console.warn('[Marvin.execCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
+      this.logger.warn('[Marvin.execCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
       cmd = 'help';
     }
 
@@ -158,11 +157,11 @@ await (new class Marvin {
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        console.warn('[Marvin.execCommand]', `${cmd} does not export a Command class, exiting`);
+        this.logger.warn('[Marvin.execCommand]', `${cmd} does not export a Command class, exiting`);
         return;
       }
       // create command and load/run it
-      this.command = new Class(this.engine, args.slice(1));
+      this.command = new Class(this.engine, this.logger, args.slice(1));
       if (!this.command) {
         process.exit(1);
       }
@@ -172,12 +171,12 @@ await (new class Marvin {
       // if !deamon, exit
       if (!this.command.deamon) {
         await this.drop();
-        console.debug('[Marvin.execCommand]', 'done');
+        this.logger.debug('[Marvin.execCommand]', 'done');
       } else {
-        console.debug('[Marvin.execCommand]', 'deamon, keep running');
+        this.logger.debug('[Marvin.execCommand]', 'deamon, keep running');
       }
     } catch (err) {
-      console.error('[Marvin.execCommand]', `failed to load ${cmd}:`, err);
+      this.logger.error('[Marvin.execCommand]', `failed to load ${cmd}:`, err);
     }
   }
 
@@ -186,7 +185,7 @@ await (new class Marvin {
       return;
     }
 
-    console.debug('[Marvin.drop]');
+    this.logger.debug('[Marvin.drop]');
 
     await this.command.drop();
 
