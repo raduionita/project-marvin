@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { Logger, logger, resolveLogLevel, shouldLog, LEVEL_PREFIXES, LogMethod, LogOutput } from './logger.js';
+import { Logger, logger, resolveLogLevel, shouldLog, LEVEL_PREFIXES, setLoggerMode, LogMethod, LogOutput } from './logger.js';
 
 test('resolveLogLevel reads MARVIN_LOG_LEVEL and falls back to default', () => {
   const prev = process.env.MARVIN_LOG_LEVEL;
@@ -103,6 +103,62 @@ test('Logger.enablePrefix prefixes emitted lines with [LEVEL]', () => {
 
   lg.enablePrefix(false);
   expect(lg.isPrefixEnabled()).toBe(false);
+});
+
+test('Logger strips leading [ClassName.method] tags by default', () => {
+  const lines: { level: LogMethod; args: unknown[] }[] = [];
+  const out: LogOutput = (level, args) => lines.push({ level, args });
+  const lg = new Logger({ output: out, level: 'info' });
+
+  lg.info('[SlackChannel.onConnected]', 'connected!');
+  lg.warn('[Marvin.execCommand]', 'unknown command:', 'foo');
+  lg.error('[SlackChannel.onError]', new Error('boom'));
+
+  expect(lines[0]!.args).toEqual(['connected!']);
+  expect(lines[1]!.args).toEqual(['unknown command:', 'foo']);
+  expect(lines[2]!.args[0]).toBeInstanceOf(Error);
+});
+
+test('Logger keeps [dry] markers when stripping tags', () => {
+  const lines: { level: LogMethod; args: unknown[] }[] = [];
+  const out: LogOutput = (level, args) => lines.push({ level, args });
+  const lg = new Logger({ output: out, level: 'info' });
+
+  lg.info('[InstallCommand.makeProject]', '[dry]', '/tmp/x');
+
+  expect(lines[0]!.args).toEqual(['[dry]', '/tmp/x']);
+});
+
+test('Logger.setStripTags(false) keeps the tags', () => {
+  const lines: { level: LogMethod; args: unknown[] }[] = [];
+  const out: LogOutput = (level, args) => lines.push({ level, args });
+  const lg = new Logger({ output: out, level: 'info' });
+
+  expect(lg.isStripTags()).toBe(true);
+  lg.setStripTags(false);
+  expect(lg.isStripTags()).toBe(false);
+
+  lg.info('[SlackChannel.onConnected]', 'connected!');
+
+  expect(lines[0]!.args).toEqual(['[SlackChannel.onConnected]', 'connected!']);
+});
+
+test('setLoggerMode flips every Logger instance (daemon mode)', () => {
+  const lines: { level: LogMethod; args: unknown[] }[] = [];
+  const out: LogOutput = (level, args) => lines.push({ level, args });
+  const lg = new Logger({ output: out, level: 'info' });
+
+  setLoggerMode({ prefix: true, stripTags: false });
+  try {
+    expect(lg.isPrefixEnabled()).toBe(true);
+    expect(lg.isStripTags()).toBe(false);
+
+    lg.info('[SlackChannel.onConnected]', 'connected!');
+
+    expect(lines[0]!.args).toEqual(['[INFO]', '[SlackChannel.onConnected]', 'connected!']);
+  } finally {
+    setLoggerMode({ prefix: false, stripTags: true });
+  }
 });
 
 test('Logger writes to the console when no output override is set', () => {

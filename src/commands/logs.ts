@@ -8,7 +8,7 @@ export default class LogsCommand extends Command {
   async exec() {
     this.logger.debug('[LogsCommand.exec]');
 
-    const lpath = join(this.engine.work, 'marvin.log');
+    const lpath = join(this.engine.work, 'logs', 'marvin.log');
     if (!existsSync(lpath)) {
       this.logger.error('[LogsCommand.exec]', 'no log file found at', lpath, 'run "marvin enable" first');
       return;

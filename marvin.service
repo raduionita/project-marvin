@@ -9,8 +9,11 @@ EnvironmentFile=%h/.marvin/.env
 ExecStart=%h/.local/bin/marvin serve
 Restart=on-failure
 RestartSec=10
-StandardOutput=append:%h/.marvin/marvin.log
-StandardError=append:%h/.marvin/marvin.log
+StandardOutput=append:%h/.marvin/logs/marvin.log
+StandardError=append:%h/.marvin/logs/marvin.log
+# rotate the log daily, keep the last 7 files
+LogRotate=date
+LogRotateN=7
 SyslogIdentifier=marvin
 
 [Install]

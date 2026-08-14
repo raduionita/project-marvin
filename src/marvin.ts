@@ -8,7 +8,7 @@ import {  Command, Config } from './types.js';
 import * as constants from './constants.js';
 import { tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
-import { Logger } from './logger.js';
+import { Logger, setLoggerMode } from './logger.js';
 import Engine from './engine.js';
 
 await (new class Marvin {
@@ -125,9 +125,9 @@ await (new class Marvin {
         continue;
       }
 
-      // --useLogPrefix: prefix log lines with [LEVEL]
+      // --useLogPrefix: prefix log lines with [LEVEL] and keep [ClassName.method] tags
       if (arg === '--useLogPrefix') {
-        this.logger.enablePrefix(true);
+        setLoggerMode({ prefix: true, stripTags: false });
         continue;
       }
 

@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdtempSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import Engine from '../engine.js';
@@ -9,7 +9,9 @@ import LogsCommand from './logs.js';
 function buildLogFile(lines: string[]): { engine: Engine; path: string } {
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
-  const path = join(engine.work, 'marvin.log');
+  const dir = join(engine.work, 'logs');
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, 'marvin.log');
   writeFileSync(path, lines.join('\n') + '\n');
   return { engine, path };
 }

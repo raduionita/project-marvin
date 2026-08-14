@@ -45,14 +45,14 @@ export default class IntegrationsCommand extends Command {
 
   // `marvin integrations help`
   async execHelp() {
-    this.logger.info('usage: marvin integrations [command]');
-    this.logger.info('commands:');
-    this.logger.info('  help              ', 'show this help');
-    this.logger.info('  list              ', 'list configured integrations');
-    this.logger.info('  add <name> [type] ', 'add an integration (discovery wizard)');
-    this.logger.info('  info <name>       ', 'preview the config discovery would produce (no changes)');
-    this.logger.info('  edit <name>       ', 'edit the fields/meta of an integration');
-    this.logger.info('  drop <name>       ', 'drop an integration');
+    this.logger.log('usage: marvin integrations [command]');
+    this.logger.log('commands:');
+    this.logger.log('  help              ', 'show this help');
+    this.logger.log('  list              ', 'list configured integrations');
+    this.logger.log('  add <name> [type] ', 'add an integration (discovery wizard)');
+    this.logger.log('  info <name>       ', 'preview the config discovery would produce (no changes)');
+    this.logger.log('  edit <name>       ', 'edit the fields/meta of an integration');
+    this.logger.log('  drop <name>       ', 'drop an integration');
   }
 
   // `marvin integrations list`
@@ -76,7 +76,7 @@ export default class IntegrationsCommand extends Command {
 
   // `marvin integrations add [name] [type]`
   async execAdd() {
-    this.logger.info('[IntegrationsCommand.execAdd]', 'adding an integration...');
+    this.logger.debug('[IntegrationsCommand.execAdd]', 'adding an integration...');
 
     // available integration types (files in src/integrations)
     const types = listIntegrations(this.engine).map(c => c.replace('.ts', ''));

@@ -858,7 +858,7 @@ test('onError logs error to its logger', async () => {
   await channel.onError(new Error('test error'));
 
   expect(lines.length).toBe(1);
-  expect(lines[0]).toContain('[SlackChannel.onError]');
+  expect(lines[0]).toContain('test error');
 });
 
 test('onConnected logs connected message', async () => {

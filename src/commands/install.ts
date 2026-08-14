@@ -57,6 +57,17 @@ export default class InstallCommand extends Command {
       this.logger.info('directory', tpath, 'exists');
     }
 
+    // ~/.marvin/logs (daemon log file lives here)
+    const lpath = join(hpath, 'logs');
+    if (this.engine.isDry) {
+      this.logger.info('[InstallCommand.makeProject]', '[dry]', lpath);
+    } else if (!existsSync(lpath)) {
+      mkdirSync(lpath, { recursive: true });
+      this.logger.info('created logs directory:', lpath);
+    } else {
+      this.logger.info('directory', lpath, 'exists');
+    }
+
     //  ~/.marvin/MARVIN.md
     const mpath = join(hpath, 'MARVIN.md');
     if (this.engine.isDry) {

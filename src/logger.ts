@@ -23,6 +23,25 @@ export type LogMethod = 'log' | LogLevel;
 // intercepts every emitted line instead of writing to the console
 export type LogOutput = (level: LogMethod, args: unknown[]) => void;
 
+// a `[ClassName.method]` tag (contains a dot). `[dry]` and other markers
+// without a dot are not tags and are kept as-is.
+const TAG_RE = /^\[[^\]]+\.[^\]]+\]$/;
+
+// shared output mode applied to every Logger instance (console vs daemon):
+// console strips [ClassName.method] tags and never prefixes [LEVEL];
+// the daemon (marvin serve) prefixes [LEVEL] and keeps the tags.
+const sharedMode = { prefix: false, stripTags: true };
+
+// flip the mode for every Logger (existing and future instances)
+export function setLoggerMode(mode: { prefix?: boolean; stripTags?: boolean }): void {
+  if (mode.prefix !== undefined) {
+    sharedMode.prefix = mode.prefix;
+  }
+  if (mode.stripTags !== undefined) {
+    sharedMode.stripTags = mode.stripTags;
+  }
+}
+
 // would a message at `level` be emitted when the logger is at `current`?
 export function shouldLog(level: LogLevel, current: LogLevel): boolean {
   return LOG_LEVELS[level] >= LOG_LEVELS[current];
@@ -40,16 +59,20 @@ export function resolveLogLevel(): LogLevel {
 // instance logger: debug/info/warn/error are level-filtered (and optionally
 // prefixed with [LEVEL]); log is raw/unfiltered output (e.g. `marvin logs`).
 // an `output` override (e.g. Slack) can capture lines instead of printing.
+// prefix/stripTags fall back to the shared mode (setLoggerMode), so `marvin
+// serve` can switch every logger to daemon output in one call.
 export class Logger {
   // undefined = resolve from MARVIN_LOG_LEVEL on every emit, so `--log-level`
   // (set at runtime in marvin.loadFlags) is honored without extra wiring
   private level: LogLevel | undefined;
-  private prefixEnabled: boolean;
+  private prefixEnabled: boolean | undefined;
+  private stripTags: boolean | undefined;
   private output: LogOutput;
 
-  constructor(opts: { level?: LogLevel; prefix?: boolean; output?: LogOutput } = {}) {
+  constructor(opts: { level?: LogLevel; prefix?: boolean; stripTags?: boolean; output?: LogOutput } = {}) {
     this.level = opts.level;
-    this.prefixEnabled = opts.prefix ?? false;
+    this.prefixEnabled = opts.prefix;
+    this.stripTags = opts.stripTags;
     this.output = opts.output ?? ((level, args) => {
       console[level](...args);
     });
@@ -70,7 +93,15 @@ export class Logger {
   }
 
   isPrefixEnabled(): boolean {
-    return this.prefixEnabled;
+    return this.prefixEnabled ?? sharedMode.prefix;
+  }
+
+  setStripTags(enabled: boolean): void {
+    this.stripTags = enabled;
+  }
+
+  isStripTags(): boolean {
+    return this.stripTags ?? sharedMode.stripTags;
   }
 
   // raw output, never filtered (mirrors console.log)
@@ -98,7 +129,13 @@ export class Logger {
     if (!shouldLog(level, this.getLevel())) {
       return;
     }
-    const out = this.prefixEnabled ? [LEVEL_PREFIXES[level], ...args] : args;
+    let out = args;
+    if (this.isPrefixEnabled()) {
+      out = [LEVEL_PREFIXES[level], ...out];
+    }
+    if (this.isStripTags()) {
+      out = out.filter((a) => !(typeof a === 'string' && TAG_RE.test(a)));
+    }
     this.output(level, out);
   }
 }
