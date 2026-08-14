@@ -13,7 +13,12 @@ function mockFetch(data: { [key: string]: any }, status = 200): { calls: [string
   const calls: [string, any][] = [];
   globalThis.fetch = ((url: any, init?: any) => {
     calls.push([String(url), init]);
-    return Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(data) } as Response);
+    return Promise.resolve({
+      ok: status < 400,
+      status,
+      text: () => Promise.resolve(JSON.stringify(data)),
+      json: () => Promise.resolve(data),
+    } as Response);
   }) as typeof fetch;
   return { calls };
 }
@@ -133,15 +138,18 @@ test('discover fetches the REST discovery index', async () => {
   expect(result.data.namespaces).toContain('wp/v2');
 });
 
-test('create_post supports standard REST post fields', async () => {
+test('create_post supports standard REST post fields when configured', async () => {
   const fetchMock = mockFetch({ id: 12 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+    type: 'wordpress', endpoint: 'https://example.com',
+    actions: { create_post: { enabled: true, fields: { title: { type: 'string' }, content: { type: 'string' }, status: { type: 'string' }, slug: { type: 'string' }, featured_media: { type: 'integer' }, categories: { type: 'array' } } } },
+  });
 
   await integration.call({ action: 'create_post', title: 'Hello', slug: 'hello', status: 'publish', featured_media: 5, categories: [1, 2] });
 
   const [url, init] = fetchMock.calls[0]!;
   expect(url).toBe('https://example.com/wp-json/wp/v2/posts');
-  expect(JSON.parse(init.body)).toEqual({ title: 'Hello', content: '', status: 'publish', slug: 'hello', featured_media: 5, categories: [1, 2] });
+  expect(JSON.parse(init.body)).toEqual({ title: 'Hello', status: 'publish', slug: 'hello', featured_media: 5, categories: [1, 2] });
 });
 
 test('request action allows a generic path/method/body', async () => {
@@ -184,4 +192,172 @@ test('sends Basic auth when user and appPassword are configured', async () => {
   const [, init] = fetchMock.calls[0]!;
   const expected = 'Basic ' + Buffer.from('admin:abcd efgh').toString('base64');
   expect(init.headers.Authorization).toBe(expected);
+});
+
+test('create_post with publish: true posts with status publish', async () => {
+  const fetchMock = mockFetch({ id: 12 });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  await integration.call({ action: 'create_post', title: 'Hello', content: 'World', publish: true });
+
+  const [, init] = fetchMock.calls[0]!;
+  expect(JSON.parse(init.body)).toEqual({ title: 'Hello', content: 'World', status: 'publish' });
+});
+
+test('request includes the raw body in the error on non-JSON 4xx responses', async () => {
+  globalThis.fetch = (() => Promise.resolve({
+    ok: false, status: 401,
+    text: () => Promise.resolve('<html>forbidden</html>'),
+    json: () => Promise.resolve({}),
+  } as Response)) as typeof fetch;
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  const result = await integration.call({ action: 'get_post', id: 5 });
+
+  expect(result.status).toBe(401);
+  expect(result.error).toContain('<html>forbidden</html>');
+});
+
+test('request retries transient 5xx failures then reports the failure', async () => {
+  let attempts = 0;
+  globalThis.fetch = (() => {
+    attempts++;
+    return Promise.resolve({
+      ok: false, status: 503,
+      text: () => Promise.resolve(''),
+      json: () => Promise.resolve({}),
+    } as Response);
+  }) as typeof fetch;
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  const result = await integration.call({ action: 'get_post', id: 5 });
+
+  expect(attempts).toBe(3); // initial + 2 retries
+  expect(result.status).toBe(503);
+  expect(result.error).toContain('failed after retries');
+});
+
+test('request does not retry permanent 4xx errors', async () => {
+  let attempts = 0;
+  globalThis.fetch = (() => {
+    attempts++;
+    return Promise.resolve({
+      ok: false, status: 404,
+      text: () => Promise.resolve('{"code":"rest_post_invalid_id","message":"Invalid post ID"}'),
+      json: () => Promise.resolve({}),
+    } as Response);
+  }) as typeof fetch;
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  const result = await integration.call({ action: 'get_post', id: 5 });
+
+  expect(attempts).toBe(1);
+  expect(result.error).toContain('Invalid post ID');
+});
+
+// --- meta ---
+
+test('meta lists the wordpress actions', async () => {
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  const info = integration.meta;
+
+  expect(info.type).toBe('wordpress');
+  expect(info.actions.map(a => a.name)).toContain('create_post');
+  expect(info.actions.map(a => a.name)).toContain('list_posts');
+});
+
+// --- discover (OPTIONS) ---
+
+const OPTIONS_PAYLOAD = {
+  endpoints: [
+    { methods: ['GET'], args: { context: { type: 'string' } } },
+    {
+      methods: ['POST'],
+      args: {
+        title: { type: 'string', required: true, description: 'The title for the post.' },
+        content: { type: 'string', description: 'The content for the post.' },
+        status: { type: 'string', enum: ['publish', 'draft', 'pending'], description: 'A named status for the post.' },
+      },
+    },
+  ],
+};
+
+test('discover parses the OPTIONS endpoint args into FieldDefs', async () => {
+  const fetchMock = mockFetch(OPTIONS_PAYLOAD);
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  const fields = await integration.discover('create_post');
+
+  const [url, init] = fetchMock.calls[0]!;
+  expect(url).toBe('https://example.com/wp-json/wp/v2/posts');
+  expect(init.method).toBe('OPTIONS');
+
+  expect(fields.find(f => f.name === 'title')?.required).toBe(true);
+  expect(fields.find(f => f.name === 'content')?.required).toBe(false);
+  expect(fields.find(f => f.name === 'status')?.enum).toEqual(['publish', 'draft', 'pending']);
+  expect(fields.find(f => f.name === 'content')?.type).toBe('string');
+});
+
+test('discover throws when the OPTIONS payload has no POST endpoint', async () => {
+  mockFetch({ endpoints: [{ methods: ['GET'], args: {} }] });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  await expect(integration.discover('create_post')).rejects.toThrow('no POST schema');
+});
+
+test('discover throws when the fetch fails', async () => {
+  globalThis.fetch = (() => Promise.reject(new Error('network down'))) as typeof fetch;
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  await expect(integration.discover('create_post')).rejects.toThrow('network down');
+});
+
+test('discover throws for actions without a resource', async () => {
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  await expect(integration.discover('explode')).rejects.toThrow('no REST resource');
+});
+
+// --- config-driven field filtering + meta fields ---
+
+test('create_post sends only the configured fields (drops invented params)', async () => {
+  const fetchMock = mockFetch({ id: 12 });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+    type: 'wordpress', endpoint: 'https://example.com',
+    actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true }, content: { type: 'string' } } } },
+  });
+
+  await integration.call({ action: 'create_post', title: 'Hi', content: 'World', invented: 'ignored' });
+
+  const [, init] = fetchMock.calls[0]!;
+  expect(JSON.parse(init.body)).toEqual({ title: 'Hi', content: 'World' });
+});
+
+test('create_post sends custom meta fields under the meta object', async () => {
+  const fetchMock = mockFetch({ id: 12 });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+    type: 'wordpress', endpoint: 'https://example.com',
+    actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true } } } },
+    meta: { target: 'meta', fields: { custom_author: { type: 'string', required: true }, featured: { type: 'boolean' } } },
+  });
+
+  await integration.call({ action: 'create_post', title: 'Hi', custom_author: 'Ada', featured: true });
+
+  const [, init] = fetchMock.calls[0]!;
+  expect(JSON.parse(init.body)).toEqual({ title: 'Hi', meta: { custom_author: 'Ada', featured: true } });
+});
+
+test('create_post sends custom fields under acf when target is acf', async () => {
+  const fetchMock = mockFetch({ id: 12 });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+    type: 'wordpress', endpoint: 'https://example.com',
+    actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true } } } },
+    meta: { target: 'acf', fields: { custom_author: { type: 'string' } } },
+  });
+
+  await integration.call({ action: 'create_post', title: 'Hi', custom_author: 'Ada' });
+
+  const [, init] = fetchMock.calls[0]!;
+  expect(JSON.parse(init.body)).toEqual({ title: 'Hi', acf: { custom_author: 'Ada' } });
 });

@@ -178,10 +178,10 @@ export default class ApiSystem extends System {
       const agentId = (body.agentId as string) || this.engine.config.settings.name; // default to marvin (orchestrator)
 
       // send message to the LLM
-      const result = await this.engine.execChat(chatId, agentId, message);
-      if (!result) {
+      const result = await this.engine.sendChat(chatId, agentId, message);
+      if (result.error) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: '(ServeCommand.sendMessage ERROR - no LLM result)' }));
+        res.end(JSON.stringify({ ok: false, error: `(ServeCommand.sendMessage ERROR - no LLM result: ${result.error})` }));
         return;
       }
 

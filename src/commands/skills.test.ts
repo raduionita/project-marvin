@@ -1,11 +1,18 @@
-import { test, expect } from 'bun:test';
+import { mock, test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import SkillsCommand from './skills.js';
 import { Skill, Config } from '../types.js';
+
+// scripted answers consumed by the mocked terminal prompt
+let answers: string[] = [];
+mock.module('../terminal.js', () => ({
+  ask: mock(async () => answers.shift() ?? ''),
+}));
+
+import SkillsCommand from './skills.js';
 
 function mockEngine(isDry = false): Engine {
   const engine = new Engine(new Logger());
@@ -36,11 +43,6 @@ function mockEngine(isDry = false): Engine {
   return engine;
 }
 
-function scriptedAsk(answers: string[]) {
-  const queue = [...answers];
-  return async () => queue.shift() || '';
-}
-
 // a logger that captures every emitted line (info-level and up), so tests can
 // assert on command output without patching console.*
 function captureLogger(): { logger: Logger; lines: string[] } {
@@ -52,10 +54,10 @@ function captureLogger(): { logger: Logger; lines: string[] } {
 test('skills add writes a custom skill file to ~/.marvin/skills', async () => {
   const engine = mockEngine();
   const cmd = new SkillsCommand(engine, new Logger(), ['add', 'release-notes', 'write release notes']);
-  cmd.ask = scriptedAsk([]);
+  answers = [];
 
   // stub the LLM call to return generated skill content
-  engine.execChat = async () => ({ content: '# Release Notes\n\nTurn a changelog into release notes.', steps: 1 });
+  engine.sendChat = async () => ({ content: '# Release Notes\n\nTurn a changelog into release notes.', steps: 1 });
 
   await cmd.execAdd();
 
@@ -70,8 +72,8 @@ test('skills add writes a custom skill file to ~/.marvin/skills', async () => {
 test('skills add prompts for name and description when missing', async () => {
   const engine = mockEngine();
   const cmd = new SkillsCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['my-skill', 'does something useful']);
-  engine.execChat = async () => ({ content: '# My Skill\n\nDoes something useful.', steps: 1 });
+  answers = ['my-skill', 'does something useful'];
+  engine.sendChat = async () => ({ content: '# My Skill\n\nDoes something useful.', steps: 1 });
 
   await cmd.execAdd();
 
@@ -85,7 +87,7 @@ test('skills add refuses an existing skill', async () => {
   writeFileSync(join(engine.work, 'skills', 'existing.md'), '# Existing\n\nAlready here.');
   const { logger, lines } = captureLogger();
   const cmd = new SkillsCommand(engine, logger, ['add', 'existing', 'desc']);
-  cmd.ask = scriptedAsk([]);
+  answers = [];
 
   await cmd.execAdd();
 
@@ -95,9 +97,9 @@ test('skills add refuses an existing skill', async () => {
 test('skills add works in dry mode without calling the LLM', async () => {
   const engine = mockEngine(true);
   const cmd = new SkillsCommand(engine, new Logger(), ['add', 'dry-skill', 'desc']);
-  cmd.ask = scriptedAsk([]);
+  answers = [];
   let called = false;
-  engine.execChat = async () => { called = true; return null; };
+  engine.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execAdd();
 
@@ -144,10 +146,10 @@ test('skills use runs the tools-create skill and saves the generated tool', asyn
   addToolsSkill(engine);
   const { logger, lines } = captureLogger();
   const cmd = new SkillsCommand(engine, logger, ['use', 'tools-create', 'web_fetch']);
-  cmd.ask = scriptedAsk(['fetch a URL and return the text']);
+  answers = ['fetch a URL and return the text'];
 
   // stub the LLM call to return generated tool source
-  engine.execChat = async () => ({ content: `import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class WebFetch extends Tool { /* ... */ }`, steps: 1 });
+  engine.sendChat = async () => ({ content: `import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class WebFetch extends Tool { /* ... */ }`, steps: 1 });
 
   await cmd.execUse();
 
@@ -167,9 +169,9 @@ test('skills use prompts for the skill and info when missing', async () => {
   addToolsSkill(engine);
   const cmd = new SkillsCommand(engine, new Logger(), ['use']);
   // answers: skill pick, tool name, tool purpose
-  cmd.ask = scriptedAsk(['tools-create', 'my_tool', 'does something']);
+  answers = ['tools-create', 'my_tool', 'does something'];
 
-  engine.execChat = async () => ({ content: 'export default class MyTool extends Tool { /* ... */ }', steps: 1 });
+  engine.sendChat = async () => ({ content: 'export default class MyTool extends Tool { /* ... */ }', steps: 1 });
 
   await cmd.execUse();
 
@@ -182,7 +184,7 @@ test('skills use errors on unknown skill', async () => {
   const engine = mockEngine();
   const { logger, lines } = captureLogger();
   const cmd = new SkillsCommand(engine, logger, ['use', 'nope']);
-  cmd.ask = scriptedAsk([]);
+  answers = [];
 
   await cmd.execUse();
 
@@ -206,9 +208,9 @@ test('skills use edits an existing tool with the tools-edit skill', async () => 
   writeFileSync(tpath, 'old code');
 
   const cmd = new SkillsCommand(engine, new Logger(), ['use', 'tools-edit', 'my_tool']);
-  cmd.ask = scriptedAsk(['make it return more data']);
+  answers = ['make it return more data'];
 
-  engine.execChat = async () => ({ content: 'new code', steps: 1 });
+  engine.sendChat = async () => ({ content: 'new code', steps: 1 });
 
   await cmd.execUse();
 
@@ -220,9 +222,9 @@ test('skills use works in dry mode without calling the LLM or writing the tool',
   const engine = mockEngine(true);
   addToolsSkill(engine);
   const cmd = new SkillsCommand(engine, new Logger(), ['use', 'tools-create', 'dry_tool']);
-  cmd.ask = scriptedAsk(['does something']);
+  answers = ['does something'];
   let called = false;
-  engine.execChat = async () => { called = true; return null; };
+  engine.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execUse();
 

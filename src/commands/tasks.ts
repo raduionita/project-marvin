@@ -1,15 +1,12 @@
-import { promises } from 'readline';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from "../types";
 import * as constants from '../constants';
+import { ask } from '../terminal';
 
 // `marvin tasks [command] [--dry]` add/list tasks for an agent
 export default class TasksCommand extends Command {
-  // overridable for tests (scripted answers)
-  public ask?: (question: string) => Promise<string>;
-
   async exec() {
     this.logger.debug('[TasksCommand.exec]');
 
@@ -57,13 +54,6 @@ export default class TasksCommand extends Command {
   // `marvin tasks add [agentId] [taskId]` // add a task interactively
   async execAdd() {
     this.logger.debug('[TasksCommand.execAdd]', 'adding a task...');
-
-    const ask = this.ask || (async (q: string) => {
-      const pli = promises.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = (await pli.question(q)).trim();
-      pli.close();
-      return answer;
-    });
 
     // ask for agentId
     const agentIds = Object.keys(this.engine.config.agents);

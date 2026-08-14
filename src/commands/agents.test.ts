@@ -1,4 +1,4 @@
-import { test, expect } from 'bun:test';
+import { mock, test, expect } from 'bun:test';
 import { mkdtempSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -6,6 +6,13 @@ import { Config } from '../types.js';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
+
+// scripted answers consumed by the mocked terminal prompt
+let answers: string[] = [];
+mock.module('../terminal.js', () => ({
+  ask: mock(async () => answers.shift() ?? ''),
+}));
+
 import AgentsCommand from './agents.js';
 
 function mockConfig(models: Config['models'], channels: Config['channels']): Config {
@@ -18,11 +25,6 @@ function mockConfig(models: Config['models'], channels: Config['channels']): Con
   } as Config;
 }
 
-function scriptedAsk(answers: string[]) {
-  const queue = [...answers];
-  return async () => queue.shift() || '';
-}
-
 test('agents add writes IDENTITY.md and persists config', async () => {
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
@@ -32,7 +34,7 @@ test('agents add writes IDENTITY.md and persists config', async () => {
   );
 
   const cmd = new AgentsCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['my-agent', '', 'slack', 'general', 'I am a test agent']);
+  answers = ['my-agent', '', 'slack', 'general', 'I am a test agent'];
   await cmd.execAdd();
 
   // IDENTITY.md created with the provided identity
@@ -62,7 +64,7 @@ test('agents add refuses unknown model', async () => {
   );
 
   const cmd = new AgentsCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['my-agent', 'gpt-4']);
+  answers = ['my-agent', 'gpt-4'];
   await cmd.execAdd();
 
   expect(engine.config.agents['my-agent']).toBeUndefined();
@@ -79,7 +81,7 @@ test('agents add refuses existing agent', async () => {
   engine.config.agents['my-agent'] = { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} };
 
   const cmd = new AgentsCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['my-agent']);
+  answers = ['my-agent'];
   await cmd.execAdd();
 
   // still single entry, identity dir untouched
@@ -96,7 +98,7 @@ test('agents add uses default identity when blank', async () => {
   );
 
   const cmd = new AgentsCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['my-agent', '', '', '']);
+  answers = ['my-agent', '', '', ''];
   await cmd.execAdd();
 
   const ipath = join(engine.work, 'agents', 'my-agent', 'IDENTITY.md');

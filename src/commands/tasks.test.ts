@@ -1,4 +1,4 @@
-import { test, expect } from 'bun:test';
+import { mock, test, expect } from 'bun:test';
 import { mkdtempSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -6,6 +6,13 @@ import { Config } from '../types.js';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
+
+// scripted answers consumed by the mocked terminal prompt
+let answers: string[] = [];
+mock.module('../terminal.js', () => ({
+  ask: mock(async () => answers.shift() ?? ''),
+}));
+
 import TasksCommand from './tasks.js';
 
 function mockConfig(agents: Config['agents']): Config {
@@ -18,11 +25,6 @@ function mockConfig(agents: Config['agents']): Config {
   } as Config;
 }
 
-function scriptedAsk(answers: string[]) {
-  const queue = [...answers];
-  return async () => queue.shift() || '';
-}
-
 test('tasks add writes TASK.md and persists config', async () => {
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
@@ -31,7 +33,7 @@ test('tasks add writes TASK.md and persists config', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['', 'my-task', 'do the thing every hour', '7200', '5', 'text']);
+  answers = ['', 'my-task', 'do the thing every hour', '7200', '5', 'text'];
   await cmd.execAdd();
 
   // TASK.md created with the prompt
@@ -59,7 +61,7 @@ test('tasks add refuses unknown agent', async () => {
   engine.config = mockConfig({});
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['ghost-agent']);
+  answers = ['ghost-agent'];
   await cmd.execAdd();
 
   expect(existsSync(join(engine.work, 'agents', 'ghost-agent'))).toBe(false);
@@ -73,7 +75,7 @@ test('tasks add refuses existing task', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['my-agent', 'my-task']);
+  answers = ['my-agent', 'my-task'];
   await cmd.execAdd();
 
   expect(Object.keys(engine.config.agents['my-agent']!.tasks!)).toEqual(['my-task']);
@@ -88,7 +90,7 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  cmd.ask = scriptedAsk(['', 'empty-task', '', '60', '', '']);
+  answers = ['', 'empty-task', '', '60', '', ''];
   await cmd.execAdd();
 
   expect(existsSync(join(engine.work, 'agents', 'my-agent', 'tasks', 'empty-task', 'TASK.md'))).toBe(false);

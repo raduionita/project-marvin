@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { extractOutput, cleanContent } from './helpers.js';
+import { extractOutput, cleanContent, withRetry } from './helpers.js';
 
 test('extractOutput pulls the output field from JSON', () => {
   expect(extractOutput('{"output": "hello world"}')).toBe('hello world');
@@ -43,4 +43,40 @@ test('cleanContent handles braces inside the JSON string value', () => {
 
 test('cleanContent returns plain text unchanged when no JSON value is present', () => {
   expect(cleanContent('plain text <tool_calls>...</tool_calls>')).toBe('plain text <tool_calls>...</tool_calls>');
+});
+
+test('withRetry retries until success', async () => {
+  let attempts = 0;
+  const result = await withRetry(async () => {
+    attempts++;
+    if (attempts < 3) throw new Error('transient');
+    return 'ok';
+  }, { retries: 3, delayMs: 1 });
+
+  expect(result).toBe('ok');
+  expect(attempts).toBe(3);
+});
+
+test('withRetry gives up after retries are exhausted', async () => {
+  let attempts = 0;
+  await expect(async () => {
+    await withRetry(async () => {
+      attempts++;
+      throw new Error('boom');
+    }, { retries: 2, delayMs: 1 });
+  }).toThrow('boom');
+
+  expect(attempts).toBe(3);
+});
+
+test('withRetry does not retry when shouldRetry says no', async () => {
+  let attempts = 0;
+  await expect(async () => {
+    await withRetry(async () => {
+      attempts++;
+      throw new Error('permanent');
+    }, { retries: 3, delayMs: 1, shouldRetry: () => false });
+  }).toThrow('permanent');
+
+  expect(attempts).toBe(1);
 });

@@ -31,7 +31,7 @@ Current reality (from code):
 
 ## Phase 2 - AI Loop (core agent loop)
 
-- [x] 2.1 `Engine.execChat` AI loop: model call -> tool execution -> repeat (`engine.ts`)
+- [x] 2.1 `Engine.sendChat` AI loop: model call -> tool execution -> repeat (`engine.ts`)
 - [x] 2.2 Sessionless task loop `Engine.execTask` + reschedule (`setTimeout`)
 - [x] 2.3 Orchestrator loop `Engine.execOrchestrator`
 - [x] 2.4 `--dry` flag (DRY feature) — `Engine.isDry`, all commands honor it

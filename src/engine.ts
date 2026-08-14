@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs";
 
 import type { Logger } from './logger.js';
 import { listSystems } from "./systems";
-import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat, Integration, Skill } from "./types";
+import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat, Integration, Skill, IntegrationAction } from "./types";
 import * as constants from './constants.js';
 import { listTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
@@ -662,6 +662,50 @@ export default class Engine {
     task.timeout = setTimeout(this.execMonitor.bind(this), task.schedule, agentId, taskId);
   }
 
+  // removes cached chats idle for longer than the TTL, then reschedules itself
+  async execSweep(agentId: string, taskId: string) {
+    this.logger.debug('[Engine.execSweep]', `${agentId}/${taskId}`);
+
+    // check assistant state
+    if (this.state !== 'exec') {
+      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (assistant NOT running)`);
+      return;
+    }
+
+    // check if agent exists
+    const agent = this.agents[agentId];
+    if (!agent) {
+      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (agent not found)`);
+      return;
+    }
+    // check if task exists
+    const task = agent.tasks[taskId]!;
+    if (!task) {
+      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (task not found)`);
+      return;
+    }
+
+    // remove cached chats idle for longer than the TTL
+    const now = Date.now();
+    let removed = 0;
+    for (const [chatId, chat] of Object.entries(this.cache)) {
+      if (now - (chat.updatedAt || 0) > constants.CHAT_TTL_MS) {
+        this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
+        delete this.cache[chatId];
+        removed++;
+      }
+    }
+    this.logger.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
+
+    if (this.isDry) {
+      this.logger.info('[Engine.execSweep]', '[dry]', 'task executed (once)');
+      return;
+    }
+
+    // re-schedule next execution
+    task.timeout = setTimeout(this.execSweep.bind(this), task.schedule, agentId, taskId);
+  }
+
   // prompts the LLM with the task input, sends the result through channels, then reschedules
   async execInput(agentId: string, taskId: string) {
     this.logger.debug('[Engine.execInput]', `${agentId}/${taskId}`);
@@ -710,9 +754,9 @@ export default class Engine {
     const schema = task.schema || constants.DEFAULT_SCHEMA;
 
     // set task input as user message to LLM
-    const result = await this.execChat(chatId, agentId, task.input, format, schema, maxSteps);
-    if (!result) {
-      this.logger.error('[Engine.execInput]', `no result from sendMessage for agent ${agentId}`);
+    const result = await this.sendChat(chatId, agentId, task.input, format, schema, maxSteps);
+    if (result.error) {
+      this.logger.error('[Engine.execInput]', `no result from sendMessage for agent ${agentId}:`, result.error);
       return;
     }
 
@@ -807,54 +851,51 @@ export default class Engine {
     }
   }
 
-  // removes cached chats idle for longer than the TTL, then reschedules itself
-  async execSweep(agentId: string, taskId: string) {
-    this.logger.debug('[Engine.execSweep]', `${agentId}/${taskId}`);
+  // build the agent system prompt: identity + the "## Integrations" block from
+  // the configured integrations (so the LLM knows which sites it can act on,
+  // falling back to config when the integration is not loaded) + output format
+  // instructions (JSON_MD + schema for json format)
+  makeSystemPrompt(identity: string, format: 'text' | 'json' = 'json', schema: { [key: string]: string } = constants.DEFAULT_SCHEMA): string {
+    let system = identity;
 
-    // check assistant state
-    if (this.state !== 'exec') {
-      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (assistant NOT running)`);
-      return;
+    const entries = Object.entries(this.integrations);
+    const configs = entries.length ? entries : Object.entries(this.config.integrations || {});
+
+    const blocks = configs.map(([id, integration]) => {
+      const isLoaded = integration instanceof Integration;
+      const info = isLoaded ? integration.meta : null;
+      const cfg = isLoaded ? integration.config : integration;
+      const infoType = info || {
+        type: cfg?.type || 'integration',
+        title: id,
+        description: '',
+        actions: [],
+      };
+      const endpoint = cfg?.endpoint || cfg?.url || '';
+      const actions = infoType.actions.length
+        ? `\nActions: ${infoType.actions.map((a: IntegrationAction) => `${a.name} - ${a.description}`).join('; ')}`
+        : '';
+      const url = endpoint ? ` (${endpoint})` : '';
+      return `### ${id}${url}\n${infoType.description || infoType.title}${actions}`;
+    });
+
+    const integrationsBlock = blocks.length ? `## Integrations\n${blocks.join('\n')}` : '';
+    if (integrationsBlock) {
+      system += '\n\n' + integrationsBlock;
     }
 
-    // check if agent exists
-    const agent = this.agents[agentId];
-    if (!agent) {
-      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (agent not found)`);
-      return;
-    }
-    // check if task exists
-    const task = agent.tasks[taskId]!;
-    if (!task) {
-      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (task not found)`);
-      return;
+    if (format === 'json') {
+      system += '\n\n' + constants.JSON_MD;
+      system += '\n' + '- JSON schema: ' + JSON.stringify(schema);
     }
 
-    // remove cached chats idle for longer than the TTL
-    const now = Date.now();
-    let removed = 0;
-    for (const [chatId, chat] of Object.entries(this.cache)) {
-      if (now - (chat.updatedAt || 0) > constants.CHAT_TTL_MS) {
-        this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
-        delete this.cache[chatId];
-        removed++;
-      }
-    }
-    this.logger.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
-
-    if (this.isDry) {
-      this.logger.info('[Engine.execSweep]', '[dry]', 'task executed (once)');
-      return;
-    }
-
-    // re-schedule next execution
-    task.timeout = setTimeout(this.execSweep.bind(this), task.schedule, agentId, taskId);
+    return system;
   }
 
   // agent loop
-  async execChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number} | null> {
+  async sendChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number, error?: string}> {
     try {
-      this.logger.debug('[Engine.execChat]', chatId, agentId, message.slice(0, 100));
+      this.logger.debug('[Engine.sendChat]', chatId, agentId, message.slice(0, 100));
 
       const agent = this.agents[agentId]!;
 
@@ -863,16 +904,12 @@ export default class Engine {
       if (!chat) {
         chat = { id: chatId, messages: [], thinking: false, userId: '', format: 'text', updatedAt: Date.now() } as Chat;
 
-        let system = agent.identity;
-
         if (format === 'json') {
           chat.format = 'json';
-          system += '\n\n' + constants.JSON_MD;
-          system += '\n' +'- JSON schema: ' + JSON.stringify(schema);
         }
 
         // load agent IDENTITY.md as system message
-        chat.messages.push({ role: 'system', content: system });
+        chat.messages.push({ role: 'system', content: this.makeSystemPrompt(agent.identity, format, schema) });
       }
 
       // load task input as user message
@@ -880,7 +917,7 @@ export default class Engine {
 
       // return early
       if (this.isDry) {
-        this.logger.info('[Engine.execChat]', '[dry]', 'send messages to:', agent.model.model);
+        this.logger.info('[Engine.sendChat]', '[dry]', 'send messages to:', agent.model.model);
         this.saveChat(chatId, chat);
         return { content: '(dry)', steps: 0 };
       }
@@ -904,17 +941,17 @@ export default class Engine {
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
         // trim result, this can be really big
-        this.logger.debug('[Engine.execChat]', `step=${steps}`, `tools={${reply.message.tools?.length}}`);
+        this.logger.debug('[Engine.sendChat]', `step=${steps}`, `tools={${reply.message.tools?.length}}`);
 
         // force stop
         if (reply.stop) {
-          this.logger.debug('[Engine.execChat]', `response force stop at step ${steps}`);
+          this.logger.debug('[Engine.sendChat]', `response force stop at step ${steps}`);
           break;
         }
 
         // execute any tool calls
         for (const tool of reply.message.tools || []) {
-          this.logger.debug('[Engine.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+          this.logger.debug('[Engine.sendChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
           if (tool.name === constants.END_CHAT_NAME) {
             ender = true;
@@ -930,20 +967,20 @@ export default class Engine {
 
         // if model produced content without pending tool calls, we're done
         // if (reply.message.content && (!reply.message.tools || reply.message.tools.length === 0)) {
-        //   this.logger.info('[Engine.execChat]', `response without tool calls, stopping the AI loop`);
+        //   this.logger.info('[Engine.sendChat]', `response without tool calls, stopping the AI loop`);
         //   break;
         // }
 
         // if end_chat tool call is found, we're done
         if (ender) {
-          this.logger.info('[Engine.execChat]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
+          this.logger.info('[Engine.sendChat]', `found ${constants.END_CHAT_NAME} tool call, stopping the AI loop`);
           break;
         }
       } while (steps < maxSteps - 1);
 
       // warn if max steps reached
       if (steps >= maxSteps) {
-        this.logger.warn('[Engine.execChat]', `max steps (${maxSteps}) reached for ${agentId}`);
+        this.logger.warn('[Engine.sendChat]', `max steps (${maxSteps}) reached for ${agentId}`);
       }
 
       // save chat to cache
@@ -956,8 +993,8 @@ export default class Engine {
       const content = chat.format === 'json' ? cleanContent(rawContent) : rawContent;
       return { content: content, steps: steps };
     } catch (error) {
-      this.logger.error('[Engine.execChat]', error);
-      return null;
+      this.logger.error('[Engine.sendChat]', error);
+      return { content: '', steps: 0, error: (error as Error).message };
     } 
   }
 }

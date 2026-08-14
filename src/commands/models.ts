@@ -1,9 +1,8 @@
-import { promises } from 'readline';
-
 import { listModels } from "../models";
 import { Command, Config, Provider } from "../types";
 import { writeFileSync } from 'fs';
 import { join } from 'path';
+import { ask } from '../terminal';
 
 export default class ModelsCommand extends Command {
   async exec() {
@@ -38,12 +37,10 @@ export default class ModelsCommand extends Command {
         const config = {} as Config['models'][string];
         
         this.logger.log('');
-        const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
-        config['provider'] = await pli.question('Enter provider [openai, anthropic, deepseek, lmstudio]: ') as Provider;
-        config['model']    = await pli.question('Enter model name (e.g. gpt-3.5-turbo): ');
-        config['baseUrl']  = await pli.question('Enter baseUrl (e.g. http://localhost:1234): ');
-        config['apiKey']   = await pli.question('Enter apiKey (e.g. sk-1234): ');
-        pli.close();
+        config['provider'] = await ask('Enter provider [openai, anthropic, deepseek, lmstudio]: ') as Provider;
+        config['model']    = await ask('Enter model name (e.g. gpt-3.5-turbo): ');
+        config['baseUrl']  = await ask('Enter baseUrl (e.g. http://localhost:1234): ');
+        config['apiKey']   = await ask('Enter apiKey (e.g. sk-1234): ');
         this.logger.log('');
         
         if (!config['baseUrl']) delete config['baseUrl'];

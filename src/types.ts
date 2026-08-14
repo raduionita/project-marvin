@@ -3,6 +3,9 @@ import type { Logger } from "./logger.js";
 
 export type Mode = 'client' | 'server';
 
+// a selectable entry in a terminal select/multiselect prompt
+export type Option<T = string> = { label: string; value: T };
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type Provider = 'fallback' | 'deepseek' | 'lmstudio' | 'openai' | 'qwen' | 'anthropic' | 'google';
 export type Thinking = 'enabled' | 'disabled';
@@ -67,7 +70,7 @@ export abstract class System {
   abstract drop(): Promise<void>;
 }
 
-export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string}}, required?:string[]}} };
+export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string, enum?:string[]}}, required?:string[]}} };
 
 export abstract class Tool {
   constructor(public engine: Engine, public logger: Logger) {
@@ -94,9 +97,49 @@ export abstract class Channel {
   abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;
 }
 
+// a single parameter/field an integration action accepts (used to build the
+// call_integration tool schema and to prompt the user during `marvin
+// integrations add`). derived from the provider's API schema via discovery.
+export interface Field {
+  // field name as sent to the provider (e.g. title, content, meta)
+  name: string;
+  // parameter type: string, number, boolean, object, array, integer
+  type: string;
+  // required by the provider (schema "required" or user-marked during add)
+  required: boolean;
+  // human readable description of what the field is for
+  description: string;
+  // allowed values, when the provider restricts them (e.g. post status)
+  enum?: string[];
+  // target when the field is a custom/meta field: meta, acf or undefined
+  meta?: 'meta' | 'acf';
+}
+
+export interface IntegrationAction {
+  // action name passed to Integration.call (e.g. create_post)
+  name: string;
+  // one line description shown to the user and the LLM
+  description: string;
+}
+
+// what an integration type is capable of, without any per-site configuration.
+export interface IntegrationMeta {
+  // integration type (e.g. wordpress)
+  type: string;
+  // human readable title (e.g. "Wordpress")
+  title: string;
+  // one line description (e.g. "Post articles to a Wordpress site")
+  description: string;
+  // all actions this integration type supports
+  actions: IntegrationAction[];
+}
+
 // integration interface: a bridge to a 3rd party endpoint (e.g. Wordpress API)
 export abstract class Integration {
   abstract args: {[key: string]: any};
+  // static info about this integration type (type, title, description, actions).
+  // used to build the ## Integrations system-prompt block and the wizard prompts.
+  abstract meta: IntegrationMeta;
 
   constructor(public engine: Engine, public logger: Logger, public config: { [key: string]: any }) {
     this.logger.debug(`[${this.constructor.name||'Integration'}.constructor]`);
@@ -106,6 +149,13 @@ export abstract class Integration {
   abstract drop(): Promise<void>;
   // run a named action on the integration (e.g. create_post, publish_post)
   abstract call(args: {[key:string]:any}): Promise<{[key:string]:any}>;
+
+  // discover the fields an action accepts from the provider (e.g. via OPTIONS
+  // on the Wordpress REST API). returns normalized FieldDef[], throws when the
+  // provider cannot be reached or exposes no schema.
+  async discover(_action: string): Promise<Field[]> {
+    return [];
+  }
 }
 
 // skill meta data, populated on engine load. The .md content itself is loaded

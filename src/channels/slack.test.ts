@@ -125,7 +125,7 @@ class MockSlackChannel extends SlackChannel {
   }
 
   // expose protected members for tests
-  findAgent(channel?: string): Agent {
+  findAgent(channel?: string): Agent | undefined {
     return super.findAgent(channel);
   }
 
@@ -333,7 +333,7 @@ test('findAgent returns agent whose channels.slack matches the passed channel', 
   engine.agents['agent-2'] = { id: 'agent-2', enabled: true, identity: '', channels: { slack: 'C456' }, tasks: {}, model: {} as never } as Agent;
 
   const channel = new MockSlackChannel(engine);
-  expect(channel.findAgent('C123').id).toBe('agent-1');
+  expect(channel.findAgent('C123')!.id).toBe('agent-1');
 });
 
 test('findAgent returns default agent when no channel is passed', () => {
@@ -342,7 +342,7 @@ test('findAgent returns default agent when no channel is passed', () => {
   engine.agents['marvin'] = { id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never } as Agent;
 
   const channel = new MockSlackChannel(engine);
-  expect(channel.findAgent().id).toBe('marvin');
+  expect(channel.findAgent()!.id).toBe('marvin');
 });
 
 test('findAgent skips disabled agents', () => {
@@ -352,7 +352,7 @@ test('findAgent skips disabled agents', () => {
   engine.agents['active-agent'] = { id: 'active-agent', enabled: true, identity: '', channels: { slack: 'C789' }, tasks: {}, model: {} as never } as Agent;
 
   const channel = new MockSlackChannel(engine);
-  expect(channel.findAgent('C789').id).toBe('active-agent');
+  expect(channel.findAgent('C789')!.id).toBe('active-agent');
 });
 
 test('findAgent falls back to the default agent when no channel matches', () => {
@@ -361,7 +361,7 @@ test('findAgent falls back to the default agent when no channel matches', () => 
   engine.agents['marvin'] = { id: 'marvin', enabled: true, identity: '', channels: { slack: 'CDEFAULT' }, tasks: {}, model: {} as never } as Agent;
 
   const channel = new MockSlackChannel(engine);
-  expect(channel.findAgent('CUNKNOWN').id).toBe('marvin');
+  expect(channel.findAgent('CUNKNOWN')!.id).toBe('marvin');
 });
 
 // ============================================================================
@@ -501,17 +501,14 @@ test('sendMessage() reports failure on channel mismatch', async () => {
   expect(result.ok).toBe(false);
 });
 
-test('sendMessage() throws when web client is not attached', async () => {
+test('sendMessage() returns ok:false when web client is not attached', async () => {
   const { channel } = buildEngine();
   // do not call load() - web is undefined
 
-  let threw = false;
-  try {
-    await channel.sendMessage({ role: 'assistant', content: 'hello' });
-  } catch {
-    threw = true;
-  }
-  expect(threw).toBe(true);
+  const result = await channel.sendMessage({ role: 'assistant', content: 'hello', channel: 'C123' });
+
+  expect(result.ok).toBe(false);
+  expect(result.error).toContain('not attached');
 });
 
 test('sendMessage() reports actionable hints for known Slack errors', async () => {
@@ -685,8 +682,21 @@ test('E2E: mention with no text posts the placeholder reply', async () => {
   expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('(no text content)');
 });
 
-test('E2E: LLM failure posts the (no response from the AI) reply', async () => {
+test('E2E: LLM failure posts an (AI loop error) reply', async () => {
   const { channel } = buildEngine({ fail: true });
+  await channel.load();
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.005', channel: 'C123',
+    message: { text: '(AI loop error: mock model failure)', ts: '1700000000.005' },
+  } as ChatPostMessageResponse);
+
+  await channel.mockSok.emit('app_mention', mentionEvent());
+
+  expect(channel.mockWeb.postMessageCalls[0]!.text).toContain('(AI loop error: mock model failure)');
+});
+
+test('E2E: empty AI content posts the (no response from the AI) placeholder', async () => {
+  const { channel } = buildEngine({ replies: [reply('')] });
   await channel.load();
   channel.mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.005', channel: 'C123',
@@ -696,6 +706,26 @@ test('E2E: LLM failure posts the (no response from the AI) reply', async () => {
   await channel.mockSok.emit('app_mention', mentionEvent());
 
   expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('(no response from the AI)');
+});
+
+test('E2E: missing agent posts an error reply instead of crashing', async () => {
+  const engine = new Engine(new Logger());
+  engine.isDry = false;
+  engine.state = 'exec';
+  engine.config = mockConfig({
+    channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xbot-test' } },
+    agents: {}, // no agents configured at all
+  });
+  const channel = new MockSlackChannel(engine);
+  await channel.load();
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.007', channel: 'C123',
+    message: { text: '(no agent is configured for this channel)', ts: '1700000000.007' },
+  } as ChatPostMessageResponse);
+
+  await channel.mockSok.emit('app_mention', mentionEvent());
+
+  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('(no agent is configured for this channel)');
 });
 
 test('E2E: JSON LLM output is extracted to the string sent to Slack', async () => {

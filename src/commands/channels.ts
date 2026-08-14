@@ -1,10 +1,10 @@
 
 import { join } from 'path';
 import { writeFileSync } from 'fs';
-import { promises } from 'readline';
 
 import { Command, Message } from "../types";
 import { listChannels, loadChannel } from '../channels';
+import { ask } from '../terminal';
 
 // `marvin channels [command] [--dry]` list, add, bind, chat, drop channels
 export default class ChannelsCommand extends Command {
@@ -77,29 +77,25 @@ export default class ChannelsCommand extends Command {
     const channels = listChannels(this.engine).map(c => c.replace('.ts', ''));
 
     this.logger.log('');
-    const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
 
     // ask for channelId
-    const channelId = this.args[1] || await pli.question('Enter channel name (e.g. slack): ');
+    const channelId = this.args[1] || await ask('Enter channel name (e.g. slack): ');
     
     if (!channels.includes(channelId)) {
       this.logger.error('[ChannelsCommand.execAdd]', `unknown channel "${channelId}"`);
       this.logger.error('[ChannelsCommand.execAdd]', 'available channels:', channels.join(', '));
-      pli.close();
       return;
     }
 
     // check if channel is already loaded
     if (this.engine.config.channels[channelId]) {
       this.logger.warn('[ChannelsCommand.execAdd]', `channel "${channelId}" is already loaded`);
-      pli.close();
       return;
     }
 
     const channel = await loadChannel(this.engine, channelId);
     if (!channel) {
       this.logger.error('[ChannelsCommand.execAdd]', `channel "${channelId}" not found`);
-      pli.close();
       return;
     }
 
@@ -107,10 +103,9 @@ export default class ChannelsCommand extends Command {
 
     // ask for arguments (for each arg in args, ask for value)
     for (const [arg, placeholder] of Object.entries(channel.args)) {
-      config[arg] = await pli.question(`Enter ${channelId} ${arg} (e.g. ${placeholder}): `) as string;
+      config[arg] = await ask(`Enter ${channelId} ${arg} (e.g. ${placeholder}): `) as string;
     }
 
-    pli.close();
     this.logger.log('');
 
     // register the channel in config
@@ -138,14 +133,12 @@ export default class ChannelsCommand extends Command {
     this.logger.info('[ChannelsCommand.execBind]', 'binding a channel:group to an agent...');
 
     this.logger.log('');
-    const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
     // ask for agentId
-    const agentId = this.args[1] || await pli.question('Enter agent (e.g. my-agent): ');
+    const agentId = this.args[1] || await ask('Enter agent (e.g. my-agent): ');
     // ask for channelId
-    const channelId = this.args[2] || await pli.question('Enter channel (e.g. slack): ');
+    const channelId = this.args[2] || await ask('Enter channel (e.g. slack): ');
     // ask for groupId
-    const groupId = this.args[3] || await pli.question('Enter group (optional, e.g. general): ');
-    pli.close();
+    const groupId = this.args[3] || await ask('Enter group (optional, e.g. general): ');
 
     if (!channelId || !agentId) {
       this.logger.warn('[ChannelsCommand.execBind]', 'invalid inputs, exiting');
@@ -185,10 +178,9 @@ export default class ChannelsCommand extends Command {
     this.logger.info('[ChannelsCommand.execChat]', 'sending a message to a channel...');
     
     this.logger.log('');
-    const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
     
     // ask for channelId
-    let channelId = this.args[1] || await pli.question('Enter channel (e.g. slack): ');
+    let channelId = this.args[1] || await ask('Enter channel (e.g. slack): ');
     const channel = await loadChannel(this.engine, channelId);
     if (!channel) {
       this.logger.error('[ChannelsCommand.execChat]', `channel "${channelId}" not found`);
@@ -207,7 +199,7 @@ export default class ChannelsCommand extends Command {
     this.logger.log('');
 
     // ask for groupId
-    let groupId = this.args[2] || await pli.question('Enter group (optional, e.g. general): ');
+    let groupId = this.args[2] || await ask('Enter group (optional, e.g. general): ');
 
     // find groupId in groups
     for (const [id, name] of Object.entries(groups)) {
@@ -223,9 +215,8 @@ export default class ChannelsCommand extends Command {
     }
 
     // ask for message
-    const message = await pli.question('Message: ');
+    const message = await ask('Message: ');
 
-    pli.close();
     this.logger.log('');
 
     const result = await channel.sendMessage({ role: 'assistant', content: message, channel: groupId } as Message);

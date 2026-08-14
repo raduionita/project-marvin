@@ -1,15 +1,12 @@
-import { promises } from 'readline';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from "../types";
 import * as constants from '../constants';
+import { ask } from '../terminal';
 
 // `marvin agents [command] [--dry]` list, add, bind, chat, drop agents
 export default class AgentsCommand extends Command {
-  // overridable for tests (scripted answers)
-  public ask?: (question: string) => Promise<string>;
-
   async exec() {
     this.logger.debug('[AgentsCommand.exec]');
 
@@ -47,9 +44,7 @@ export default class AgentsCommand extends Command {
     // TODO: start interactive prompt mode here...loop until /exit/quit/stop
 
     // prompt interactively
-    const pli = promises.createInterface({input: process.stdin, output: process.stdout, });
-    const answer = (await pli.question('You: ')).trim();
-    pli.close();
+    const answer = await ask('You: ');
 
     // if empty answer, exit
     if (!answer) {
@@ -62,9 +57,9 @@ export default class AgentsCommand extends Command {
       this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'message:', answer);
       this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'agent:', agentId);
     } else {
-      const result = await this.engine.execChat(chatId, agentId, answer);
-      if (!result) {
-        this.logger.error('[AgentsCommand.execChat]', 'no result from sendMessage for agent', agentId);
+      const result = await this.engine.sendChat(chatId, agentId, answer);
+      if (result.error) {
+        this.logger.error('[AgentsCommand.execChat]', 'no result from sendMessage for agent', agentId, ':', result.error);
         return;
       }
 
@@ -78,13 +73,6 @@ export default class AgentsCommand extends Command {
   // `marvin agents add [agentId]` // add an agent interactively
   async execAdd() {
     this.logger.debug('[AgentsCommand.execAdd]', 'adding an agent...');
-
-    const ask = this.ask || (async (q: string) => {
-      const pli = promises.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = (await pli.question(q)).trim();
-      pli.close();
-      return answer;
-    });
 
     this.logger.log('');
 

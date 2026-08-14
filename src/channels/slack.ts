@@ -214,12 +214,12 @@ export default class SlackChannel extends Channel {
     // need web client
     if (!this.web) {
       this.logger.error('[SlackChannel.sendMessage]', 'not attached, skipping submit');
-      throw new Error('[SlackChannel.sendMessage] web client not attached');
+      return { ts: '', ok: false, error: 'web client not attached', message: '(slack not attached)' };
     }
 
     if (!message.channel) {
       this.logger.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
-      throw new Error('[SlackChannel.sendMessage] no channel provided');
+      return { ts: '', ok: false, error: 'no channel provided', message: '(no channel)' };
     }
 
     // send the message
@@ -253,10 +253,23 @@ export default class SlackChannel extends Channel {
     }
   }
 
-  protected async onMention({ event, body, ack }: HandlerParams) {
+  // best-effort reply to the event's channel/thread: never throws, falls back
+  // to a placeholder when the AI produced no content
+  protected async replyTo(event: { [key: string]: any }, thread: string | undefined, content: string) {
+    const text = (content || '').trim() || '(no response from the AI)';
     try {
-      const thread = event.thread_ts || event.ts || event.event_ts;
+      const res = await this.sendMessage({ role: 'assistant', content: text, channel: event.channel, thread });
+      if (!res.ok) {
+        this.logger.warn('[SlackChannel.replyTo]', 'failed to post reply:', res.error, res.message);
+      }
+    } catch (err) {
+      this.logger.error('[SlackChannel.replyTo]', 'failed to post reply:', err);
+    }
+  }
 
+  protected async onMention({ event, body, ack }: HandlerParams) {
+    const thread = event.thread_ts || event.ts || event.event_ts;
+    try {
       this.logger.debug('[SlackChannel.onMention]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
       
       // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
@@ -266,36 +279,40 @@ export default class SlackChannel extends Channel {
       const text = this.extractText(event);
       if (!text) {
         this.logger.warn('[SlackChannel.onMention]', 'no text content');
-        await this.sendMessage({ role: 'assistant', content: '(no text content)', channel: event.channel, thread: thread });
+        await this.replyTo(event, thread, '(no text content)');
         return; 
       }
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
+      if (!agent) {
+        this.logger.error('[SlackChannel.onMention]', 'no agent found for channel:', event.channel);
+        await this.replyTo(event, thread, '(no agent is configured for this channel)');
+        return;
+      }
       const agentId = agent.id;
       const chatId: string = `slack-${event.channel}-${thread}`;
 
       this.logger.info('[SlackChannel.onMention]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await this.engine.execChat(chatId, agentId, text);
-      if (!result) {
-        this.logger.error('[SlackChannel.onMention]', `no result from sendMessage for agent ${agentId}`);
-        await this.sendMessage({ role: 'assistant', content: '(no response from the AI)', channel: event.channel, thread: thread });
+      const result = await this.engine.sendChat(chatId, agentId, text);
+      if (result.error) {
+        this.logger.error('[SlackChannel.onMention]', `AI loop failed for agent ${agentId}:`, result.error);
+        await this.replyTo(event, thread, `(AI loop error: ${result.error})`);
         return;
       }
 
-      const content = extractOutput(result.content);
-      await this.sendMessage({ role: 'assistant', content, channel: event.channel, thread: thread });
+      await this.replyTo(event, thread, extractOutput(result.content));
     } catch (error) {
       this.logger.error('[SlackChannel.onMention]', error);
+      await this.replyTo(event, thread, '(failed to process your message)');
     }
   }
 
   protected async onDirectMessage({ event, body, ack }: HandlerParams) {
+    const thread = event.thread_ts || event.ts || event.event_ts;
     try {
-      const thread = event.thread_ts || event.ts || event.event_ts;
-
       this.logger.debug('[SlackChannel.onDirectMessage]', event.channel, thread);
       
       // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
@@ -305,29 +322,34 @@ export default class SlackChannel extends Channel {
       const text = this.extractText(event);
       if (!text) {
         this.logger.warn('[SlackChannel.onDirectMessage]', 'no text content');
-        await this.sendMessage({ role: 'assistant', content: '(no text content)', channel: event.channel, thread: thread });
+        await this.replyTo(event, thread, '(no text content)');
         return;
       }
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
+      if (!agent) {
+        this.logger.error('[SlackChannel.onDirectMessage]', 'no agent found for channel:', event.channel);
+        await this.replyTo(event, thread, '(no agent is configured for this channel)');
+        return;
+      }
       const agentId = agent.id;
       const chatId = `slack-${event.channel}-${thread}`;
 
       this.logger.debug('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await this.engine.execChat(chatId, agentId, text);
-      if (!result) {
-        this.logger.error('[SlackChannel.onDirectMessage]', `no result from processMessage for agent ${agentId}`);
-        await this.sendMessage({ role: 'assistant', content: '(SlackChannel.onDirectMessage ERROR - no response from the AI)', channel: event.channel, thread: thread });
+      const result = await this.engine.sendChat(chatId, agentId, text);
+      if (result.error) {
+        this.logger.error('[SlackChannel.onDirectMessage]', `AI loop failed for agent ${agentId}:`, result.error);
+        await this.replyTo(event, thread, `(AI loop error: ${result.error})`);
         return;
       }
 
-      const content = extractOutput(result.content);
-      await this.sendMessage({ role: 'assistant', content, channel: event.channel, thread: thread });
+      await this.replyTo(event, thread, extractOutput(result.content));
     } catch (error) {
       this.logger.error('[SlackChannel.onDirectMessage]', error);
+      await this.replyTo(event, thread, '(failed to process your message)');
     }
   }
 
@@ -450,12 +472,15 @@ export default class SlackChannel extends Channel {
   }
 
   // find agent using event.channel or fallback to default "marvin"
-  protected findAgent(channel?: string): Agent {
+  protected findAgent(channel?: string): Agent | undefined {
     this.logger.debug('[SlackChannel.findAgent]', channel ? `channel=${channel}` : 'marvin');
+
+    // default agent (settings.name), the orchestrator
+    const fallback = () => this.engine.agents[this.engine.config.settings.name];
 
     // diretly use marvin/orchestrator agent
     if (!channel) {
-      return this.engine.agents[this.engine.config.settings.name]!;
+      return fallback();
     }
 
     // find ir first enabled agent that has slack configured
@@ -469,7 +494,7 @@ export default class SlackChannel extends Channel {
     }
 
     // fallback: default agent (settings.name), fallback doesnt need slack configured
-    return this.engine.agents[this.engine.config.settings.name]!;
+    return fallback();
   }
 
   // translate common Slack API errors into actionable hints

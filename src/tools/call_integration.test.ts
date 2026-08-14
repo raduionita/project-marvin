@@ -2,17 +2,19 @@ import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import CallIntegrationTool from './call_integration.js';
-import { Integration } from '../types.js';
+import { Integration, Config } from '../types.js';
 
-function mockEngine(integrations: Record<string, Integration> = {}): Engine {
+function mockEngine(integrations: Record<string, Integration> = {}, configIntegrations: { [id: string]: { type: string; [key: string]: any } } = {}): Engine {
   const engine = new Engine(new Logger());
   engine.integrations = integrations;
+  engine.config.integrations = configIntegrations as Config['integrations'];
   engine.state = 'exec';
   return engine;
 }
 
 class FakeIntegration extends Integration {
   args = { endpoint: 'https://example.com' };
+  meta = { type: 'fake', title: 'Fake', description: '', actions: [] };
   calls: { action: string, params: { [key: string]: any } }[] = [];
   async load() {}
   async drop() {}
@@ -20,6 +22,14 @@ class FakeIntegration extends Integration {
     this.calls.push({ action: args.action, params: args });
     return { ok: true, echo: args };
   }
+}
+
+class WordpressLikeIntegration extends Integration {
+  args = { endpoint: 'https://example.com' };
+  meta = { type: 'wordpress', title: 'Wordpress', description: '', actions: [{ name: 'create_post', description: 'Create a post' }, { name: 'publish_post', description: 'Publish a post' }] };
+  async load() {}
+  async drop() {}
+  async call() { return {}; }
 }
 
 test('call_integration executes an action on the configured integration', async () => {
@@ -51,4 +61,22 @@ test('call_integration returns an error for an unknown integration', async () =>
 
   expect(result.error).toContain('does not exist');
   expect(result.integrations).toEqual([]);
+});
+
+test('call_integration meta reflects the configured integration ids', async () => {
+  const engine = mockEngine({}, { gloobeam: { type: 'wordpress' }, other: { type: 'wordpress' } });
+  const tool = new CallIntegrationTool(engine, new Logger());
+
+  const meta = tool.meta;
+  const integrationProp = meta.function.parameters.properties.integration!;
+  expect(integrationProp.enum).toEqual(['gloobeam', 'other']);
+  expect(meta.function.parameters.required).toEqual(['integration', 'action']);
+});
+
+test('call_integration meta exposes the union of actions from loaded integrations', async () => {
+  const engine = mockEngine({ gloobeam: new WordpressLikeIntegration(new Engine(new Logger()), new Logger(), { type: 'wordpress' }) }, { gloobeam: { type: 'wordpress' } });
+  const tool = new CallIntegrationTool(engine, new Logger());
+
+  const meta = tool.meta;
+  expect(meta.function.parameters.properties.action!.enum).toEqual(['create_post', 'publish_post']);
 });

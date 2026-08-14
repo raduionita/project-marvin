@@ -41,30 +41,31 @@ export default class WebSearchTool extends Tool {
     const query = args.query;
     const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
 
-    const page = await system.newPage((request) => {
-      // exlude everything except links.duckduckgo.com/d.js and document
-      const type = request.resourceType();
-      const url = request.url();
-      if (type === 'script' && !url.includes('links.duckduckgo.com/d.js')) {
-        // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
-        return request.abort();
-      } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
-        // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
-        return request.abort();
-      } else {
-        this.logger.debug('[WebSearchTool.newPage]', 'allowing', type, url);
-        return request.continue();
-      }
-    });
-    page.setDefaultNavigationTimeout(15_000);
-
+    let page: Awaited<ReturnType<BrowserSystem['newPage']>> | undefined;
     try {
+      page = await system.newPage((request) => {
+        // exlude everything except links.duckduckgo.com/d.js and document
+        const type = request.resourceType();
+        const url = request.url();
+        if (type === 'script' && !url.includes('links.duckduckgo.com/d.js')) {
+          // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+          return request.abort();
+        } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
+          // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+          return request.abort();
+        } else {
+          this.logger.debug('[WebSearchTool.newPage]', 'allowing', type, url);
+          return request.continue();
+        }
+      });
+      page.setDefaultNavigationTimeout(15_000);
+
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10_000 });
 
       // after the html/doc is loaded, duck requests d.js that contains the search results
       const script = await page.waitForResponse((response) => response.url().includes('links.duckduckgo.com/d.js'), { timeout: 10_000 });
       const text = await script.text();
-      
+
       // done with the page
       await page.close();
 
@@ -81,14 +82,15 @@ export default class WebSearchTool extends Tool {
         link: o.c
       })) };
     } catch (error) {
+      // distinguish "search failed" from "no results", so the LLM does not
+      // conclude nothing exists when the scrape/parse simply failed
       this.logger.error('[WebSearchTool.call]', 'error:', error);
+      return { results: [], warning: `web_search failed: ${(error as Error).message}` };
     } finally {
-      if (!page.isClosed()) {
+      if (page && !page.isClosed()) {
         this.logger.debug('[WebSearchTool.call]', 'closing page');
         await page.close();
       }
     }
-    // return nothing
-    return { results: [] };
   }
 }

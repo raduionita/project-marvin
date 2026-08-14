@@ -39,6 +39,7 @@ You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI
   - `engine.ts`             # core of marvin, AI loop, agent/task scheduling,
   - `types.ts`              # types and interfaces
   - `logger.ts`             # logger
+  - `terminal.ts`           # terminal helpers
   - `constants.ts`          # project wide constants
   - `helpers.ts`            # helper functions
   - `declare.d.ts`          # declares modules (i.e. bun:test)
@@ -77,7 +78,7 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 - `Tool` - executable action: `webSearch`, `webBrowse`, `getDate`, …
 - `Agent` - runs scheduled tasks; communicates via configured channels
 - `Task` - periodic prompt or `.md` file that starts the AI loop
-- `execChat` - engine: prompts the LLM with task input, then reschedules itself (`execMonitor`/`execSweep` handle monitor/sweep tasks)
+- `sendChat` - engine: prompts the LLM with task input, then reschedules itself (`execMonitor`/`execSweep` handle monitor/sweep tasks)
 
 Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-contained entry points for their respective modes.
 Do not confuse Marvin channels with Slack channels, they are different things. In Marvin they are communication channels between the client and the server.
@@ -102,10 +103,6 @@ Do not confuse Marvin channels with Slack channels, they are different things. I
 - All changes must stay compatible with the current codebase
 - Avoid using `as any` or `as unknown`
 - logging: info should not be prefixed with function name ('[EnableCommand.exec]'), only debug, warn & error
-
-## Task Backlog
-`TODO.md` file contains project's for pending taks, code that needs to be implemented, and other notes.
-Completed items in `TODO.md` should be removed, ask before removing it.
 
 ---
 

@@ -1,17 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { promises } from 'readline';
 
 import { tryJsonParse } from "../helpers";
 import { listSystems } from "../systems";
 import { listTools, listCustomTools } from "../tools";
 import { readSkill } from "../skills";
 import { Command, System, Tool, ToolMeta } from "../types";
+import { ask } from '../terminal';
 
 export default class ToolsCommand extends Command {
-  // overridable for tests (scripted answers)
-  public ask?: (question: string) => Promise<string>;
-
   async exec() {
     this.logger.debug('[ToolsCommand.exec]');
 
@@ -125,13 +122,6 @@ export default class ToolsCommand extends Command {
   async execAdd() {
     this.logger.debug('[ToolCommand.execAdd]', 'creating a custom tool...');
 
-    const ask = this.ask || (async (q: string) => {
-      const pli = promises.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = (await pli.question(q)).trim();
-      pli.close();
-      return answer;
-    });
-
     // ask for the tool name
     const name = this.args[1] || await ask('Tool name (e.g. web_search): ');
     if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
@@ -178,8 +168,8 @@ export default class ToolsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
-      if (!result || !result.content) {
+      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      if (result.error || !result.content) {
         this.logger.error('[ToolCommand.execAdd]', 'no result from the LLM');
         return;
       }
@@ -204,13 +194,6 @@ export default class ToolsCommand extends Command {
   // `marvin tools edit [name] [description]` // edit an existing custom tool
   async execEdit() {
     this.logger.debug('[ToolCommand.execEdit]', 'editing a custom tool...');
-
-    const ask = this.ask || (async (q: string) => {
-      const pli = promises.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = (await pli.question(q)).trim();
-      pli.close();
-      return answer;
-    });
 
     // ask for the tool name
     const name = this.args[1] || await ask('Tool name (e.g. web_search): ');
@@ -263,8 +246,8 @@ export default class ToolsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
-      if (!result || !result.content) {
+      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      if (result.error || !result.content) {
         this.logger.error('[ToolCommand.execEdit]', 'no result from the LLM');
         return;
       }

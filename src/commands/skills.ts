@@ -1,16 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { promises } from 'readline';
 
 import { Command } from "../types";
 import { listSkills, listCustomSkills, readSkill, parseSkill } from '../skills';
 import * as constants from '../constants';
+import { ask } from '../terminal';
 
 // `marvin skills [command] [--dry]` list and add (create) skills
 export default class SkillsCommand extends Command {
-  // overridable for tests (scripted answers)
-  public ask?: (question: string) => Promise<string>;
-
   async exec() {
     this.logger.debug('[SkillsCommand.exec]');
 
@@ -75,13 +72,6 @@ export default class SkillsCommand extends Command {
   async execAdd() {
     this.logger.debug('[SkillsCommand.execAdd]', 'creating a skill...');
 
-    const ask = this.ask || (async (q: string) => {
-      const pli = promises.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = (await pli.question(q)).trim();
-      pli.close();
-      return answer;
-    });
-
     // ask for the skill name
     const name = this.args[1] || await ask('Enter skill name (e.g. release-notes): ');
     if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
@@ -131,8 +121,8 @@ export default class SkillsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
-      if (!result || !result.content) {
+      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      if (result.error || !result.content) {
         this.logger.error('[SkillsCommand.execAdd]', 'no result from the LLM');
         return;
       }
@@ -155,13 +145,6 @@ export default class SkillsCommand extends Command {
   // `marvin skills use [skill] [<name>]` // apply a skill interactively
   async execUse() {
     this.logger.debug('[SkillsCommand.execUse]', 'using a skill...');
-
-    const ask = this.ask || (async (q: string) => {
-      const pli = promises.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = (await pli.question(q)).trim();
-      pli.close();
-      return answer;
-    });
 
     // ensure skills are loaded (defaults + custom) so we can pick from them
     await this.engine.load();
@@ -247,8 +230,8 @@ export default class SkillsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
-      if (!result || !result.content) {
+      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      if (result.error || !result.content) {
         this.logger.error('[SkillsCommand.execUse]', 'no result from the LLM');
         return;
       }

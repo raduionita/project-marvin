@@ -1,30 +1,55 @@
-import { Tool, ToolMeta } from '../types.js';
+import { Tool, ToolMeta, IntegrationAction } from '../types.js';
 
 export default class CallIntegrationTool extends Tool {
-  public meta: ToolMeta = {
-    type: 'function',
-    function: {
-      name: 'call_integration',
-      description: 'Call a configured 3rd party integration (e.g. a Wordpress site). Actions depend on the integration type (e.g. create_post, publish_post)',
-      parameters: {
-        type: 'object',
-        properties: {
-          integration: {
-            type: 'string',
-            description: 'Integration id as configured in marvin.json (e.g. gloobeam)',
-          },
-          action: {
-            type: 'string',
-            description: 'Action to run on the integration, e.g. create_post, publish_post',
-          },
-          params: {
-            type: 'object',
-            description: 'Action parameters (e.g. title, content, id)',
-          },
-        },
-        required: ['integration', 'action'],
+  // the meta is dynamic: rebuilt from the configured integrations so the LLM
+  // sees the actual sites and their actions. loadIntegrations() runs before
+  // loadModels(), and models snapshot tool metas in their constructor.
+  public get meta(): ToolMeta {
+    const integrations = Object.keys(this.engine.config.integrations || {});
+
+    // collect the union of actions across the configured integration types,
+    // deduped, so the enum stays valid
+    const actions = new Map<string, string>();
+    for (const [id, config] of Object.entries(this.engine.config.integrations || {})) {
+      const type = config.type || '';
+      const integration = this.engine.integrations[id];
+      const info = integration ? integration.meta : { actions: [] as IntegrationAction[] };
+      for (const a of info.actions) {
+        if (!actions.has(a.name)) actions.set(a.name, a.description);
       }
-    },
+      if (type && !info.actions.length && !actions.has('request')) {
+        // unknown/undescribed integration type: fall back to a generic action
+        actions.set('request', 'Run a raw request against the integration');
+      }
+    }
+
+    return {
+      type: 'function',
+      function: {
+        name: 'call_integration',
+        description: 'Execute an action on a configured 3rd party integration (e.g. a Wordpress site). Use find_integration first to learn the required fields for the action.',
+        parameters: {
+          type: 'object',
+          properties: {
+            integration: {
+              type: 'string',
+              enum: integrations,
+              description: 'Integration id as configured in marvin.json (e.g. gloobeam)',
+            },
+            action: {
+              type: 'string',
+              ...(actions.size ? { enum: Array.from(actions.keys()) } : {}),
+              description: 'Action to run (e.g. create_post, publish_post)',
+            },
+            params: {
+              type: 'object',
+              description: 'Action parameters. Call find_integration with the integration and action to learn the exact fields and which are required (e.g. title, content, meta fields).',
+            },
+          },
+          required: ['integration', 'action'],
+        }
+      },
+    };
   }
 
   public async call(args: { integration: string, action: string, params?: { [key: string]: any } }) {

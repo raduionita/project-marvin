@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
-import { Chat, Config, Agent } from './types.js';
+import { Chat, Config, Agent, Integration } from './types.js';
 import * as constants from './constants.js';
 
 function buildEngine(): Engine {
@@ -107,4 +107,56 @@ test('drop clears the chat cache', async () => {
   await engine.drop();
 
   expect(engine.findChat('x')).toBeNull();
+});
+
+test('sendChat returns an error field when the agent does not exist', async () => {
+  const engine = buildEngine();
+  engine.state = 'exec';
+
+  const result = await engine.sendChat('chat-1', 'nope', 'hello');
+
+  expect(result.content).toBe('');
+  expect(result.error).toBeDefined();
+});
+
+test('makeSystemPrompt renders an integrations block for loaded integrations', () => {
+  const engine = buildEngine();
+  engine.integrations['gloobeam'] = new class extends Integration {
+    args = { endpoint: 'https://gloobeam.com' };
+    meta = {
+      type: 'wordpress',
+      title: 'Wordpress',
+      description: 'Post articles to a Wordpress site via its REST API',
+      actions: [
+        { name: 'create_post', description: 'Create a new post' },
+        { name: 'publish_post', description: 'Publish an existing draft post' },
+      ],
+    };
+    async load() {}
+    async drop() {}
+    async call() { return {}; }
+  }(engine, new Logger(), { type: 'wordpress', endpoint: 'https://gloobeam.com' });
+
+  const prompt = engine.makeSystemPrompt('', 'text', {});
+
+  expect(prompt).toContain('## Integrations');
+  expect(prompt).toContain('### gloobeam (https://gloobeam.com)');
+  expect(prompt).toContain('create_post - Create a new post');
+  expect(prompt).toContain('publish_post - Publish an existing draft post');
+});
+
+test('makeSystemPrompt falls back to config when integrations are not loaded', () => {
+  const engine = buildEngine();
+  engine.config.integrations = { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://gloobeam.com' } };
+
+  const prompt = engine.makeSystemPrompt('', 'text', {});
+
+  expect(prompt).toContain('## Integrations');
+  expect(prompt).toContain('### gloobeam (https://gloobeam.com)');
+});
+
+test('makeSystemPrompt returns only the identity when there are no integrations', () => {
+  const engine = buildEngine();
+
+  expect(engine.makeSystemPrompt('my identity', 'text', {})).toBe('my identity');
 });

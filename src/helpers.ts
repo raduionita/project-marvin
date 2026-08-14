@@ -17,6 +17,25 @@ export function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// retry an async call a few times on failure, with a short backoff between
+// attempts. used for transient failures (timeouts, 5xx, network hiccups).
+export async function withRetry<T>(fn: () => Promise<T>, opts: { retries?: number; delayMs?: number; shouldRetry?: (err: unknown) => boolean } = {}): Promise<T> {
+  const { retries = 2, delayMs = 500 } = opts;
+  const shouldRetry = opts.shouldRetry || (() => true);
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt === retries || !shouldRetry(err)) break;
+      await delay(delayMs * (attempt + 1));
+    }
+  }
+  throw lastErr;
+}
+
 export function rand(min:number, max:number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
