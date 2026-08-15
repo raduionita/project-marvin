@@ -48,8 +48,8 @@ export default class SkillsCommand extends Command {
     this.logger.debug('[SkillsCommand.execList]');
 
     // default skills shipped with marvin
-    const defaults = listSkills(this.engine).map(f => f.replace('.md', '').toLowerCase());
-    const custom = listCustomSkills(this.engine).map(f => f.replace('.md', '').toLowerCase());
+    const defaults = listSkills(this.engine);
+    const custom = listCustomSkills(this.engine);
 
     this.logger.info('default skills:');
     if (defaults.length === 0) this.logger.info('  (none)');

@@ -25,8 +25,8 @@ export default class ModelsCommand extends Command {
       case 'list' : { // list available models, for each one, it's connected agents
         this.logger.info('list models:');
         // for each model, list enabled agents
-        listModels(this.engine!).forEach(modelId => {
-          this.logger.info(`  ${modelId.replace('.ts', '')}`);
+        listModels(this.engine).forEach(modelId => {
+          this.logger.info(`  ${modelId}`);
           const config = this.engine.config.models[modelId];
           if (config) {
             this.logger.info('  - enabled:', config.enabled);

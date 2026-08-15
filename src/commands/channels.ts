@@ -55,7 +55,7 @@ export default class ChannelsCommand extends Command {
     this.logger.debug('[ChannelsCommand.execList]');
     this.logger.info('list channels:');
     // for each channel, list enabled agents
-    listChannels(this.engine).map(c => c.replace('.ts', '')).forEach(channel => {
+    listChannels(this.engine).forEach(channel => {
       this.logger.info(`  ${channel}`);
       const channelConfig = this.engine.config.channels[channel];
       if (channelConfig) {
@@ -74,7 +74,7 @@ export default class ChannelsCommand extends Command {
   async execAdd() {
     this.logger.info('[ChannelsCommand.execAdd]', 'adding a channel...');
 
-    const channels = listChannels(this.engine).map(c => c.replace('.ts', ''));
+    const channels = listChannels(this.engine);
 
     this.logger.log('');
 

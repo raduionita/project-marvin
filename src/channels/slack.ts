@@ -377,7 +377,7 @@ export default class SlackChannel extends Channel {
       const args = parts.slice(1);
       const channelId = body.channel_id || event.channel_id;
 
-      const cmds = listCommands(this.engine).map(f => f.replace(/\.ts$/, '')).filter(c => !SLASH_BLOCKED_COMMANDS.includes(c));
+      const cmds = listCommands(this.engine).filter(c => !SLASH_BLOCKED_COMMANDS.includes(c));
 
       // acknowledge immediately (Slack requires ack within ~3s), the result is posted afterwards
       await ack({ text: `running /marvin ${name}${args.length ? ' ' + args.join(' ') : ''}...` });

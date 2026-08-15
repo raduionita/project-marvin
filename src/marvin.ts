@@ -17,11 +17,9 @@ await (new class Marvin {
   command: Command | undefined = undefined;
 
   async exec() {
+    this.logger.debug('[Marvin.exec]');
     
     this.loadFlags();
-    
-    this.logger.debug('[Marvin.exec]');
-
     this.loadProcess();
     this.loadConfig();
           
@@ -145,7 +143,7 @@ await (new class Marvin {
 
     const args = process.argv.slice(2);
     let   cmd  = args[0] || 'help';
-    const cmds = listCommands(this.engine).map(f => f.replace('.ts', ''));
+    const cmds = listCommands(this.engine);
 
     if (!cmds.includes(cmd)) {
       this.logger.warn('[Marvin.execCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));

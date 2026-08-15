@@ -7,14 +7,17 @@ import { Integration } from '../types.js';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
+let integrations: string[] = [];
+
 export function listIntegrations(engine: Engine): string[] {
-  return readdirSync(tdir).filter(f =>
+  if (integrations.length) return integrations;
+  return integrations = readdirSync(tdir).filter(f =>
     f !== 'index.ts' &&
     !f.includes('.test.ts') &&
     !f.includes('.d.ts') &&
     (engine.isTest || !f.includes('.mock.ts')) &&
     f.endsWith('.ts')
-  );
+  ).map(f => f.replace('.ts$', ''));
 }
 
 export async function loadIntegration(engine: Engine, type: string, config: { [key: string]: any }): Promise<Integration | null> {

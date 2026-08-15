@@ -251,7 +251,7 @@ export default class Engine {
   async loadChannels() {
     this.logger.debug('[Engine.loadChannels]');
     
-    const files = listChannels(this).map(f => f.replace('.ts', ''));
+    const files = listChannels(this);
     for (const [id, config] of Object.entries(this.config.channels)) {
       if (!config.enabled) continue;
 
@@ -285,7 +285,7 @@ export default class Engine {
   async loadIntegrations() {
     this.logger.debug('[Engine.loadIntegrations]');
 
-    const files = listIntegrations(this).map(f => f.replace('.ts', ''));
+    const files = listIntegrations(this);
     for (const [id, config] of Object.entries(this.config.integrations)) {
       if (!config.enabled) continue;
 
@@ -321,29 +321,27 @@ export default class Engine {
 
     // default skills shipped with marvin (src/skills)
     const files = listSkills(this);
-    for (const file of files) {
-      const id = file.replace('.md', '').toLowerCase();
+    for (const id of files) {
       if (this.skills[id]) continue;
       try {
-        const skill = parseSkill(join(import.meta.dirname, 'skills', file), 'default');
+        const skill = parseSkill(join(import.meta.dirname, 'skills', id), 'default');
         this.skills[id] = skill;
         this.logger.info('[Engine.loadSkills]', `skill "${id}" loaded (default)`);
       } catch (err) {
-        this.logger.error('[Engine.loadSkills]', `failed to load "${file}":`, err);
+        this.logger.error('[Engine.loadSkills]', `failed to load "${id}":`, err);
       }
     }
 
     // custom skills in the workspace (~/.marvin/skills), override defaults
     const cdir = join(this.work, 'skills');
     const cfiles = listCustomSkills(this);
-    for (const file of cfiles) {
-      const id = file.replace('.md', '').toLowerCase();
+    for (const id of cfiles) {
       try {
-        const skill = parseSkill(join(cdir, file), 'custom');
+        const skill = parseSkill(join(cdir, id), 'custom');
         this.skills[id] = skill;
         this.logger.info('[Engine.loadSkills]', `skill "${id}" loaded (custom)`);
       } catch (err) {
-        this.logger.error('[Engine.loadSkills]', `failed to load custom skill "${file}":`, err);
+        this.logger.error('[Engine.loadSkills]', `failed to load custom skill "${id}":`, err);
       }
     }
   }
@@ -352,7 +350,7 @@ export default class Engine {
     this.logger.debug('[Engine.loadModels]');
 
     // config models
-    const files = listModels(this).map(f => f.replace('.ts', ''))
+    const files = listModels(this);
     for (const [modelId, config] of Object.entries(this.config.models)) {
       try {
         if (this.models[modelId]) continue;

@@ -7,14 +7,17 @@ import { Channel } from '../types.js';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
+let channels: string[] = [];
+
 export function listChannels(engine: Engine): string[] {
-  return readdirSync(tdir).filter(f =>
+  if (channels.length) return channels;
+  return channels = readdirSync(tdir).filter(f =>
     f !== 'index.ts' &&
     !f.includes('.test.ts') &&
     !f.includes('.d.ts') &&
     (engine.isTest || !f.includes('.mock.ts')) &&
     f.endsWith('.ts')
-  );
+  ).map(f => f.replace('.ts$', ''));
 }
 
 

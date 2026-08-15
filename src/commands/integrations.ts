@@ -79,7 +79,7 @@ export default class IntegrationsCommand extends Command {
     this.logger.debug('[IntegrationsCommand.execAdd]', 'adding an integration...');
 
     // available integration types (files in src/integrations)
-    const types = listIntegrations(this.engine).map(c => c.replace('.ts', ''));
+    const types = listIntegrations(this.engine);
 
     // ask for the integration name
     let name = this.args[1] || await ask('Enter integration name (e.g. mycoolsite): ');
