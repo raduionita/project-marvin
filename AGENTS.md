@@ -1,89 +1,48 @@
 # AGENTS.md - Marvin Project
 
-**Marvin** - CLI multi-agent AI assistant
+**Marvin** - Multi-purpose AI assistant. Node.js + TypeScript, run with `bun`.
 
-**Tech stack:** Node.js + TypeScript
-
----
-
-## Repository Structure
-
-- `src/`
-  - `channels/`             # where all channels are being loaded from
-    - `index.ts`            # lists channels
-    - `*.ts`                # channel implementation
-    - `*.test.ts`           # channel tests
-  - `models/`               # where all models are being loaded from
-    - `index.ts`            # lists models
-    - `*.ts`                # model implementation
-    - `*.ts.ts`             # model tests
-  - `tools/`                # internal tools folder
-    - `index.ts`            # lists tools
-    - `*.ts`                # tool implementation
-    - `*.test.ts`           # tool tests
-  - `commands/`             # commands folder
-    - `*.ts`                # command implementation
-    - `*.test.ts`           # command tests
-  - `systems/`              # internal systems
-    - `index.ts`            # lists systems
-    - `*.ts`                # system implementation
-    - `*.test.ts`           # system tests
-  - `skills/`               # internal skills
-    - `index.ts`            # lists skills
-    - `*.md`                # skill implementation
-  - `integrations/`         # internal integrations
-    - `index.ts`            # lists integrations
-    - `*.ts`                # integration implementation
-    - `*.test.ts`           # integration tests
-  - `marvin.ts`             # entry point
-  - `engine.ts`             # core of marvin, AI loop, agent/task scheduling,
-  - `types.ts`              # types and interfaces
-  - `logger.ts`             # logger
-  - `terminal.ts`           # terminal helpers
-  - `constants.ts`          # project wide constants
-  - `helpers.ts`            # helper functions
-  - `declare.d.ts`          # declares modules (i.e. bun:test)
-  - `**/*.test.ts`          # test files
-  - `**/*.mock.ts`          # mock files
+## Goal
+A general-purpose AI assistant daemon: agents run scheduled tasks, each task seeds an AI loop that produces a result, and the engine delivers that result to user-facing channels and external integrations. Claude/opencode agents should be able to read the codebase and implement commands, tools, models, integrations, channels, skills, and systems without prior knowledge of the project.
 
 ---
 
-## Workspace Structure
+## Repository structure
+- `src/marvin.ts` - entry point / CLI bootstrap. Parses flags, loads `.env`/`.env.local` (dotenv), reads `marvin.json`, then dynamically imports `./commands/<cmd>.ts` (the module must export a `default` class extending `Command`). Daemon commands (`deamon = true`, e.g. `serve`) keep the process alive.
+- `src/engine.ts` - the core `Engine` class: config + workspace (`~/.marvin`), the AI loop (`sendChat`), agent/task scheduling (`execMonitor`/`execSweep`/`execInput`/`execDeliverable`), tool dispatch (`execTool`), chat cache (chatId -> Chat), and system prompt assembly.
+- `src/types.ts` - all core interfaces: `Command`, `Config`, `Channel`, `Tool`, `Model`, `Agent`, `System`, `Task`, `Message`, `Reply`, `Chat`, `Integration`, `Skill`, `ToolMeta`, `Schema`. Almost every class is an `abstract class` with a `meta` (name/description) and `load()`/`drop()` lifecycle.
+- `src/commands/` - one file per CLI command (`add`, `enable`, `reload`, `serve`, ...), each exporting a `default` class extending `Command` with `exec()`.
+- `src/tools/` - built-in executable actions (`web_search`, `get_date`, `read_file`, `memory`, `call_integration`, ...). `end_chat` (`constants.END_CHAT_NAME`) is special: calling it stops the AI loop.
+- `src/models/` - one file per provider (`openai`, `anthropic`, `deepseek`, `lmstudio`, `fallback`), each exporting a `default` class extending `Model` implementing `sendChat(chat): Promise<Reply>`. Tools are passed as `chat.tools`.
+- `src/channels/` - user-facing output channels (`slack`, `telegram`, `whatsapp`): `sendMessage(message)`, plus `load()`/`drop()`.
+- `src/integrations/` - external service integrations (`wordpress`) with named actions, called from tasks via `call_integration` or the structured deliverable flow.
+- `src/systems/` - internal infrastructure (`api` HTTP server, `browser`, `watch` file watcher) with `load()`/`drop()`.
+- `src/skills/` - markdown skill docs (header + body, e.g. `META.md`, `TOOLS-CREATE.md`, `WORDPRESS.md`); parsed and injected into the system prompt. User skills in `~/.marvin/skills/` override.
+- `src/constants.ts` - project-wide constants (`END_CHAT_NAME`, `MAX_OUTPUT_RETRIES`, `DEFAULT_CONFIG`).
+- `src/helpers.ts` - pure helpers: `tryJsonParse`, `extractOutput`, `cleanContent`, `schemaToJsonSchema`, `validateSchema`, `markdownToHtml`, `safeJoin`, ...
+- `src/logger.ts`, `src/terminal.ts`, `src/memory.ts` - logging, terminal output helpers, and memory storage (see below).
 
-Loaded from `~/.marvin/` at runtime (created on first run):
+## Workspace (`~/.marvin/`, created on first run)
+- `marvin.json` - the whole configuration: settings, channels, models, agents, tools, skills, integrations.
+- `MARVIN.md` - assistant identity.
+- `marvin.service` - systemd unit file.
+- `agents/<agent>/IDENTITY.md` + `agents/<agent>/tasks/<task>/TASK.md` - agent identities and task prompts (TASK.md seeds the AI loop).
+- `memories/<key>.md` - persistent memory, written/read by the `memory` tool and summarized into the system prompt.
+- `skills/*.md`, `tools/*.ts` - user-defined skills and tools (snake_case) that mirror the built-in folders.
 
-- `~/.marvin/`
-  - `marvin.json`       # config: settings, channels, models, agents
-  - `MARVIN.md`         # assistant identity file
-  - `marvin.service`    # systemd service file
-  - `agents/`
-    - `agent-1/`
-      - `IDENTITY.md`   # agent identity file
-      - `tasks/`        # task prompts
-        - `task-1/`     # task-1 folder
-          - `TASK.md`   # task prompt - seeds the AI loop
-  - `skills/`           # user-defined skills (mirrors src/skills/)
-    - `SKILL-NAME.md`
-  - `tools/`            # user-defined tools (mirrors src/tools/)
-    - `do_something.ts` # tool implementation (snake case)
+## Core concepts and flows
+- **Registration pattern**: every `channels/`, `models/`, `tools/`, `integrations/`, `systems/`, `skills/`, `commands/` folder has an `index.ts` that lists its files by scanning the directory (skipping `.test.ts`, `.mock.ts`, `.d.ts`). To add a component: create the file, export `default`, done - no registry edits.
+- **The AI loop** (`engine.sendChat`): keep chat history bounded (`trimChat`) -> `model.sendChat(chat)` -> persist assistant reply -> execute each tool call, pushing results back as `role: 'tool'` messages -> repeat until `end_chat`, max steps, or truncation (`reply.finish === 'length'`).
+- **Structured deliverables**: tasks can declare a `schema` (typed fields: `{key: {type, description?, required?}}` or legacy `{key: "description"}`) plus `outputTool`/`integration`/`action`. The model must write its markdown answer **and** call the typed deliverable tool once; the engine validates the args (`validateSchema`), feeds errors back for self-correction (bounded by `MAX_OUTPUT_RETRIES`), captures the `data`, sends the markdown to channels, and auto-runs the integration. Use `format: 'text'` for deliverable tasks.
+- **Scheduling**: tasks run on schedules (`execMonitor`/`execSweep`) and each run reschedules itself; `serve` is the daemon that keeps this alive.
+- **Testing**: `bun test` (files `*.test.ts`, mocks in `*.mock.ts`) and `npx tsc --noEmit` for type checks.
 
----
-
-## Core Concepts
-
-- `Model` - `MyModel extends Model`; provider logic + LLM config
-- `Chat` - conversation history (messages, thinking, …)
-- `Message` - single entry in the chat history
-- `Channel` - user-facing output: Slack, Discord, Telegram, email, …
-- `Tool` - executable action: `webSearch`, `webBrowse`, `getDate`, …
-- `Agent` - runs scheduled tasks; communicates via configured channels
-- `Task` - periodic prompt or `.md` file that starts the AI loop
-- `sendChat` - engine: prompts the LLM with task input, then reschedules itself (`execMonitor`/`execSweep` handle monitor/sweep tasks)
-
----
+## Conventions
+- Use ESM `import ... from './x.js'`; TypeScript `strict` - avoid `as any`/`as unknown` (non-null assertions are fine).
+- `logger.info` messages must NOT be prefixed with `[ClassName.method]`; `debug`/`warn`/`error` must. Log level via `MARVIN_LOG_LEVEL` or `--logLevel`; `setLoggerMode` toggles prefixes.
+- No new dependencies unless necessary; explain non-obvious tradeoffs.
 
 ## AI Workflow (claude, opencode, etc.)
-
 1. Read and inspect the relevant source files
 2. Create a plan split into small, independent, focused steps/edits (edit = **smallest correct change**)
 3. Execute plan STEP-BY-STEP, each step MUST pass tests and have NO errors
@@ -93,15 +52,8 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 4. Summarize what changed and why
 
 ## Rules
-
 - Prefer small, focused edits - avoid unrelated cleanup
 - Preserve existing style, conventions, and formatting unless asked
-- No new dependencies unless necessary; explain any non-obvious tradeoffs
 - All changes must stay compatible with the current codebase
-- Avoid using `as any` or `as unknown`
-- logging: info should not be prefixed with function name ('[EnableCommand.exec]'), only debug, warn & error
-
----
-
-## Goal
-General purpose AI assistant (that runs on agents that schedule tasks).
+- Follow the registration pattern above when adding new components
+- Only commit when explicitly asked

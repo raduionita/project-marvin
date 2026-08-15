@@ -688,7 +688,7 @@ export default class Engine {
     const now = Date.now();
     let removed = 0;
     for (const [chatId, chat] of Object.entries(this.cache)) {
-      if (now - (chat.updatedAt || 0) > constants.CHAT_TTL_MS) {
+      if (now - (chat.updated || 0) > constants.CHAT_TTL_MS) {
         this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
         delete this.cache[chatId];
         // also drop the persisted copy, so the chat is fully forgotten
@@ -887,7 +887,7 @@ export default class Engine {
   // save chat to cache (and persist it to ~/.marvin/chats/<chatId>.json)
   saveChat(chatId: string | undefined, chat: Chat): void {
     if (!chatId) return;
-    chat.updatedAt = Date.now();
+    chat.updated = Date.now();
     this.cache[chatId] = chat;
     if (this.isDry) return;
 
@@ -905,7 +905,7 @@ export default class Engine {
 
     const cached = this.cache[chatId];
     if (cached) {
-      cached.updatedAt = Date.now();
+      cached.updated = Date.now();
       return cached;
     }
 
@@ -916,7 +916,7 @@ export default class Engine {
       const file = join(this.work, 'chats', `${chatId}.json`);
       if (!existsSync(file)) return null;
       const chat = JSON.parse(readFileSync(file, 'utf-8')) as Chat;
-      chat.updatedAt = Date.now();
+      chat.updated = Date.now();
       this.cache[chatId] = chat;
       return chat;
     } catch (err) {
@@ -952,7 +952,7 @@ export default class Engine {
         thinking: false, 
         userId: '', 
         format: format, 
-        updatedAt: Date.now() 
+        updated: Date.now() 
       } as Chat;
       
       // load task input as user message

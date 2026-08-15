@@ -22,7 +22,7 @@ function buildEngine(): Engine {
 }
 
 function chatWith(messages: Chat['messages']): Chat {
-  return { id: 'c', thinking: false, messages, updatedAt: Date.now() };
+  return { id: 'c', thinking: false, messages, updated: Date.now() };
 }
 
 test('trimChat keeps only the system message + the last N messages', () => {
@@ -77,7 +77,7 @@ test('execSweep removes chats idle longer than the TTL and reschedules', async (
 
   const stale = chatWith([{ role: 'user', content: 'old' }]);
   engine.saveChat('stale', stale);
-  stale.updatedAt = Date.now() - constants.CHAT_TTL_MS - 1000;
+  stale.updated = Date.now() - constants.CHAT_TTL_MS - 1000;
 
   const fresh = chatWith([{ role: 'user', content: 'new' }]);
   engine.saveChat('fresh', fresh);
@@ -99,9 +99,9 @@ test('saveChat/findChat track last use time', () => {
   engine.saveChat('x', chat);
 
   // simulate an idle chat, then confirm findChat bumps last-use time
-  chat.updatedAt = 0;
+  chat.updated = 0;
   engine.findChat('x');
-  expect(chat.updatedAt).toBeGreaterThan(0);
+  expect(chat.updated).toBeGreaterThan(0);
 });
 
 test('drop clears the in-memory chat cache but chats survive on disk', async () => {

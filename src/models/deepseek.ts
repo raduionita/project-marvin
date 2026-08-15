@@ -38,8 +38,8 @@ export default class DeepseekModel extends Model {
     }
 
     body.response_format = { type: chat.format === 'json' ? 'json_object' : 'text' };
-    body.tools = this.tools;
-    body.tool_choice = this.tools ? 'auto' : 'none';
+    body.tools = chat.tools || this.tools;
+    body.tool_choice = body?.length ? 'auto' : 'none';
     body.temperature = this.temperature;
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;

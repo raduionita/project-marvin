@@ -248,12 +248,14 @@ export interface Chat {
   thinking: boolean;
   // messages is the chat history
   messages: Message[];
+  // tools
+  tools?: ToolMeta[];
   // format
   format?: 'text' | 'json';
   // userId is the user's id
   userId?: string;
   // last time this chat was used (for TTL eviction)
-  updatedAt?: number;
+  updated?: number;
   // sum/total of all usages (Reply.usage)
   usage?: {
     completion: number;
