@@ -600,7 +600,7 @@ test('E2E: app_mention runs tools then posts the final answer', async () => {
   expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('The date is 1/1/1970');
 
   // tool result was persisted to the thread's chat history
-  const chat = engine.findChat('slack-C123-1700000000.001');
+  const chat = engine.makeChat('slack-C123-1700000000.001', engine.agents['marvin']!, 'json', {});
   expect(chat).not.toBeNull();
   expect(chat!.messages.filter((m: Message) => m.role === 'tool').length).toBeGreaterThan(0);
 });

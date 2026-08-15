@@ -284,7 +284,7 @@ test('full flow: the tool results are kept in the chat cache for context', async
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  const chat = engine.findChat('slack-C123-1700000000.001');
+  const chat = engine.makeChat('slack-C123-1700000000.001', engine.agents['marvin']!, 'json', {});
   expect(chat).not.toBeNull();
 
   const toolMessages = chat!.messages.filter(m => m.role === 'tool');

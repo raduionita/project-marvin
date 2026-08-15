@@ -47,7 +47,7 @@ export default class ToolsCommand extends Command {
 
   async listTools() {
     this.logger.debug('[ToolCommand.listTools]', 'tools:');
-    const files = listTools(this.engine).map(f => f.replace('.ts', ''));
+    const files = listTools(this.engine);
     for (const file of files) {
       const name = file;
       try {
@@ -68,7 +68,7 @@ export default class ToolsCommand extends Command {
     }
 
     // custom tools from the workspace (~/.marvin/tools)
-    const cfiles = listCustomTools(this.engine).map(f => f.replace('.ts', ''));
+    const cfiles = listCustomTools(this.engine);
     for (const name of cfiles) {
       try {
         const Module = await import(join(this.engine.work, 'tools', `${name}.ts`));

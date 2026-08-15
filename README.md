@@ -31,10 +31,10 @@ curl -fsSL https://raw.githubusercontent.com/raduionita/project-marvin/refs/head
 
 ```bash
 # 1. Edit environment file (add your API keys)
-~/.config/marvin/env
+cat ~/.config/marvin/env
 
 # 2. Configure models, channels, and agents
-~/.marvin/marvin.json
+cat ~/.marvin/logs/marvin.json
 
 # 3. Check the service is running
 systemctl --user status marvin
@@ -46,17 +46,18 @@ journalctl --user -u marvin -f
 ### Usage
 
 ```bash
+# Interactive CLI (TBD)
+marvin
+
 # Start the server (daemon mode)
 marvin serve
 
-# Client mode (interacts with the running server)
-marvin
 
 # Reload server config via HTTP
 marvin reload
 
-# Bootstrap the system (workspace + service + env)
-marvin load
+# Enables the marvin.service
+marvin enable
 
 # Check for and apply updates from GitHub
 marvin update

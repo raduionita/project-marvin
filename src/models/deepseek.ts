@@ -12,7 +12,7 @@ export default class DeepseekModel extends Model {
     body.messages = chat.messages.map(m => JSON.parse(JSON.stringify({
       role: m.role, 
       content: m.content, 
-      name: m.name, 
+      name: 'Human', 
       tool_call_id: m.toolId, 
       tool_calls: m.tools?.map(t => ({
         id: t.id,
@@ -21,7 +21,7 @@ export default class DeepseekModel extends Model {
           name: t.name,
           arguments: JSON.stringify(t.arguments),
         },
-      })), 
+      })),
     })));
 
     body.stream = false;
@@ -38,8 +38,8 @@ export default class DeepseekModel extends Model {
     }
 
     body.response_format = { type: chat.format === 'json' ? 'json_object' : 'text' };
-    body.tools = chat.tools || this.tools;
-    body.tool_choice = body?.length ? 'auto' : 'none';
+    body.tools = chat.tools;
+    body.tool_choice = body.tools?.length ? 'auto' : 'none';
     body.temperature = this.temperature;
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;

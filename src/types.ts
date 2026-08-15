@@ -175,7 +175,7 @@ export interface Skill {
 }
 
 // task keeps track of the setTimeout id, schedule
-export type TaskType = 'input' | 'monitor' | 'sweep';
+export type TaskType = 'task' | 'monitor' | 'sweep';
 
 export interface Task {
   id: string;
@@ -189,6 +189,8 @@ export interface Task {
   input?: string;
   format?: 'text' | 'json';
   schema?: {[key:string]:string};
+  // TODO: task integrations, string[] or Record<string, Integration>?
+  integrations?: string[];
 }
 
 // model interface class
@@ -214,11 +216,9 @@ export abstract class Model {
   public userId: string = 'user-id';
   public reasoning: string = 'high';
   public format: 'text' | 'json' = 'text';
-  public tools: ToolMeta[]; // 
 
   constructor(public readonly engine: Engine, public readonly logger: Logger, config: { [key: string]: any }) {
     Object.assign(this, config);
-    this.tools = Object.values(this.engine.tools).map(tool => tool.meta);
   }
 
   // sends messages to LLM model

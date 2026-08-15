@@ -6,24 +6,30 @@ import type Engine from '../engine.js';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
+let tools: string[] = [];
+
 export function listTools(engine: Engine): string[] {
-  return readdirSync(tdir).filter(f =>
+  if (tools.length) return tools;
+  return tools = readdirSync(tdir).filter(f =>
     f !== 'index.ts' &&
     !f.includes('.test.ts') &&
     !f.includes('.d.ts') &&
     (engine.isTest || !f.includes('.mock.ts')) &&
     f.endsWith('.ts')
-  );
+  ).map(f => f.replace('.ts', ''));
 }
+
+let customs: string[] = [];
 
 // custom tool files in the user workspace (~/.marvin/tools/*.ts)
 export function listCustomTools(engine: Engine): string[] {
   const cdir = join(engine.work, 'tools');
   if (!existsSync(cdir)) return [];
-  return readdirSync(cdir).filter(f =>
+  if (customs.length) return customs;
+  return customs = readdirSync(cdir).filter(f =>
     f !== 'index.ts' &&
     !f.includes('.test.ts') &&
     !f.includes('.d.ts') &&
     f.endsWith('.ts')
-  );
+  ).map(f => f.replace('.ts', ''));
 }

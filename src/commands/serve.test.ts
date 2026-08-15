@@ -367,7 +367,7 @@ test('sendMessage returns dry result when engine.isDry is true', async () => {
   // Dry mode returns early without calling the model
   expect(result).toEqual({ content: '(dry)', steps: 0 });
   // Verify the model was never invoked by checking the chat has no assistant messages
-  const chat = engine.findChat('chat-1');
+  const chat = engine.makeChat('chat-1', engine.agents['marvin']!, 'json', {});
   expect(chat).toBeDefined();
   const assistantMessages = chat!.messages.filter((m: Message) => m.role === 'assistant');
   expect(assistantMessages.length).toBe(0);
@@ -378,7 +378,7 @@ test('sendMessage pushes system and user messages to chat', async () => {
 
   await engine.sendChat('chat-1', 'marvin', 'hello world', 'json', {"output": "text string of the answer"}, 5);
 
-  const chat = engine.findChat('chat-1');
+  const chat = engine.makeChat('chat-1', engine.agents['marvin']!, 'json', {});
   expect(chat).not.toBeNull();
   // 2 system/user messages + 5 assistant replies from the AI loop
   expect(chat!.messages.length).toBe(7);
@@ -419,7 +419,7 @@ test('sendMessage caches the chat after execution', async () => {
 
   await engine.sendChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
 
-  const cached = engine.findChat('chat-1');
+  const cached = engine.makeChat('chat-1', engine.agents['marvin']!, 'json', {});
   expect(cached).toBeDefined();
   expect(cached!.id).toBe('chat-1');
   expect(cached!.messages.length).toBeGreaterThan(0);
@@ -434,7 +434,7 @@ test('sendMessage reuses existing chat when chatId already exists', async () => 
   // Second call with same chatId
   await engine.sendChat('chat-1', 'marvin', 'second', 'json', {"output": "text string of the answer"}, 5);
 
-  const chat = engine.findChat('chat-1');
+  const chat = engine.makeChat('chat-1', engine.agents['marvin']!, 'json', {});
   // Each call adds 2 messages (system + user) + 5 assistant replies (one per loop iteration)
   // But the model always returns the same reply, so we get 2 calls * (2 + 5) = 14 messages
   // Actually: first call: system + user + 5 assistant = 7
@@ -490,7 +490,7 @@ test('sendMessage executes tool calls from model reply', async () => {
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(5);
 
   // Check that tool result was pushed to chat
-  const chat = engine.findChat('chat-1');
+  const chat = engine.makeChat('chat-1', engine.agents['marvin']!, 'json', {});
   const toolMessages = chat!.messages.filter((m: Message) => m.role === 'tool');
   expect(toolMessages.length).toBeGreaterThan(0);
 });
@@ -518,7 +518,7 @@ test('sendMessage handles invalid JSON in tool arguments gracefully', async () =
 
   expect(result).toBeDefined();
   // Verify tool error was pushed to chat
-  const chat = engine.findChat('chat-1');
+  const chat = engine.makeChat('chat-1', engine.agents['marvin']!, 'json', {});
   const toolMessages = chat!.messages.filter((m: Message) => m.role === 'tool');
   expect(toolMessages.length).toBeGreaterThan(0);
   // The tool error message should contain the parse error
@@ -602,7 +602,7 @@ test('sendMessage passes correct agentId and chatId to cache', async () => {
 
   await engine.sendChat('unique-chat-id', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
 
-  const chat = engine.findChat('unique-chat-id');
+  const chat = engine.makeChat('unique-chat-id', engine.agents['marvin']!, 'json', {});
   expect(chat!.id).toBe('unique-chat-id');
 });
 
@@ -688,7 +688,7 @@ test('execInput calls sendChat and sends result through agent channels', async (
   };
 
   // Call execInput directly
-  await engine.execInput('marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
   // stop the reschedule so the test does not keep firing execInput
   clearTimeout(engine.agents['marvin']!.tasks['test-task']!.timeout!);
 
@@ -715,7 +715,7 @@ test('execInput skips disabled tasks', async () => {
   };
 
   // Should log and return without calling sendMessage
-  await engine.execInput('marvin', 'disabled-task');
+  await engine.execTask('marvin', 'disabled-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
@@ -737,7 +737,7 @@ test('execInput skips disabled agents', async () => {
     },
   };
 
-  await engine.execInput('marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
@@ -760,7 +760,7 @@ test('execInput warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await engine.execInput('marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
   // stop the reschedule so the test does not keep firing execInput
   clearTimeout(engine.agents['marvin']!.tasks['test-task']!.timeout!);
   // sendMessage was called (execInput tries it), but the channel send failed
@@ -784,7 +784,7 @@ test('execInput skips disabled tasks', async () => {
   };
 
   // Should log and return without calling sendMessage
-  await engine.execInput('marvin', 'disabled-task');
+  await engine.execTask('marvin', 'disabled-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
@@ -806,7 +806,7 @@ test('execInput skips disabled agents', async () => {
     },
   };
 
-  await engine.execInput('marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
@@ -829,7 +829,7 @@ test('execInput warns and skips when agent channel is not loaded', async () => {
   };
 
   // Should log a warning but not throw
-  await engine.execInput('marvin', 'test-task');
+  await engine.execTask('marvin', 'test-task');
   // stop the reschedule so the test does not keep firing execInput
   clearTimeout(engine.agents['marvin']!.tasks['test-task']!.timeout!);
   // sendMessage was called (execInput tries it), but the channel send failed

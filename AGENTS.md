@@ -9,17 +9,17 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 
 ## Repository structure
 - `src/marvin.ts` - entry point / CLI bootstrap. Parses flags, loads `.env`/`.env.local` (dotenv), reads `marvin.json`, then dynamically imports `./commands/<cmd>.ts` (the module must export a `default` class extending `Command`). Daemon commands (`deamon = true`, e.g. `serve`) keep the process alive.
-- `src/engine.ts` - the core `Engine` class: config + workspace (`~/.marvin`), the AI loop (`sendChat`), agent/task scheduling (`execMonitor`/`execSweep`/`execInput`/`execDeliverable`), tool dispatch (`execTool`), chat cache (chatId -> Chat), and system prompt assembly.
+- `src/engine.ts` - the core `Engine` class: config + workspace (`~/.marvin`), the AI loop (`sendChat`), agent/task scheduling (`execMonitor`/`execSweep`/`execInput`), tool dispatch (`execTool`), chat cache (chatId -> Chat), and system prompt assembly.
 - `src/types.ts` - all core interfaces: `Command`, `Config`, `Channel`, `Tool`, `Model`, `Agent`, `System`, `Task`, `Message`, `Reply`, `Chat`, `Integration`, `Skill`, `ToolMeta`, `Schema`. Almost every class is an `abstract class` with a `meta` (name/description) and `load()`/`drop()` lifecycle.
 - `src/commands/` - one file per CLI command (`add`, `enable`, `reload`, `serve`, ...), each exporting a `default` class extending `Command` with `exec()`.
 - `src/tools/` - built-in executable actions (`web_search`, `get_date`, `read_file`, `memory`, `call_integration`, ...). `end_chat` (`constants.END_CHAT_NAME`) is special: calling it stops the AI loop.
 - `src/models/` - one file per provider (`openai`, `anthropic`, `deepseek`, `lmstudio`, `fallback`), each exporting a `default` class extending `Model` implementing `sendChat(chat): Promise<Reply>`. Tools are passed as `chat.tools`.
 - `src/channels/` - user-facing output channels (`slack`, `telegram`, `whatsapp`): `sendMessage(message)`, plus `load()`/`drop()`.
-- `src/integrations/` - external service integrations (`wordpress`) with named actions, called from tasks via `call_integration` or the structured deliverable flow.
+- `src/integrations/` - external service integrations (`wordpress`) with named actions, called from tasks via `call_integration`.
 - `src/systems/` - internal infrastructure (`api` HTTP server, `browser`, `watch` file watcher) with `load()`/`drop()`.
 - `src/skills/` - markdown skill docs (header + body, e.g. `META.md`, `TOOLS-CREATE.md`, `WORDPRESS.md`); parsed and injected into the system prompt. User skills in `~/.marvin/skills/` override.
-- `src/constants.ts` - project-wide constants (`END_CHAT_NAME`, `MAX_OUTPUT_RETRIES`, `DEFAULT_CONFIG`).
-- `src/helpers.ts` - pure helpers: `tryJsonParse`, `extractOutput`, `cleanContent`, `schemaToJsonSchema`, `validateSchema`, `markdownToHtml`, `safeJoin`, ...
+- `src/constants.ts` - project-wide constants (`END_CHAT_NAME`, `DEFAULT_MAX_STEPS`, `DEFAULT_CONFIG`).
+- `src/helpers.ts` - pure helpers: `tryJsonParse`, `extractOutput`, `cleanContent`, `markdownToHtml`, `safeJoin`, ...
 - `src/logger.ts`, `src/terminal.ts`, `src/memory.ts` - logging, terminal output helpers, and memory storage (see below).
 
 ## Workspace (`~/.marvin/`, created on first run)
@@ -33,7 +33,6 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 ## Core concepts and flows
 - **Registration pattern**: every `channels/`, `models/`, `tools/`, `integrations/`, `systems/`, `skills/`, `commands/` folder has an `index.ts` that lists its files by scanning the directory (skipping `.test.ts`, `.mock.ts`, `.d.ts`). To add a component: create the file, export `default`, done - no registry edits.
 - **The AI loop** (`engine.sendChat`): keep chat history bounded (`trimChat`) -> `model.sendChat(chat)` -> persist assistant reply -> execute each tool call, pushing results back as `role: 'tool'` messages -> repeat until `end_chat`, max steps, or truncation (`reply.finish === 'length'`).
-- **Structured deliverables**: tasks can declare a `schema` (typed fields: `{key: {type, description?, required?}}` or legacy `{key: "description"}`) plus `outputTool`/`integration`/`action`. The model must write its markdown answer **and** call the typed deliverable tool once; the engine validates the args (`validateSchema`), feeds errors back for self-correction (bounded by `MAX_OUTPUT_RETRIES`), captures the `data`, sends the markdown to channels, and auto-runs the integration. Use `format: 'text'` for deliverable tasks.
 - **Scheduling**: tasks run on schedules (`execMonitor`/`execSweep`) and each run reschedules itself; `serve` is the daemon that keeps this alive.
 - **Testing**: `bun test` (files `*.test.ts`, mocks in `*.mock.ts`) and `npx tsc --noEmit` for type checks.
 
