@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
-import { resolveInsideHome } from '../helpers.js';
+import { isSafePath, safeJoin } from '../helpers.js';
 
 export default class ReadFileTool extends Tool {
   public meta: ToolMeta = {
@@ -28,10 +28,11 @@ export default class ReadFileTool extends Tool {
       return { error: 'read_file: no path provided' };
     }
 
-    const path = resolveInsideHome(this.engine.work, args.path);
-    if (!path) {
+    if (!isSafePath(args.path)) {
       return { error: `read_file: path "${args.path}" is outside the workspace (~/.marvin)` };
     }
+
+    const path = safeJoin(this.engine.work, args.path);
 
     try {
       const content = readFileSync(path, 'utf-8');

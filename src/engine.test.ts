@@ -1,4 +1,7 @@
 import { test, expect } from 'bun:test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
 import { Chat, Config, Agent, Integration } from './types.js';
@@ -7,6 +10,7 @@ import * as constants from './constants.js';
 function buildEngine(): Engine {
   const engine = new Engine(new Logger());
   engine.state = 'load';
+  engine.work = mkdtempSync(join(tmpdir(), 'marvin-engine-'));
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },
     channels: {},
@@ -100,13 +104,38 @@ test('saveChat/findChat track last use time', () => {
   expect(chat.updatedAt).toBeGreaterThan(0);
 });
 
-test('drop clears the chat cache', async () => {
+test('drop clears the in-memory chat cache but chats survive on disk', async () => {
   const engine = buildEngine();
   engine.saveChat('x', chatWith([{ role: 'user', content: 'hi' }]));
 
   await engine.drop();
 
-  expect(engine.findChat('x')).toBeNull();
+  // cache is cleared, but the persisted copy is reloaded on demand
+  expect(engine.findChat('x')).not.toBeNull();
+  expect(engine.findChat('x')?.messages[0]).toEqual({ role: 'user', content: 'hi' });
+  rmSync(engine.work, { recursive: true, force: true });
+});
+
+test('saveChat persists chats to disk and findChat reloads them in a fresh engine', () => {
+  const engine = buildEngine();
+  const chat = chatWith([{ role: 'user', content: 'persisted' }]);
+  engine.saveChat('persist-1', chat);
+
+  // a brand new engine over the same workspace reloads the chat from disk
+  const fresh = new Engine(new Logger());
+  fresh.work = engine.work;
+  const loaded = fresh.findChat('persist-1');
+
+  expect(loaded).not.toBeNull();
+  expect(loaded?.messages[0]).toEqual({ role: 'user', content: 'persisted' });
+  rmSync(engine.work, { recursive: true, force: true });
+});
+
+test('findChat returns null for a chat that was never saved', () => {
+  const engine = buildEngine();
+
+  expect(engine.findChat('never-saved')).toBeNull();
+  rmSync(engine.work, { recursive: true, force: true });
 });
 
 test('sendChat returns an error field when the agent does not exist', async () => {
@@ -137,7 +166,9 @@ test('makeSystemPrompt renders an integrations block for loaded integrations', (
     async call() { return {}; }
   }(engine, new Logger(), { type: 'wordpress', endpoint: 'https://gloobeam.com' });
 
-  const prompt = engine.makeSystemPrompt('', 'text', {});
+  const agent = { memory: true, identity: '' } as Agent;
+
+  const prompt = engine.makeSystemPrompt(agent, 'text', {});
 
   expect(prompt).toContain('## Integrations');
   expect(prompt).toContain('### gloobeam (https://gloobeam.com)');
@@ -148,8 +179,9 @@ test('makeSystemPrompt renders an integrations block for loaded integrations', (
 test('makeSystemPrompt falls back to config when integrations are not loaded', () => {
   const engine = buildEngine();
   engine.config.integrations = { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://gloobeam.com' } };
+  const agent = { memory: true, identity: '' } as Agent;
 
-  const prompt = engine.makeSystemPrompt('', 'text', {});
+  const prompt = engine.makeSystemPrompt(agent, 'text', {});
 
   expect(prompt).toContain('## Integrations');
   expect(prompt).toContain('### gloobeam (https://gloobeam.com)');
@@ -157,6 +189,34 @@ test('makeSystemPrompt falls back to config when integrations are not loaded', (
 
 test('makeSystemPrompt returns only the identity when there are no integrations', () => {
   const engine = buildEngine();
+  const agent = { memory: false, identity: 'my identity' } as Agent;
 
-  expect(engine.makeSystemPrompt('my identity', 'text', {})).toBe('my identity');
+  expect(engine.makeSystemPrompt(agent, 'text', {})).toBe('my identity');
+});
+
+test('makeSystemPrompt renders a memory block when memory notes exist', () => {
+  const engine = buildEngine();
+  const mem = join(engine.work, 'memories');
+  mkdirSync(mem, { recursive: true });
+  writeFileSync(join(mem, 'prefs.md'), 'Prefers concise answers');
+  writeFileSync(join(mem, 'goals.md'), 'Ship marvin 1.0');
+
+  const agent = { memory: true, identity: '' } as Agent;
+
+  const prompt = engine.makeSystemPrompt(agent, 'text', {});
+
+  expect(prompt).toContain('## Memory');
+  expect(prompt).toContain('prefs: Prefers concise answers');
+  expect(prompt).toContain('goals: Ship marvin 1.0');
+  rmSync(engine.work, { recursive: true, force: true });
+});
+
+test('makeSystemPrompt omits the memory block when memory is disabled', () => {
+  const engine = buildEngine();
+  const agent = { memory: false, identity: 'my identity' } as Agent;
+
+  const prompt = engine.makeSystemPrompt(agent, 'text', {});
+
+  expect(prompt).toBe('my identity');
+  rmSync(engine.work, { recursive: true, force: true });
 });

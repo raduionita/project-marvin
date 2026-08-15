@@ -61,12 +61,11 @@ export default class TasksCommand extends Command {
       this.logger.error('[TasksCommand.execAdd]', 'no agents configured, please run "marvin agents add" first');
       return;
     }
-    this.logger.log('');
-    const defaultAgent = agentIds[0]!;
-    const agentId = (this.args[1] || await ask(`Enter agent name (press enter for "${defaultAgent}"): `) || defaultAgent);
+    
+    const marvin = agentIds[0]!;
+    const agentId = (this.args[1] || await ask(`Enter agent name (press enter for "${marvin}"): `) || marvin);
     if (!this.engine.config.agents[agentId!]) {
-      this.logger.error('[TasksCommand.execAdd]', `agent "${agentId}" not found in config`);
-      this.logger.error('[TasksCommand.execAdd]', 'available agents:', agentIds.join(', '));
+      this.logger.error('[TasksCommand.execAdd]', `agent "${agentId}" not found`, 'available agents:', agentIds.join(', '));
       return;
     }
 
@@ -110,7 +109,7 @@ export default class TasksCommand extends Command {
     this.logger.log('');
 
     // persist the task prompt to agents/<agentId>/tasks/<taskId>/TASK.md
-    const apath = this.engine.config.agents[agentId];
+    const agent = this.engine.config.agents[agentId]!;
     let pinn: string | null = null;
     if (input) {
       const ppath = join(this.engine.work, 'agents', agentId, 'tasks', taskId, 'TASK.md');
@@ -124,8 +123,8 @@ export default class TasksCommand extends Command {
     }
 
     // register the task in config
-    apath!.tasks = apath!.tasks || {};
-    apath!.tasks![taskId] = {
+    agent.tasks = agent.tasks || {};
+    agent.tasks[taskId] = {
       enabled: true,
       schedule,
       maxSteps,

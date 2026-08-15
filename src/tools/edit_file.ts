@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
-import { resolveInsideHome } from '../helpers.js';
+import { isSafePath, safeJoin } from '../helpers.js';
 
 export default class EditFileTool extends Tool {
   public meta: ToolMeta = {
@@ -40,10 +40,11 @@ export default class EditFileTool extends Tool {
       return { error: 'edit_file: no newString provided' };
     }
 
-    const path = resolveInsideHome(this.engine.work, args.path);
-    if (!path) {
+    if (!isSafePath(args.path)) {
       return { error: `edit_file: path "${args.path}" is outside the workspace (~/.marvin)` };
     }
+
+    const path = safeJoin(this.engine.work, args.path);
 
     try {
       let content = args.newString;

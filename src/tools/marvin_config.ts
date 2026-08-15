@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
-import { resolveInsideHome } from '../helpers.js';
+import { safeJoin } from '../helpers.js';
 
 function getByPath(obj: Record<string, any>, path: string): any {
   return path.split('.').reduce((acc, part) => (acc && typeof acc === 'object' ? acc[part] : undefined), obj);
@@ -61,10 +61,7 @@ export default class MarvinConfigTool extends Tool {
   public async call(args: { operation?: string; key?: string; value?: any }) {
     this.logger.debug('[MarvinConfigTool.call]', args);
 
-    const path = resolveInsideHome(this.engine.work, 'marvin.json');
-    if (!path) {
-      return { error: 'marvin_config: "marvin.json" is outside the workspace (~/.marvin)' };
-    }
+    const path = safeJoin(this.engine.work, 'marvin.json');
 
     let config: Record<string, any>;
     try {

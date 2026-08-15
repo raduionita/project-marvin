@@ -1,4 +1,7 @@
 import { test, expect } from 'bun:test';
+import { mkdtempSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
 import { Config, Message, Agent, Chat, Reply, System, Model } from './types.js';
@@ -200,6 +203,7 @@ function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChan
   const engine = new Engine(new Logger());
   engine.isDry = false;
   engine.state = 'exec';
+  engine.work = mkdtempSync(join(tmpdir(), 'marvin-flow-'));
   engine.config = mockConfig();
 
   const model = new FlowModel(engine, new Logger(), {});

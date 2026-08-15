@@ -17,6 +17,7 @@ export interface Config {
     host: string;
     port: number;
     apiToken?: string;
+    memory?: boolean;
   };
   channels: Record<string, {
     enabled?: boolean;
@@ -228,6 +229,8 @@ export interface Agent {
   id: string;
   // agent is enabled or disabled
   enabled: boolean;
+  // memory
+  memory?: boolean;
   // agent system prompt
   identity: string;
   // inside the task, the agent will send messages through these channels to the user/owner

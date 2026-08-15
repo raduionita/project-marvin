@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
 
 import type { Logger } from './logger.js';
 import { listSystems } from "./systems";
@@ -11,6 +11,7 @@ import { listSkills, listCustomSkills, parseSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
 import { extractOutput, cleanContent } from "./helpers.js";
+import { readMemorySummary } from "./memory.js";
 
 export default class Engine {
   public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
@@ -692,9 +693,16 @@ export default class Engine {
       if (now - (chat.updatedAt || 0) > constants.CHAT_TTL_MS) {
         this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
         delete this.cache[chatId];
+        // also drop the persisted copy, so the chat is fully forgotten
+        try {
+          unlinkSync(join(this.work, 'chats', `${chatId}.json`));
+        } catch {
+          // no persisted copy, nothing to remove
+        }
         removed++;
       }
     }
+
     this.logger.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
 
     if (this.isDry) {
@@ -702,8 +710,10 @@ export default class Engine {
       return;
     }
 
+    const schedule = Math.max(60*60*1000, Math.min(60*1000, removed === 0 ? task.schedule * 2 : task.schedule / 2));
+
     // re-schedule next execution
-    task.timeout = setTimeout(this.execSweep.bind(this), task.schedule, agentId, taskId);
+    task.timeout = setTimeout(this.execSweep.bind(this), schedule, agentId, taskId);
   }
 
   // prompts the LLM with the task input, sends the result through channels, then reschedules
@@ -823,19 +833,98 @@ export default class Engine {
     }
   }
 
-  // save chat to cache
+  // system prompt: identity + the "## Integrations" block from + memory + format
+  makeSystemPrompt(agent: Agent, format: 'text' | 'json' = 'json', schema: { [key: string]: string } = constants.DEFAULT_SCHEMA): string {
+    // start with the identity
+    let system = agent.identity;
+
+    const entries = Object.entries(this.integrations);
+    const configs = entries.length ? entries : Object.entries(this.config.integrations || {});
+
+    const blocks = configs.map(([id, integration]) => {
+      const isLoaded = integration instanceof Integration;
+      const config = isLoaded ? integration.config : integration;
+      const meta = isLoaded ? integration.meta :  {
+        type: config?.type || 'integration',
+        title: id,
+        description: '',
+        actions: [],
+      };
+      const endpoint = config?.endpoint || config?.url || config?.baseUrl || '';
+      const actions = meta.actions.length
+        ? `\nActions: ${meta.actions.map((a: IntegrationAction) => `${a.name} - ${a.description}`).join('; ')}`
+        : '';
+      const url = endpoint ? ` (${endpoint})` : '';
+      return `### ${id}${url}\n${meta.description || meta.title}${actions}`;
+    });
+
+    // inject the integrations block
+    if (blocks.length) {
+      system += '\n\n';
+      system += '## Integrations\n';
+      system += blocks.join('\n');
+    }
+
+    // inject a compact summary of the most recently updated memory notes, so
+    // the agent keeps cross-run context (facts, preferences, progress)
+    if (this.config.settings.memory || agent.memory) {
+      system += '\n\n';
+      system += '## Memory\n';
+      system += readMemorySummary(this.work) + '\n';
+      system += 'Use the memory tool (remember/recall) to read and update these notes.';
+    }
+
+    // add the JSON schema for JSON output
+    if (format === 'json') {
+      system += '\n\n';
+      system += `## Output format`;
+      system += '- ALWAYS respond in valid JSON format.\n';
+      system += '- Use EXACT keys in the JSON schema below.\n';
+      system += '- JSON schema: ' + JSON.stringify(schema);
+    }
+
+    return system;
+  }
+
+  // save chat to cache (and persist it to ~/.marvin/chats/<chatId>.json)
   saveChat(chatId: string | undefined, chat: Chat): void {
     if (!chatId) return;
     chat.updatedAt = Date.now();
     this.cache[chatId] = chat;
+    if (this.isDry) return;
+
+    try {
+      mkdirSync(join(this.work, 'chats'), { recursive: true });
+      writeFileSync(join(this.work, 'chats', `${chatId}.json`), JSON.stringify(chat), 'utf-8');
+    } catch (err) {
+      this.logger.error('[Engine.saveChat]', 'failed to persist chat:', err);
+    }
   }
 
-  // find cached chat by id
+  // find cached chat by id, falling back to the persisted copy on disk
   findChat(chatId: string | undefined): Chat | null {
     if (!chatId) return null;
-    const chat = this.cache[chatId] as Chat || null;
-    if (chat) chat.updatedAt = Date.now();
-    return chat;
+
+    const cached = this.cache[chatId];
+    if (cached) {
+      cached.updatedAt = Date.now();
+      return cached;
+    }
+
+    if (this.isDry) return null;
+
+    // load from disk, then re-cache
+    try {
+      const file = join(this.work, 'chats', `${chatId}.json`);
+      if (!existsSync(file)) return null;
+      const chat = JSON.parse(readFileSync(file, 'utf-8')) as Chat;
+      chat.updatedAt = Date.now();
+      this.cache[chatId] = chat;
+      return chat;
+    } catch (err) {
+      this.logger.debug('[Engine.findChat]', 'failed to load chat from disk:', err);
+      return null;
+    }
   }
 
   // bound chat history to the system message + the last N messages
@@ -851,47 +940,6 @@ export default class Engine {
     }
   }
 
-  // build the agent system prompt: identity + the "## Integrations" block from
-  // the configured integrations (so the LLM knows which sites it can act on,
-  // falling back to config when the integration is not loaded) + output format
-  // instructions (JSON_MD + schema for json format)
-  makeSystemPrompt(identity: string, format: 'text' | 'json' = 'json', schema: { [key: string]: string } = constants.DEFAULT_SCHEMA): string {
-    let system = identity;
-
-    const entries = Object.entries(this.integrations);
-    const configs = entries.length ? entries : Object.entries(this.config.integrations || {});
-
-    const blocks = configs.map(([id, integration]) => {
-      const isLoaded = integration instanceof Integration;
-      const info = isLoaded ? integration.meta : null;
-      const cfg = isLoaded ? integration.config : integration;
-      const infoType = info || {
-        type: cfg?.type || 'integration',
-        title: id,
-        description: '',
-        actions: [],
-      };
-      const endpoint = cfg?.endpoint || cfg?.url || '';
-      const actions = infoType.actions.length
-        ? `\nActions: ${infoType.actions.map((a: IntegrationAction) => `${a.name} - ${a.description}`).join('; ')}`
-        : '';
-      const url = endpoint ? ` (${endpoint})` : '';
-      return `### ${id}${url}\n${infoType.description || infoType.title}${actions}`;
-    });
-
-    const integrationsBlock = blocks.length ? `## Integrations\n${blocks.join('\n')}` : '';
-    if (integrationsBlock) {
-      system += '\n\n' + integrationsBlock;
-    }
-
-    if (format === 'json') {
-      system += '\n\n' + constants.JSON_MD;
-      system += '\n' + '- JSON schema: ' + JSON.stringify(schema);
-    }
-
-    return system;
-  }
-
   // agent loop
   async sendChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number, error?: string}> {
     try {
@@ -900,18 +948,15 @@ export default class Engine {
       const agent = this.agents[agentId]!;
 
       // get chat from cache/store using chatId
-      let chat = this.findChat(chatId);
-      if (!chat) {
-        chat = { id: chatId, messages: [], thinking: false, userId: '', format: 'text', updatedAt: Date.now() } as Chat;
-
-        if (format === 'json') {
-          chat.format = 'json';
-        }
-
-        // load agent IDENTITY.md as system message
-        chat.messages.push({ role: 'system', content: this.makeSystemPrompt(agent.identity, format, schema) });
-      }
-
+      let chat = this.findChat(chatId) || { 
+        id: chatId, 
+        messages: [{ role: 'system', content: this.makeSystemPrompt(agent, format, schema) }], 
+        thinking: false, 
+        userId: '', 
+        format: format, 
+        updatedAt: Date.now() 
+      } as Chat;
+      
       // load task input as user message
       chat.messages.push({ role: 'user', content: message.trim() });
 

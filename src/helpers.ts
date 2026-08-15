@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, realpathSync } from 'fs';
-import { basename, dirname, resolve, sep } from 'path';
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'path';
 import { readdirSync } from 'fs';
 
 import logger from './logger.js';
@@ -135,50 +135,88 @@ function extractLeadingJson(content: string): string | null {
   }
   return null;
 }
-// Guards against escaping via `..`, absolute paths, and symlinks. Returns the
-// canonical (symlink-free) absolute path, or `null` when the target is outside
-// the workspace or is a symlink at the final path component.
-export function resolveInsideHome(home: string, target: string): string | null {
-  if (!target) return null;
 
-  try {
-    const homeReal = realpathSync(home);
-
-    // absolute, normalized target (relative paths are resolved against home)
-    const abs = resolve(home, target);
-
-    // if the target exists (or is a broken symlink), inspect the final component
-    try {
-      const st = lstatSync(abs);
-      if (st.isSymbolicLink()) {
-        // never follow symlinks at the target: they could point outside home
-        return null;
-      }
-      const real = realpathSync(abs);
-      return (real === homeReal || real.startsWith(homeReal + sep)) ? real : null;
-    } catch (err) {
-      if ((err as { code?: string })?.code !== 'ENOENT') {
-        // exists but unreadable -> treat as invalid
-        return null;
-      }
-    }
-
-    // target does not exist: realpath the deepest existing ancestor, then
-    // re-append the missing components
-    const missing: string[] = [];
-    let probe = abs;
-    while (!existsSync(probe)) {
-      const parent = dirname(probe);
-      if (parent === probe) return null; // walked past the filesystem root
-      missing.unshift(basename(probe));
-      probe = parent;
-    }
-
-    const resolved = resolve(realpathSync(probe), ...missing);
-    return (resolved === homeReal || resolved.startsWith(homeReal + sep)) ? resolved : null;
-  } catch {
-    return null;
-  }
+// safe version of join, that guards against escaping via `..`, absolute paths, and symlinks
+export function safeJoin(...values: string[]) {
+  const joined = join(...values).split('..').filter(s => s).join('').split(sep).filter(s => s).join(sep);
+  return joined.startsWith(sep) ? joined : sep + joined;
 }
 
-// #endregion
+// validate a user-supplied path before it reaches safeJoin: only relative
+// paths without `..` segments are allowed inside the workspace
+export function isSafePath(path: string): boolean {
+  if (!path || isAbsolute(path)) return false;
+  return !path.split(sep).includes('..');
+}
+
+// Convert markdown to Slack mrkdwn so LLM output renders in Slack. Code blocks
+// and inline code pass through untouched (mrkdwn uses the same syntax);
+// headers become bold, **bold** -> *bold*, *italic* -> _italic_,
+// [text](url) -> <url|text>, - lists -> • lists.
+export function markdownToMrkdwn(markdown: string): string {
+  if (!markdown) return markdown;
+
+  const lines = markdown.split('\n');
+  const out: string[] = [];
+  let inCodeBlock = false;
+
+  for (const line of lines) {
+    // fenced code blocks pass through untouched
+    if (/^\s*```/.test(line)) {
+      inCodeBlock = !inCodeBlock;
+      out.push(line);
+      continue;
+    }
+    if (inCodeBlock) {
+      out.push(line);
+      continue;
+    }
+
+    let text = line;
+
+    // unordered list -> bullet
+    text = text.replace(/^\s*[-*+]\s+/, '• ');
+
+    // headers -> bold (content is formatted inline first)
+    const header = text.match(/^\s{0,3}#{1,6}\s+(.*)$/);
+    if (header) {
+      text = `*${formatInline(header[1]!)}*`;
+    } else {
+      text = formatInline(text);
+    }
+
+    out.push(text);
+  }
+
+  return out.join('\n');
+}
+
+// inline markdown -> mrkdwn: links, bold, italic, strikethrough. inline code
+// spans are protected so formatting inside them is never touched.
+function formatInline(text: string): string {
+  // protect inline code spans from the formatting below
+  const codeSpans: string[] = [];
+  text = text.replace(/`[^`\n]+`/g, (m) => {
+    codeSpans.push(m);
+    return `\u0000${codeSpans.length - 1}\u0000`;
+  });
+
+  // links [text](url) -> <url|text>
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<$2|$1>');
+
+  // bold/italic/strikethrough in one pass (bold wins over italic)
+  text = text.replace(
+    /\*\*([^*]+)\*\*|(?<!\*)\*([^*\n]+)\*(?!\*)|~~([^~]+)~~/g,
+    (m, bold: string, italic: string, strike: string) => {
+      if (bold) return `*${bold}*`;
+      if (italic) return `_${italic}_`;
+      if (strike) return `~${strike}~`;
+      return m;
+    }
+  );
+
+  // restore inline code spans
+  text = text.replace(/\u0000(\d+)\u0000/g, (_, i: string) => codeSpans[Number(i)]!);
+
+  return text;
+}

@@ -54,13 +54,13 @@ Current reality (from code):
 - [x] 3.2 `web_search` (`web_search.ts`) — DuckDuckGo scraped via browser
 - [x] 3.3 `web_browse` (`web_browse.ts`) — browser page -> text
 - [x] 3.4 `end_chat` (`end_chat.ts`) — AI loop stop tool
-- [x] 3.5 `read_file` (`read_file.ts`) — read a file from disk, **guarded to `~/.marvin`** (`resolveInsideHome`)
+- [x] 3.5 `read_file` (`read_file.ts`) — read a file from disk, **guarded to `~/.marvin`** (`safeJoin`)
 - [x] 3.6 `edit_file` (`edit_file.ts`) — create/overwrite a file or replace a snippet, **same `~/.marvin` guard**
   (rejects `..` escapes, absolute paths outside home, and symlinks pointing outside)
 - [x] 3.7 Config/state tools (`marvin_state.ts`, `marvin_config.ts`)
   - `marvin_state` — read the runtime state (agents, tasks, models, channels, settings; optional `area` filter)
   - `marvin_config` — read marvin.json (whole config or dotted `key`) and `set` a dotted key (JSON/string),
-    persists inside `~/.marvin` via `resolveInsideHome`, keeps `engine.config` in sync
+    persists inside `~/.marvin` via `safeJoin`, keeps `engine.config` in sync
 
 ### Systems (`src/systems/`)
 - [x] 3.6 `api` (`api.ts`) — HTTP server: `_health`, `reload`, `status`, `chat` (basic Bearer auth)
@@ -178,7 +178,7 @@ Implemented commands: `agents, channels, debug, disable, enable, help, install, 
 Uncommitted changes: `src/channels/slack.ts`, `src/commands/channels.ts` (modified), `src/channels/example.ts` (deleted).
 This session also adds: `src/tools/read_file.ts` + `read_file.test.ts`, `src/tools/edit_file.ts` +
 `edit_file.test.ts`, `src/tools/marvin_state.ts` + `marvin_state.test.ts`, `src/tools/marvin_config.ts` +
-`marvin_config.test.ts`, `resolveInsideHome` guard in `helpers.ts`, `extractOutput` (LLM JSON -> string)
+`marvin_config.test.ts`, `safeJoin` guard in `helpers.ts`, `extractOutput` (LLM JSON -> string)
 in `helpers.ts` + `helpers.test.ts`, `src/engine.ts` (null-safe assistant reply + awaited `load()` +
 dry-mode chat save + outbound JSON extraction in `execTask`), `src/channels/slack.ts` (real `message`
 event dispatch for DMs, bot-self filter, empty-DM guard, JSON output extraction), rewritten

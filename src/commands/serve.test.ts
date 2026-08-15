@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { Channel, Config, Model, Chat, Reply, Message, Tool, Integration } from '../types.js';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import * as constants from '../constants.js';
@@ -24,6 +24,7 @@ function mockEngine(isDry = false): Engine {
   const engine = new Engine(new Logger());
   engine.isDry = isDry;
   engine.state = 'exec';
+  engine.work = mkdtempSync(join(tmpdir(), 'marvin-serve-'));
   return engine;
 }
 

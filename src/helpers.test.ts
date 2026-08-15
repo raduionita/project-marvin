@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { extractOutput, cleanContent, withRetry } from './helpers.js';
+import { extractOutput, cleanContent, withRetry, markdownToMrkdwn } from './helpers.js';
 
 test('extractOutput pulls the output field from JSON', () => {
   expect(extractOutput('{"output": "hello world"}')).toBe('hello world');
@@ -79,4 +79,30 @@ test('withRetry does not retry when shouldRetry says no', async () => {
   }).toThrow('permanent');
 
   expect(attempts).toBe(1);
+});
+
+test('markdownToMrkdwn converts headers to bold', () => {
+  expect(markdownToMrkdwn('# Hello')).toBe('*Hello*');
+  expect(markdownToMrkdwn('### Deep')).toBe('*Deep*');
+});
+
+test('markdownToMrkdwn converts bold, italic and strikethrough', () => {
+  expect(markdownToMrkdwn('**bold** and *italic* and ~~gone~~')).toBe('*bold* and _italic_ and ~gone~');
+});
+
+test('markdownToMrkdwn converts links to mrkdwn format', () => {
+  expect(markdownToMrkdwn('[docs](https://example.com)')).toBe('<https://example.com|docs>');
+});
+
+test('markdownToMrkdwn converts unordered lists to bullets', () => {
+  expect(markdownToMrkdwn('- one\n- two')).toBe('• one\n• two');
+});
+
+test('markdownToMrkdwn leaves code blocks and inline code untouched', () => {
+  const md = '```js\nconst x = **not bold**;\n```\nand `**code**` here';
+  expect(markdownToMrkdwn(md)).toBe(md);
+});
+
+test('markdownToMrkdwn handles empty content', () => {
+  expect(markdownToMrkdwn('')).toBe('');
 });

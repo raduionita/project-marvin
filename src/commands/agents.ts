@@ -21,15 +21,11 @@ export default class AgentsCommand extends Command {
         this.logger.info('  add     ', 'add an agent');
         this.logger.info('  chat    ', 'send a chat message to the specified agent');
       break;
-      // `marvin agents add [agentId]` // add an agent interactively
-      case 'add':
+      case 'add': // `marvin agents add [agentId]` // add an agent interactively
         await this.execAdd();
       break;
-      // `marvin agents chat [agentId]` // send message to agent
-      case 'chat':
-        await this.engine.load();
+      case 'chat': // `marvin agents chat [agentId]` // send message to agent
         await this.execChat();
-        await this.engine.drop();
       break;
     }
   }
@@ -37,34 +33,42 @@ export default class AgentsCommand extends Command {
   async execChat() {
     this.logger.debug('[AgentsCommand.execChat]');
 
-    // default to orchestrator
-    const agentId = this.args[0] || this.engine!.config.settings?.name;
-    let   chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      await this.engine.load();
 
-    // TODO: start interactive prompt mode here...loop until /exit/quit/stop
+      // default to orchestrator
+      const agentId = this.args[0] || this.engine!.config.settings?.name;
+      let   chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    // prompt interactively
-    const answer = await ask('You: ');
+      // TODO: start interactive prompt mode here...loop until /exit/quit/stop
 
-    // if empty answer, exit
-    if (!answer) {
-      this.logger.warn('[AgentsCommand.execChat]', 'empty message');
-      return;
-    }
+      // prompt interactively
+      const answer = await ask('You: ');
 
-    // send chat message to server /chat
-    if (this.engine.isDry) {
-      this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'message:', answer);
-      this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'agent:', agentId);
-    } else {
-      const result = await this.engine.sendChat(chatId, agentId, answer);
-      if (result.error) {
-        this.logger.error('[AgentsCommand.execChat]', 'no result from sendMessage for agent', agentId, ':', result.error);
+      // if empty answer, exit
+      if (!answer) {
+        this.logger.warn('[AgentsCommand.execChat]', 'empty message');
         return;
       }
 
-      // call send chat
-      this.logger.log('LLM: ', result.content);
+      // send chat message to server /chat
+      if (this.engine.isDry) {
+        this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'message:', answer);
+        this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'agent:', agentId);
+      } else {
+        // send message to the LLM
+        const result = await this.engine.sendChat(chatId, agentId, answer);
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        // call send chat
+        this.logger.log('LLM: ', result.content);
+      }
+    } catch (error) {
+      this.logger.error('[AgentsCommand.execChat]', 'error:', error);
+    } finally {
+      await this.engine.drop();
     }
 
     this.logger.debug('[AgentsCommand.execChat]', 'done');
@@ -73,8 +77,6 @@ export default class AgentsCommand extends Command {
   // `marvin agents add [agentId]` // add an agent interactively
   async execAdd() {
     this.logger.debug('[AgentsCommand.execAdd]', 'adding an agent...');
-
-    this.logger.log('');
 
     // ask for agentId
     const agentId = this.args[1] || await ask('Enter agent name (e.g. my-agent): ');

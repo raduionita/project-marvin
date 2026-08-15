@@ -68,6 +68,28 @@ export default class InstallCommand extends Command {
       this.logger.info('directory', lpath, 'exists');
     }
 
+    // ~/.marvin/memories (persistent memory notes live here)
+    const memPath = join(hpath, 'memories');
+    if (this.engine.isDry) {
+      this.logger.info('[InstallCommand.makeProject]', '[dry]', memPath);
+    } else if (!existsSync(memPath)) {
+      mkdirSync(memPath, { recursive: true });
+      this.logger.info('created memories directory:', memPath);
+    } else {
+      this.logger.info('directory', memPath, 'exists');
+    }
+
+    // ~/.marvin/chats (persisted chat transcripts live here)
+    const chatsPath = join(hpath, 'chats');
+    if (this.engine.isDry) {
+      this.logger.info('[InstallCommand.makeProject]', '[dry]', chatsPath);
+    } else if (!existsSync(chatsPath)) {
+      mkdirSync(chatsPath, { recursive: true });
+      this.logger.info('created chats directory:', chatsPath);
+    } else {
+      this.logger.info('directory', chatsPath, 'exists');
+    }
+
     //  ~/.marvin/MARVIN.md
     const mpath = join(hpath, 'MARVIN.md');
     if (this.engine.isDry) {

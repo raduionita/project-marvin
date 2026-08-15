@@ -485,6 +485,20 @@ test('sendMessage() includes thread_ts for threaded messages', async () => {
   expect(result.ok).toBe(true);
 });
 
+test('sendMessage() converts markdown to Slack mrkdwn', async () => {
+  const { channel } = buildEngine();
+  await channel.load();
+
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.124', channel: 'C123',
+    message: { text: 'reply', ts: '1700000000.124' },
+  } as ChatPostMessageResponse);
+
+  await channel.sendMessage({ role: 'assistant', content: '**bold** [link](https://x.com)', channel: 'C123' });
+
+  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('*bold* <https://x.com|link>');
+});
+
 test('sendMessage() reports failure on channel mismatch', async () => {
   const { channel } = buildEngine();
   await channel.load();

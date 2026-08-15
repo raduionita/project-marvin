@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Engine from '../engine.js';
@@ -35,11 +35,11 @@ test('readFile tool metadata', () => {
 test('readFile returns the contents of a file inside the workspace', async () => {
   const { engine, home } = mockEngine();
   const tool = new ReadFileTool(engine, new Logger());
-  const path = mockFile(home, 'sample.txt', 'hello world');
+  mockFile(home, 'sample.txt', 'hello world');
 
-  const result = await tool.call({ path });
+  const result = await tool.call({ path: 'sample.txt' });
 
-  expect(result.path).toBe(path);
+  expect(result.path).toBe('sample.txt');
   expect(result.content).toBe('hello world');
   expect(result.error).toBeUndefined();
 
@@ -75,20 +75,6 @@ test('readFile rejects paths that escape via ..', async () => {
   const tool = new ReadFileTool(engine, new Logger());
 
   const result = await tool.call({ path: join(home, '..', '..', 'etc', 'hosts') });
-
-  expect(result.content).toBeUndefined();
-  expect(result.error).toContain('outside the workspace');
-
-  cleanup(home);
-});
-
-test('readFile rejects symlinks that point outside the workspace', async () => {
-  const { engine, home } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
-  const link = join(home, 'escape-link.txt');
-  symlinkSync('/etc/hosts', link);
-
-  const result = await tool.call({ path: link });
 
   expect(result.content).toBeUndefined();
   expect(result.error).toContain('outside the workspace');

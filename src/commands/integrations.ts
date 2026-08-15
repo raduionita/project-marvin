@@ -58,18 +58,18 @@ export default class IntegrationsCommand extends Command {
   // `marvin integrations list`
   async execList() {
     this.logger.debug('[IntegrationsCommand.execList]');
-    this.logger.info('integrations:');
+    this.logger.log('integrations:');
     const configured = Object.keys(this.engine.config.integrations).length;
     if (configured === 0) {
-      this.logger.info('  (none)');
+      this.logger.log('  (none)');
     }
     for (const [id, config] of Object.entries(this.engine.config.integrations)) {
-      this.logger.info(`  ${id}`);
-      this.logger.info('  - type:', config.type);
-      this.logger.info('  - enabled:', config.enabled);
+      this.logger.log(`  ${id}`);
+      this.logger.log('  - type:', config.type);
+      this.logger.log('  - enabled:', config.enabled);
       for (const [key, value] of Object.entries(config)) {
         if (key === 'type' || key === 'enabled') continue;
-        this.logger.info(`  - ${key}:`, value);
+        this.logger.log(`  - ${key}:`, value);
       }
     }
   }
@@ -81,8 +81,6 @@ export default class IntegrationsCommand extends Command {
     // available integration types (files in src/integrations)
     const types = listIntegrations(this.engine).map(c => c.replace('.ts', ''));
 
-    this.logger.log('');
-
     // ask for the integration name
     let name = this.args[1] || await ask('Enter integration name (e.g. mycoolsite): ');
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
@@ -92,14 +90,14 @@ export default class IntegrationsCommand extends Command {
 
     // check if the integration is already configured
     if (this.engine.config.integrations[name]) {
-      this.logger.warn('[IntegrationsCommand.execAdd]', `integration "${name}" is already configured`);
+      this.logger.error('[IntegrationsCommand.execAdd]', `integration "${name}" is already configured`);
       return;
     }
 
     // ask for the type (radio select from the available types)
     const type = this.args[2] || await select('Select integration type:', types.map(t => ({ label: t, value: t }) as Option<string>), ask);
     if (!type) {
-      this.logger.warn('[IntegrationsCommand.execAdd]', 'no integration type selected');
+      this.logger.error('[IntegrationsCommand.execAdd]', 'no integration type selected');
       return;
     }
 

@@ -2,7 +2,7 @@ import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import { Channel, Command, Message, Agent } from '../types.js';
 import type Engine from '../engine.js';
-import { extractOutput } from '../helpers.js';
+import { extractOutput, markdownToMrkdwn } from '../helpers.js';
 import { listCommands } from '../commands/index.js';
 import { Logger } from '../logger.js';
 
@@ -222,11 +222,9 @@ export default class SlackChannel extends Channel {
       return { ts: '', ok: false, error: 'no channel provided', message: '(no channel)' };
     }
 
-    // send the message
+    // send the message (LLM markdown is converted to Slack mrkdwn)
     const response = await this.web.chat.postMessage({
-      text: message.content,
-      // OR .markdown_text
-      // +  .mrkdwn
+      text: markdownToMrkdwn(message.content),
       channel: message.channel,
       thread_ts: message.thread || undefined,
     });

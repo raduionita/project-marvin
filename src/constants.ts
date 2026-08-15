@@ -7,10 +7,6 @@ You are Marvin - the AI sidekick.
 - Be direct and concise, do not repeat yourself, trim unnecessary words.
 - If a tool result contains the answer, use it to answer the user.`;
 
-export const JSON_MD = `## Output format
-- ALWAYS respond in valid JSON format.
-- Use EXACT keys in the JSON schema below.`;
-
 export const DEFAULT_SCHEMA = {"output": "text string of the answer"};
 
 export const DEFAULT_MAX_STEPS = 20;
@@ -28,6 +24,7 @@ export const DEFAULT_CONFIG = {
     host: '127.0.0.1',
     port: 7331,
     apiToken: 'changeme',
+    memory: false,
   },
   channels: {},
   integrations: {},
@@ -44,3 +41,11 @@ export const END_CHAT_NAME = 'end_chat';
 export const END_CHAT_DESCRIPTION = 'Call this tool ONLY when you have completed all necessary steps and are ready to give the final, definitive answer to the user.';
 
 export const ACKS = ['Here...', 'On it...', 'One sec...', 'Hold on...', 'I got this...', 'Got it...', 'Lemme see...'];
+
+
+export const MEMORIES_FOLDER = 'memories';
+export const AGENTS_FOLDER = 'agents';
+export const SKILLS_FOLDER = 'skills';
+export const TOOLS_FOLDER = 'tools';
+export const CHANNELS_FOLDER = 'channels';
+export const INTEGRATIONS_FOLDER = 'integrations';

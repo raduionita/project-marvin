@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Engine from '../engine.js';
@@ -38,7 +38,7 @@ test('marvinConfig reads the whole config', async () => {
 
   const result: { [key: string]: any } = await tool.call({});
 
-  expect(result.path).toBe(realpathSync(join(home, 'marvin.json')));
+  expect(result.path).toBe(join(home, 'marvin.json'));
   expect(result.config.settings.port).toBe(7331);
   expect(result.config.models.llm.provider).toBe('deepseek');
   cleanup(home);

@@ -1,6 +1,6 @@
 # AGENTS.md - Marvin Project
 
-You are a Principal TypeScript Engineer working on **Marvin** - a multi-agent AI assistant with a client-server architecture. The server is a persistent background process that manages agents executing autonomous scheduled tasks. The client is a standalone app communicating with the server via HTTP API.
+**Marvin** - CLI multi-agent AI assistant
 
 **Tech stack:** Node.js + TypeScript
 
@@ -80,9 +80,6 @@ Loaded from `~/.marvin/` at runtime (created on first run):
 - `Task` - periodic prompt or `.md` file that starts the AI loop
 - `sendChat` - engine: prompts the LLM with task input, then reschedules itself (`execMonitor`/`execSweep` handle monitor/sweep tasks)
 
-Common types live in `types.ts`. Both `client.ts` and `server.ts` are self-contained entry points for their respective modes.
-Do not confuse Marvin channels with Slack channels, they are different things. In Marvin they are communication channels between the client and the server.
-
 ---
 
 ## AI Workflow (claude, opencode, etc.)
@@ -107,5 +104,4 @@ Do not confuse Marvin channels with Slack channels, they are different things. I
 ---
 
 ## Goal
-
-Build a general purpose AI assistant (that runs on agents that schedule tasks).
+General purpose AI assistant (that runs on agents that schedule tasks).
