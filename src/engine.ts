@@ -6,7 +6,7 @@ import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, M
 import * as constants from './constants.js';
 import { listTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
-import { listIntegrations } from "./integrations/index.js";
+import { listIntegrations, loadIntegrationTools, splitIntegrationToolName } from "./integrations/index.js";
 import { listSkills, listCustomSkills, parseSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
@@ -323,27 +323,27 @@ export default class Engine {
 
     // default skills shipped with marvin (src/skills)
     const files = listSkills(this);
-    for (const id of files) {
-      if (this.skills[id]) continue;
+    for (const file of files) {
       try {
-        const skill = parseSkill(join(import.meta.dirname, 'skills', id), 'default');
-        this.skills[id] = skill;
-        this.logger.info('[Engine.loadSkills]', `skill "${id}" loaded (default)`);
+        const skill = parseSkill(join(import.meta.dirname, 'skills', file), 'default');
+        if (this.skills[skill.id]) continue;
+        this.skills[skill.id] = skill;
+        this.logger.info('[Engine.loadSkills]', `skill "${skill.id}" loaded (default)`);
       } catch (err) {
-        this.logger.error('[Engine.loadSkills]', `failed to load "${id}":`, err);
+        this.logger.error('[Engine.loadSkills]', `failed to load "${file}":`, err);
       }
     }
 
     // custom skills in the workspace (~/.marvin/skills), override defaults
     const cdir = join(this.work, 'skills');
     const cfiles = listCustomSkills(this);
-    for (const id of cfiles) {
+    for (const file of cfiles) {
       try {
-        const skill = parseSkill(join(cdir, id), 'custom');
-        this.skills[id] = skill;
-        this.logger.info('[Engine.loadSkills]', `skill "${id}" loaded (custom)`);
+        const skill = parseSkill(join(cdir, file), 'custom');
+        this.skills[skill.id] = skill;
+        this.logger.info('[Engine.loadSkills]', `skill "${skill.id}" loaded (custom)`);
       } catch (err) {
-        this.logger.error('[Engine.loadSkills]', `failed to load custom skill "${id}":`, err);
+        this.logger.error('[Engine.loadSkills]', `failed to load custom skill "${file}":`, err);
       }
     }
   }
@@ -517,6 +517,7 @@ export default class Engine {
           format: task.format || 'json',
           schema: task.schema || constants.DEFAULT_SCHEMA,
           input: input,
+          integrations: task.integrations,
         } as Task;
 
         this.logger.info('[Engine.loadAgents]', `task "${taskId}" created (agent ${agentId})`);
@@ -763,8 +764,12 @@ export default class Engine {
     const format = task.format || 'json';
     const schema = task.schema || constants.DEFAULT_SCHEMA;
 
+    // merge engine (default) tools with the task's integration tools
+    const taskTools = await loadIntegrationTools(this, task.integrations || []);
+    const tools = [...Object.values(this.tools).map(t => t.meta), ...taskTools];
+
     // set task input as user message to LLM
-    const result = await this.sendChat(chatId, agentId, task.input, format, schema, maxSteps);
+    const result = await this.execChat(chatId, agentId, task.input, format, schema, maxSteps, tools);
     if (result.error) {
       this.logger.error('[Engine.execTask]', `no result from sendMessage for agent ${agentId}:`, result.error);
       return;
@@ -816,28 +821,42 @@ export default class Engine {
   }
 
   // tool call
-  async  execTool(tool: string, args: {[key:string]:any}) : Promise<{[key:string]:any}> {
+  async execTool(tool: string, args: {[key:string]:any}) : Promise<{[key:string]:any}> {
     this.logger.debug('[Engine.execTool]', tool);
 
     const instance = this.tools[tool];
-    if (!instance) {
-      this.logger.error('[Engine.execTool]', `tool ${tool} not found`);
-      return {tool: tool, error: `tool ${tool} does NOT exist`};
+    if (instance) {
+      try {
+        // ! tool call
+        return await instance.call(args);
+      } catch (err) {
+        this.logger.error('[Engine.execTool]', `tool ${tool} failed:`, err);
+        return {tool: tool, error: (err as Error).message};
+      }
     }
 
-    try {
-      // ! tool call
-      return await instance.call(args);
-    } catch (err) {
-      this.logger.error('[Engine.execTool]', `tool ${tool} failed:`, err);
-      return {tool: tool, error: (err as Error).message};
+    // dynamic integration tools (<integrationId>__<action>) loaded per-task
+    const split = splitIntegrationToolName(tool);
+    const integration = split ? this.integrations[split.integrationId] : undefined;
+    if (integration) {
+      try {
+        return await integration.call({ action: split!.action, ...args });
+      } catch (err) {
+        this.logger.error('[Engine.execTool]', `tool ${tool} failed:`, err);
+        return {tool: tool, error: (err as Error).message};
+      }
     }
+
+    this.logger.error('[Engine.execTool]', `tool ${tool} not found`);
+    return {tool: tool, error: `tool ${tool} does NOT exist`};
   }
 
   // get a chat for this id: reuse the cached/persisted one, or create a new
   // chat seeded with the system prompt (identity + integrations + memory + format)
-  makeChat(chatId: string | undefined, agent: Agent, format: 'text' | 'json' = 'json', schema: { [key: string]: string } = constants.DEFAULT_SCHEMA): Chat {
-    // find cached chat by id, falling back to the persisted copy on disk
+  loadChat(chatId: string | undefined, agent: Agent, format: 'text' | 'json' = 'json', schema: { [key: string]: string } = constants.DEFAULT_SCHEMA, tools?: ToolMeta[]): Chat {
+    this.logger.debug('[Engine.loadChat]');
+
+    // try from cache or disk
     if (chatId) {
       const cached = this.cache[chatId];
       if (cached) {
@@ -846,25 +865,29 @@ export default class Engine {
       }
 
       if (!this.isDry) {
-        // load from disk, then re-cache
         try {
           const file = join(this.work, 'chats', `${chatId}.json`);
-          if (!existsSync(file)) return this.newChat(chatId, agent, format, schema);
-          const chat = JSON.parse(readFileSync(file, 'utf-8')) as Chat;
-          chat.updated = Date.now();
-          this.cache[chatId] = chat;
-          return chat;
+          if (existsSync(file)) {
+            // load from disk, then re-cache
+            const chat = JSON.parse(readFileSync(file, 'utf-8')) as Chat;
+            chat.updated = Date.now();
+            this.cache[chatId] = chat;
+            return chat;
+          }
         } catch (err) {
           this.logger.debug('[Engine.makeChat]', 'failed to load chat from disk:', err);
         }
       }
     }
 
-    return this.newChat(chatId, agent, format, schema);
+    // or make a new chat
+    return this.makeChat(chatId, agent, format, schema, tools);
   }
 
-  // new chat seeded with the system prompt (identity + integrations + memory + format)
-  private newChat(chatId: string | undefined, agent: Agent, format: 'text' | 'json', schema: { [key: string]: string }): Chat {
+  // make new chat seeded with the system prompt (identity + integrations + memory + format)
+  makeChat(chatId: string | undefined, agent: Agent, format: 'text' | 'json', schema: { [key: string]: string }, tools?: ToolMeta[]): Chat {
+    this.logger.debug('[Engine.makeChat]');
+
     let system = agent.identity;
 
     const entries = Object.entries(this.integrations);
@@ -907,9 +930,10 @@ export default class Engine {
     if (format === 'json') {
       system += '\n\n';
       system += `## Output format`;
-      system += '- ALWAYS respond in valid JSON format.\n';
-      system += '- Use EXACT keys in the JSON schema below.\n';
-      system += '- JSON schema: ' + JSON.stringify(schema);
+      system += 'Respond with exactly one JSON object, no other text::\n';
+      system += '```json\n' + JSON.stringify(schema) + '\n```\n';
+      system += '- Do not wrap the JSON in a code fence in your actual response.\n';
+      system += '- Do not include any text before or after the JSON object.';
     }
 
     // TODO: loadIntegrationTools(integrations)
@@ -920,13 +944,15 @@ export default class Engine {
       thinking: false,
       userId: '',
       format: format,
-      tools: Object.values(this.tools).map(tool => tool.meta), // needs merge with task integrations tools
+      tools: tools,
       updated: Date.now(),
     } as Chat;
   }
 
   // save chat to cache (and persist it to ~/.marvin/chats/<chatId>.json)
   saveChat(chatId: string | undefined, chat: Chat): void {
+    this.logger.debug('[Engine.saveChat]', `chatId=${chatId}`);
+
     if (!chatId) return;
     chat.updated = Date.now();
     this.cache[chatId] = chat;
@@ -955,30 +981,28 @@ export default class Engine {
     }
   }
 
-  // agent loop
-  async sendChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS) : Promise<{content:string, steps:number, error?: string}> {
+  // exec chat // agent loop
+  async execChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS, tools?: ToolMeta[]) : Promise<{content:string, steps:number, error?: string}> {
     try {
-      this.logger.debug('[Engine.sendChat]', chatId, agentId, message.slice(0, 100));
+      this.logger.debug('[Engine.execChat]', `chatId=${chatId} agentId=${agentId}, message=${message.slice(0, 32)}`);
 
       const agent = this.agents[agentId]!;
 
       // get chat from cache/store, or create a new one seeded with the system prompt
-      const chat = this.makeChat(chatId, agent, format, schema);
-      
+      const chat = this.loadChat(chatId, agent, format, schema, tools);
+
       // load task input as user message
       chat.messages.push({ role: 'user', content: message.trim() });
 
       // return early
       if (this.isDry) {
-        this.logger.info('[Engine.sendChat]', '[dry]', 'send messages to:', agent.model.model);
+        this.logger.info('[Engine.execChat]', '[dry]', 'send messages to:', agent.model.model);
         this.saveChat(chatId, chat);
         return { content: '(dry)', steps: 0 };
       }
 
-      // TODO this needs a type, Model.chat should return a proper Reply/Response/Result type
-      let reply: Reply;
-
       // AI loop: call model, execute tool calls, repeat until done
+      let reply: Reply;
       let steps = -1;
       let ended = false;
       do {
@@ -988,23 +1012,23 @@ export default class Engine {
         this.trimChat(chat);
 
         // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
-        reply = await agent.model.sendChat(chat);
+        reply = await agent.model.execChat(chat);
 
         // persist assistant reply to chat history
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
         // trim result, this can be really big
-        this.logger.debug('[Engine.sendChat]', `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
+        this.logger.debug('[Engine.execChat]', `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
 
         // force stop
         if (reply.stop) {
-          this.logger.debug('[Engine.sendChat]', `force stop at step=#${steps}`);
+          this.logger.debug('[Engine.execChat]', `force stop at step=#${steps}`);
           break;
         }
 
         // execute any tool calls
         for (const tool of reply.message.tools || []) {
-          this.logger.debug('[Engine.sendChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
+          this.logger.debug('[Engine.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
 
           // if end_chat tool call is found, we're done
           if (tool.name === constants.END_CHAT_NAME) {
@@ -1021,14 +1045,14 @@ export default class Engine {
 
         // if end_chat tool call is found, we're done
         if (ended) {
-          this.logger.info('[Engine.sendChat]', `tool stop (${constants.END_CHAT_NAME}) at step=#${steps}`);
+          this.logger.info('[Engine.execChat]', `tool stop (${constants.END_CHAT_NAME}) at step=#${steps}`);
           break;
         }
       } while (steps < maxSteps - 1);
 
       // warn if max steps reached
       if (steps >= maxSteps) {
-        this.logger.warn('[Engine.sendChat]', `max steps (${maxSteps}) reached for ${agentId}`);
+        this.logger.warn('[Engine.execChat]', `max steps (${maxSteps}) reached for ${agentId}`);
       }
 
       // save chat to cache
@@ -1041,7 +1065,7 @@ export default class Engine {
            content = chat.format === 'json' ? cleanContent(content) : content;
       return { content: content, steps: steps };
     } catch (error) {
-      this.logger.error('[Engine.sendChat]', error);
+      this.logger.error('[Engine.execChat]', error);
       return { content: '', steps: 0, error: (error as Error).message };
     } 
   }

@@ -49,6 +49,8 @@ export interface Config {
       input?: string;
       format?: 'text' | 'json';
       schema?: {[key:string]:string};
+      // integrations linked to this task: their actions become tools
+      integrations?: string[];
     }>;
   }>;
 }
@@ -189,7 +191,7 @@ export interface Task {
   input?: string;
   format?: 'text' | 'json';
   schema?: {[key:string]:string};
-  // TODO: task integrations, string[] or Record<string, Integration>?
+  // integrations linked to this task: their actions become tools for this task
   integrations?: string[];
 }
 
@@ -222,7 +224,7 @@ export abstract class Model {
   }
 
   // sends messages to LLM model
-  abstract sendChat(chat: Chat): Promise<Reply>;
+  abstract execChat(chat: Chat): Promise<Reply>;
 }
 
 export interface Agent {

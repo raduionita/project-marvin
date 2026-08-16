@@ -7,7 +7,7 @@ You are Marvin - the AI sidekick.
 - Be direct and concise, do not repeat yourself, trim unnecessary words.
 - If a tool result contains the answer, use it to answer the user.`;
 
-export const DEFAULT_SCHEMA = {"output": "text string of the answer"};
+export const DEFAULT_SCHEMA = {"output": "string — your full answer, plain text or markdown"};
 
 export const DEFAULT_MAX_STEPS = 20;
 

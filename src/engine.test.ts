@@ -85,11 +85,11 @@ test('execSweep removes chats idle longer than the TTL and reschedules', async (
   await engine.execSweep('marvin', 'sweep');
 
   // stale was evicted: makeChat returns a fresh chat (no 'old' message)
-  const staleChat = engine.makeChat('stale', engine.agents['marvin']!, 'text', {});
+  const staleChat = engine.loadChat('stale', engine.agents['marvin']!, 'text', {});
   expect(staleChat.messages.filter(m => m.content === 'old').length).toBe(0);
 
   // fresh is still cached with its 'new' message
-  const freshChat = engine.makeChat('fresh', engine.agents['marvin']!, 'text', {});
+  const freshChat = engine.loadChat('fresh', engine.agents['marvin']!, 'text', {});
   expect(freshChat.messages.some(m => m.content === 'new')).toBe(true);
 
   // rescheduled for the next run
@@ -105,7 +105,7 @@ test('saveChat/makeChat track last use time', () => {
 
   // simulate an idle chat, then confirm makeChat bumps last-use time
   chat.updated = 0;
-  engine.makeChat('x', { id: 'a', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never } as Agent, 'text', {});
+  engine.loadChat('x', { id: 'a', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never } as Agent, 'text', {});
   expect(chat.updated).toBeGreaterThan(0);
 });
 
@@ -117,8 +117,8 @@ test('drop clears the in-memory chat cache but chats survive on disk', async () 
 
   // cache is cleared, but the persisted copy is reloaded on demand
   const agent = { id: 'a', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never } as Agent;
-  expect(engine.makeChat('x', agent, 'text', {})).not.toBeNull();
-  expect(engine.makeChat('x', agent, 'text', {})?.messages[0]).toEqual({ role: 'user', content: 'hi' });
+  expect(engine.loadChat('x', agent, 'text', {})).not.toBeNull();
+  expect(engine.loadChat('x', agent, 'text', {})?.messages[0]).toEqual({ role: 'user', content: 'hi' });
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -131,7 +131,7 @@ test('saveChat persists chats to disk and makeChat reloads them in a fresh engin
   const fresh = new Engine(new Logger());
   fresh.work = engine.work;
   const agent = { id: 'a', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never } as Agent;
-  const loaded = fresh.makeChat('persist-1', agent, 'text', {});
+  const loaded = fresh.loadChat('persist-1', agent, 'text', {});
 
   expect(loaded).not.toBeNull();
   expect(loaded?.messages[0]).toEqual({ role: 'user', content: 'persisted' });
@@ -142,7 +142,7 @@ test('makeChat creates a fresh chat (with system prompt) when none was saved', (
   const engine = buildEngine();
   const agent = { id: 'a', enabled: true, identity: 'my identity', channels: {}, tasks: {}, model: {} as never } as Agent;
 
-  const chat = engine.makeChat('never-saved', agent, 'text', {});
+  const chat = engine.loadChat('never-saved', agent, 'text', {});
 
   expect(chat.id).toBe('never-saved');
   expect(chat.messages[0]).toEqual({ role: 'system', content: 'my identity' });
@@ -153,7 +153,7 @@ test('sendChat returns an error field when the agent does not exist', async () =
   const engine = buildEngine();
   engine.state = 'exec';
 
-  const result = await engine.sendChat('chat-1', 'nope', 'hello');
+  const result = await engine.execChat('chat-1', 'nope', 'hello');
 
   expect(result.content).toBe('');
   expect(result.error).toBeDefined();
@@ -179,7 +179,7 @@ test('makeChat seeds a system prompt with an integrations block for loaded integ
 
   const agent = { memory: true, identity: '' } as Agent;
 
-  const chat = engine.makeChat('chat-1', agent, 'text', {});
+  const chat = engine.loadChat('chat-1', agent, 'text', {});
   const prompt = chat.messages[0]!.content as string;
 
   expect(prompt).toContain('## Integrations');
@@ -193,7 +193,7 @@ test('makeChat falls back to config when integrations are not loaded', () => {
   engine.config.integrations = { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://gloobeam.com' } };
   const agent = { memory: true, identity: '' } as Agent;
 
-  const chat = engine.makeChat('chat-1', agent, 'text', {});
+  const chat = engine.loadChat('chat-1', agent, 'text', {});
   const prompt = chat.messages[0]!.content as string;
 
   expect(prompt).toContain('## Integrations');
@@ -204,7 +204,7 @@ test('makeChat seeds only the identity when there are no integrations', () => {
   const engine = buildEngine();
   const agent = { memory: false, identity: 'my identity' } as Agent;
 
-  expect(engine.makeChat('chat-1', agent, 'text', {}).messages[0]!.content).toBe('my identity');
+  expect(engine.loadChat('chat-1', agent, 'text', {}).messages[0]!.content).toBe('my identity');
 });
 
 test('makeChat renders a memory block when memory notes exist', () => {
@@ -216,7 +216,7 @@ test('makeChat renders a memory block when memory notes exist', () => {
 
   const agent = { memory: true, identity: '' } as Agent;
 
-  const chat = engine.makeChat('chat-1', agent, 'text', {});
+  const chat = engine.loadChat('chat-1', agent, 'text', {});
   const prompt = chat.messages[0]!.content as string;
 
   expect(prompt).toContain('## Memory');
@@ -229,6 +229,6 @@ test('makeChat omits the memory block when memory is disabled', () => {
   const engine = buildEngine();
   const agent = { memory: false, identity: 'my identity' } as Agent;
 
-  expect(engine.makeChat('chat-1', agent, 'text', {}).messages[0]!.content).toBe('my identity');
+  expect(engine.loadChat('chat-1', agent, 'text', {}).messages[0]!.content).toBe('my identity');
   rmSync(engine.work, { recursive: true, force: true });
 });

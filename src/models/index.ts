@@ -16,5 +16,5 @@ export function listModels(engine: Engine): string[] {
     !f.includes('.d.ts') &&
     (engine.isTest || !f.includes('.mock.ts')) &&
     f.endsWith('.ts')
-  ).map(f => f.replace('.ts$', ''));
+  ).map(f => f.replace(/\.ts$/, ''));
 }

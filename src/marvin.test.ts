@@ -130,7 +130,7 @@ class FakeBrowserSystem extends System {
 class FlowModel extends Model {
   public callCount = 0;
 
-  async sendChat(chat: Chat): Promise<Reply> {
+  async execChat(chat: Chat): Promise<Reply> {
     this.callCount++;
     if (this.callCount === 1) {
       // research step
@@ -284,7 +284,7 @@ test('full flow: the tool results are kept in the chat cache for context', async
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  const chat = engine.makeChat('slack-C123-1700000000.001', engine.agents['marvin']!, 'json', {});
+  const chat = engine.loadChat('slack-C123-1700000000.001', engine.agents['marvin']!, 'json', {});
   expect(chat).not.toBeNull();
 
   const toolMessages = chat!.messages.filter(m => m.role === 'tool');

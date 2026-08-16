@@ -53,7 +53,8 @@ export default class SkillsCommand extends Command {
 
     this.logger.info('default skills:');
     if (defaults.length === 0) this.logger.info('  (none)');
-    for (const id of defaults) {
+    for (const file of defaults) {
+      const id = file.replace(/\.md$/i, '').toLowerCase();
       const skill = this.engine.skills[id];
       this.logger.info(`  ${id}`);
       if (skill?.description) this.logger.info('  -', skill.description);
@@ -61,7 +62,8 @@ export default class SkillsCommand extends Command {
 
     this.logger.info('custom skills:');
     if (custom.length === 0) this.logger.info('  (none)');
-    for (const id of custom) {
+    for (const file of custom) {
+      const id = file.replace(/\.md$/i, '').toLowerCase();
       const skill = this.engine.skills[id];
       this.logger.info(`  ${id}`);
       if (skill?.description) this.logger.info('  -', skill.description);
@@ -121,7 +123,7 @@ export default class SkillsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
       if (result.error || !result.content) {
         this.logger.error('[SkillsCommand.execAdd]', 'no result from the LLM');
         return;
@@ -230,7 +232,7 @@ export default class SkillsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
       if (result.error || !result.content) {
         this.logger.error('[SkillsCommand.execUse]', 'no result from the LLM');
         return;

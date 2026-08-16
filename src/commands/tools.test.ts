@@ -69,7 +69,7 @@ test('tools add writes a custom tool to ~/.marvin/tools', async () => {
   answers = [];
 
   // stub the LLM call to return generated tool source
-  engine.sendChat = async () => ({ content: `import { Tool } from '${engine.root}/src/types.js';\nexport default class MyTool extends Tool { /* ... */ }`, steps: 1 });
+  engine.execChat = async () => ({ content: `import { Tool } from '${engine.root}/src/types.js';\nexport default class MyTool extends Tool { /* ... */ }`, steps: 1 });
 
   await cmd.execAdd();
 
@@ -82,7 +82,7 @@ test('tools add prompts for tool name and description when missing', async () =>
   const engine = mockEngine();
   const cmd = new ToolsCommand(engine, new Logger(), []);
   answers = ['prompted_tool', 'prompted purpose'];
-  engine.sendChat = async () => ({ content: 'export default class PromptedTool extends Tool {}', steps: 1 });
+  engine.execChat = async () => ({ content: 'export default class PromptedTool extends Tool {}', steps: 1 });
 
   await cmd.execAdd();
 
@@ -106,7 +106,7 @@ test('tools add works in dry mode without calling the LLM', async () => {
   const cmd = new ToolsCommand(engine, new Logger(), ['add', 'dry_tool', 'desc']);
   answers = [];
   let called = false;
-  engine.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
+  engine.execChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execAdd();
 
@@ -118,7 +118,7 @@ test('tools add replaces the MARVIN_ROOT placeholder in generated code', async (
   const engine = mockEngine();
   const cmd = new ToolsCommand(engine, new Logger(), ['add', 'rooted_tool', 'desc']);
   answers = [];
-  engine.sendChat = async () => ({ content: "import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class RootedTool extends Tool {}", steps: 1 });
+  engine.execChat = async () => ({ content: "import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class RootedTool extends Tool {}", steps: 1 });
 
   await cmd.execAdd();
 
@@ -134,7 +134,7 @@ test('tools edit rewrites an existing custom tool', async () => {
 
   const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'add a ping parameter']);
   answers = [];
-  engine.sendChat = async () => ({ content: "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = true }", steps: 1 });
+  engine.execChat = async () => ({ content: "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = true }", steps: 1 });
 
   await cmd.execEdit();
 
@@ -149,7 +149,7 @@ test('tools edit sends the current tool code to the LLM', async () => {
   const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'make it better']);
   answers = [];
   let prompt = '';
-  engine.sendChat = async (_a: any, _b: any, p: string) => { prompt = p; return { content: 'updated', steps: 1 }; };
+  engine.execChat = async (_a: any, _b: any, p: string) => { prompt = p; return { content: 'updated', steps: 1 }; };
 
   await cmd.execEdit();
 
@@ -175,7 +175,7 @@ test('tools edit works in dry mode without calling the LLM', async () => {
   const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'dry_tool', 'update']);
   answers = [];
   let called = false;
-  engine.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
+  engine.execChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execEdit();
 

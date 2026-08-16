@@ -61,7 +61,16 @@ export default class WordpressIntegration extends Integration {
     const data = tryJsonParse<{ endpoints?: { methods?: string[], args?: { [key: string]: any } }[] }>(raw) || {};
     const endpoint = (data.endpoints || []).find(e => (e.methods || []).includes('POST'));
     if (!endpoint) throw new Error(`no POST schema found at ${url} for action "${action}"`);
-    return Object.entries(endpoint.args || {}).map(([name, def]) => this.normalizeArg(name, def));
+    const fields = Object.entries(endpoint.args || {}).map(([name, def]) => this.normalizeArg(name, def));
+
+    // single-resource actions need the resource id, which the collection
+    // OPTIONS schema does not list: inject it as a required field
+    const singleResource = ['get_post', 'update_post', 'publish_post', 'delete_post'].includes(action);
+    if (singleResource) {
+      const idField: Field = { name: 'id', type: 'integer', required: true, description: 'Post id' };
+      return [idField, ...fields.filter(f => f.name !== 'id')];
+    }
+    return fields;
   }
 
   async load(): Promise<void> {
@@ -172,6 +181,8 @@ export default class WordpressIntegration extends Integration {
       }));
     }
     for (const f of allowed) {
+      // id is a URL parameter for single-resource actions, never a body field
+      if (action === 'update_post' && f.name === 'id') continue;
       if (args[f.name] !== undefined) body[f.name] = args[f.name];
     }
 

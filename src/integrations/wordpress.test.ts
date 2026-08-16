@@ -319,6 +319,33 @@ test('discover throws for actions without a resource', async () => {
   await expect(integration.discover('explode')).rejects.toThrow('no REST resource');
 });
 
+test('discover injects a required id for single-resource actions', async () => {
+  mockFetch(OPTIONS_PAYLOAD);
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  const fields = await integration.discover('publish_post');
+
+  const id = fields.find(f => f.name === 'id')!;
+  expect(id).toBeDefined();
+  expect(id.type).toBe('integer');
+  expect(id.required).toBe(true);
+  expect(fields.find(f => f.name === 'title')?.required).toBe(true);
+});
+
+test('update_post never sends the id in the request body', async () => {
+  const fetchMock = mockFetch({ id: 7 });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+    type: 'wordpress', endpoint: 'https://example.com',
+    actions: { update_post: { enabled: true, fields: { id: { type: 'integer', required: true }, content: { type: 'string' } } } },
+  });
+
+  await integration.call({ action: 'update_post', id: 7, content: 'New body' });
+
+  const [url, init] = fetchMock.calls[0]!;
+  expect(url).toBe('https://example.com/wp-json/wp/v2/posts/7');
+  expect(JSON.parse(init.body)).toEqual({ content: 'New body' });
+});
+
 // --- config-driven field filtering + meta fields ---
 
 test('create_post sends only the configured fields (drops invented params)', async () => {

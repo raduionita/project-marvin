@@ -201,6 +201,33 @@ export default class IntegrationsCommand extends Command {
 
     this.logger.log('');
 
+    // ask which agents/tasks to link this integration to (their actions become
+    // tools for those tasks)
+    const agentIds = Object.keys(this.engine.config.agents || {});
+    if (agentIds.length) {
+      const raw = await ask(`Link "${name}" to agents (comma separated, e.g. ${agentIds.join(',')}), press enter for none: `);
+      for (const agentId of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+        const agent = this.engine.config.agents[agentId];
+        if (!agent) {
+          this.logger.warn('[IntegrationsCommand.execAdd]', `unknown agent "${agentId}", skipping`);
+          continue;
+        }
+        const taskIds = Object.keys(agent.tasks || {});
+        if (!taskIds.length) continue;
+
+        const taskRaw = await ask(`Link "${name}" to tasks of "${agentId}" (comma separated, e.g. ${taskIds.join(',')}), press enter for all: `);
+        const picked = taskRaw.trim() ? taskRaw.split(',').map(s => s.trim()).filter(Boolean) : taskIds;
+        for (const taskId of picked) {
+          if (!taskIds.includes(taskId)) {
+            this.logger.warn('[IntegrationsCommand.execAdd]', `unknown task "${taskId}" for agent "${agentId}", skipping`);
+            continue;
+          }
+          const task = agent.tasks![taskId]!;
+          task.integrations = [...new Set([...(task.integrations || []), name])];
+        }
+      }
+    }
+
     // register the integration in config
     this.engine.config.integrations[name] = { enabled: true, type, ...config };
 

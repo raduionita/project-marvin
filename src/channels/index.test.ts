@@ -45,8 +45,8 @@ test('listChannels excludes test files', () => {
 test('listChannels includes known channels', () => {
   const engine = mockEngine();
   const channels = listChannels(engine);
-  expect(channels).toContain('slack.ts');
-  expect(channels).toContain('telegram.ts');
-  expect(channels).toContain('whatsapp.ts');
-  expect(channels).toContain('channel.mock.ts');
+  expect(channels).toContain('slack');
+  expect(channels).toContain('telegram');
+  expect(channels).toContain('whatsapp');
+  expect(channels).toContain('channel.mock');
 });

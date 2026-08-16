@@ -16,5 +16,5 @@ export function listCommands(engine: Engine): string[] {
     !f.includes('.d.') &&
     (engine.isTest || !f.includes('.mock.')) &&
     f.endsWith('.ts')
-  ).map(f => f.replace('.ts$', ''));
+  ).map(f => f.replace(/\.ts$/, ''));
 }

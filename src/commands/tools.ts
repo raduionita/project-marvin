@@ -168,7 +168,7 @@ export default class ToolsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
       if (result.error || !result.content) {
         this.logger.error('[ToolCommand.execAdd]', 'no result from the LLM');
         return;
@@ -246,7 +246,7 @@ export default class ToolsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.sendChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
       if (result.error || !result.content) {
         this.logger.error('[ToolCommand.execEdit]', 'no result from the LLM');
         return;

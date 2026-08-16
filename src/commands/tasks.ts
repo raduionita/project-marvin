@@ -106,6 +106,20 @@ export default class TasksCommand extends Command {
       return;
     }
 
+    // ask which configured integrations to link (their actions become tools)
+    const integrationIds = Object.keys(this.engine.config.integrations || {});
+    const integrations: string[] = [];
+    if (integrationIds.length) {
+      const raw = await ask(`Enter integrations to link (comma separated, e.g. ${integrationIds.join(',')}), press enter for none: `);
+      for (const id of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+        if (!integrationIds.includes(id)) {
+          this.logger.warn('[TasksCommand.execAdd]', `unknown integration "${id}", skipping`);
+          continue;
+        }
+        if (!integrations.includes(id)) integrations.push(id);
+      }
+    }
+
     this.logger.log('');
 
     // persist the task prompt to agents/<agentId>/tasks/<taskId>/TASK.md
@@ -130,6 +144,7 @@ export default class TasksCommand extends Command {
       maxSteps,
       format,
       schema: constants.DEFAULT_SCHEMA,
+      ...(integrations.length ? { integrations } : {}),
     };
 
     // persist to marvin.json

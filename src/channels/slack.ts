@@ -294,7 +294,7 @@ export default class SlackChannel extends Channel {
       this.logger.info('[SlackChannel.onMention]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await this.engine.sendChat(chatId, agentId, text);
+      const result = await this.engine.execChat(chatId, agentId, text);
       if (result.error) {
         this.logger.error('[SlackChannel.onMention]', `AI loop failed for agent ${agentId}:`, result.error);
         await this.replyTo(event, thread, `(AI loop error: ${result.error})`);
@@ -337,7 +337,7 @@ export default class SlackChannel extends Channel {
       this.logger.debug('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await this.engine.sendChat(chatId, agentId, text);
+      const result = await this.engine.execChat(chatId, agentId, text);
       if (result.error) {
         this.logger.error('[SlackChannel.onDirectMessage]', `AI loop failed for agent ${agentId}:`, result.error);
         await this.replyTo(event, thread, `(AI loop error: ${result.error})`);

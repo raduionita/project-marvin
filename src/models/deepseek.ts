@@ -5,7 +5,7 @@ export default class DeepseekModel extends Model {
   provider: Provider = 'deepseek';
   public baseUrl: string = 'https://api.deepseek.com';
 
-  async sendChat(chat: Chat) : Promise<Reply> {
+  async execChat(chat: Chat) : Promise<Reply> {
     const body: { [key: string]: any } = {};
 
     body.model = this.model;

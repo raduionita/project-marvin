@@ -48,14 +48,14 @@ test('listTools excludes test files', () => {
 test('listTools includes known tools', () => {
   const engine = mockEngine();
   const tools = listTools(engine);
-  expect(tools).toContain('get_date.ts');
-  expect(tools).toContain('web_search.ts');
-  expect(tools).toContain('web_browse.ts');
-  expect(tools).toContain('read_file.ts');
-  expect(tools).toContain('edit_file.ts');
-  expect(tools).toContain('marvin_state.ts');
-  expect(tools).toContain('marvin_config.ts');
-  expect(tools).toContain('call_integration.ts');
+  expect(tools).toContain('get_date');
+  expect(tools).toContain('web_search');
+  expect(tools).toContain('web_browse');
+  expect(tools).toContain('read_file');
+  expect(tools).toContain('edit_file');
+  expect(tools).toContain('marvin_state');
+  expect(tools).toContain('marvin_config');
+  expect(tools).toContain('call_integration');
 });
 
 test('listCustomTools returns [] when the workspace tools folder is missing', () => {
@@ -73,5 +73,5 @@ test('listCustomTools returns workspace tool files when present', () => {
   writeFileSync(join(engine.work, 'tools', 'my_tool.test.ts'), 'export {};');
 
   const tools = listCustomTools(engine);
-  expect(tools).toEqual(['my_tool.ts']);
+  expect(tools).toEqual(['my_tool']);
 });

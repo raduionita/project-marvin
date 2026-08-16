@@ -2,7 +2,7 @@
 
 Status legend: `[x]` done · `[~]` partial · `[ ]` open
 
-## Phase 0 — TODOs
+## Phase 0 — TODOsgo r
 - [ ] **Retry LLM loop on failure** — retry the entire loop on failure: if chat loops fails, retry the whole thing.
 
 ## Phase 1 — Quick fixes & low-risk hardening (easiest)
@@ -47,3 +47,35 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` open
 ## Phase 7 — Maybe later (deferred, not planned)
 
 - [ ] **Structured deliverables** — previously described in AGENTS.md but never implemented; moved here when docs drift was fixed. If built, it would need: typed task schemas (`validateSchema`/`schemaToJsonSchema` in `helpers.ts`), a deliverable flow in `sendChat` (`outputTool`/`integration`/`action`, schema validation with self-correction bounded by `MAX_OUTPUT_RETRIES`, auto-run integration after capture), and `execDeliverable` in `engine.ts`.
+
+## Phase 8 — Code audit: engine, slack, deepseek (from source review)
+
+### A. Bugs to resolve (blocking / correctness)
+- [ ] **Discarded `task.input` file read** — `engine.ts:494` `readFileSync(input, 'utf8').trim()` result is never assigned; a task whose `input` is a file path sends the *path* to the LLM, not the file content. Should be `input = readFileSync(...)`.
+- [ ] **Custom tools never load** — `tools/index.ts:31` `listCustomTools` returns names **without** `.ts`, but `engine.ts:235` imports `join(cdir, file)` (no extension) and `engine.ts:231` `file.replace('.ts','')` is a no-op. `~/.marvin/tools/*.ts` are silently skipped. Import `join(cdir, \`${name}.ts\`)`.
+- [ ] **Failed task kills itself permanently** — `engine.ts:773-776`: `execTask` returns on `result.error` without re-scheduling `task.timeout`; after one AI/model error the task never runs again. Must reschedule (with backoff) on error.
+- [ ] **Max-steps warning never fires** — `engine.ts:1047` loop exits when `steps == maxSteps - 1`, so `if (steps >= maxSteps)` (`:1050`) is unreachable. Off-by-one in the loop or the check.
+- [ ] **Orphaned `tool_calls` in history** — `engine.ts:1014` appends the assistant message *before* executing tools; when `reply.stop` (`:1020`) breaks the turn, tool results are never appended. OpenAI-compatible APIs reject a follow-up request with unmatched `tool_call_id`s. Execute tools / flush results before the `stop` break, or keep pairs intact.
+- [ ] **`dropChannel` not awaited** — `engine.ts:596` `this.channels[id].drop()` is async and called without `await` (also lacks the try/catch of `dropChannels`).
+- [ ] **DeepSeek forces `name: 'Human'` on every role** — `deepseek.ts:15` adds `name: 'Human'` to system/assistant/tool messages too; tool messages with `name` are rejected by OpenAI-compatible endpoints. Apply `name` only to `role: 'user'` (DeepSeek requires it there).
+- [ ] **Double `ack()` on Slack DMs** — `slack.ts:356-363` `onSocketMessage` acks, then delegates to `onDirectMessage` which acks again. Single-ack in the router.
+- [ ] **`checkPrereqs` leaks a socket-mode session** — `slack.ts:160` calls `apps.connections.open` to validate the app token, which opens a real WSS session that is never closed (and may consume the single socket-mode connection the app gets).
+
+### B. Gaps in the flow (behavioral)
+- [ ] **No conversation continuity in Slack (top-level messages / DMs)** — `slack.ts:292` and `:335` build `chatId = slack-${channel}-${thread}` with `thread = event.thread_ts || event.ts`; without a thread this is the message ts, so every mention/DM starts a brand-new chat (zero memory). Use a stable per-channel id when there is no `thread_ts` (e.g. `slack-${channel}-main`).
+- [ ] **Tasks are stateless** — `engine.ts:761-762` `chatId = undefined` (TODO; also `Task.persistent` TODO at `types.ts:187`): tasks never cache/persist chats, losing cross-run context despite `makeChat`/`saveChat` supporting it. Decide + implement persistent task chats.
+- [ ] **No per-chat concurrency lock** — two rapid Slack messages run concurrent `sendChat` calls on the same cached `chat` (engine.ts:983) and interleave `chat.messages`. Add a per-chat mutex/queue in `sendChat`.
+- [ ] **`trimChat` breaks tool_calls ↔ tool-result pairing** — `engine.ts:961-973` trims by message count and can drop a `tool` result while keeping its `assistant` tool_calls message (or vice versa) → next request invalid. Trim must drop whole call/result groups.
+- [ ] **Interactive chats cannot use per-action integration tools** — only tasks merge integration tools (`engine.ts:768`); `newChat` TODO `loadIntegrationTools` (`:932`) and `chat.tools` (`:940`) expose default tools only. Meanwhile the system prompt leaks *all* integrations into *every* chat (`:887-912`), even unlinked ones. Scope the integrations block per agent/task and expose linked actions as tools.
+- [ ] **Task overlap / missed tick** — `execTask` runs asynchronously from `setTimeout`; when execution exceeds `task.schedule` the next tick overlaps (or the error path above kills it). Add a `task.running` flag to skip an in-flight tick.
+- [ ] **Slack channel routing depends on id-vs-name mismatch** — `findAgent` (`slack.ts:489`) compares `agent.channels['slack'] === event.channel` (an id) against the config value; if `agents` stored a channel *name* (from `listGroups`), every message falls through to the orchestrator. Normalize to ids at config-write time or resolve names via `conversations.list`.
+- [ ] **No idempotency on Slack events** — acked-but-timed-out socket events are re-delivered and processed twice (duplicate AI runs/replies).
+- [ ] **`scanProject` failures don't abort `load()`** — `engine.ts:56-66` continues loading even when `~/.marvin` is missing (fail-fast instead).
+
+### C. Missing mandatory features (production-readiness)
+- [ ] **Fetch timeout + retry in all providers** — `deepseek.ts:51` fetch has no `AbortSignal.timeout` (a hung request blocks the whole task loop forever); `helpers.ts:22` `withRetry` exists but is unused. Add timeout and retry/backoff on 429/5xx/network for deepseek/openai/anthropic/lmstudio.
+- [ ] **DeepSeek param gating per model** — `deepseek.ts:28` always sends `thinking` and `:40` `response_format: json_object`; verify compatibility with `deepseek-chat` vs `deepseek-reasoner` (some combos 400). Handle `reasoning_content` (TODO `:93`).
+- [ ] **Usage/cost surfaced to callers** — `Chat.usage` (`types.ts:261`) exists but `sendChat` never accumulates `Reply.usage`; nothing reports tokens/cost to the user or the logger. Aggregate into the returned result.
+- [ ] **`loadSystems`/`loadTools` use literal `.replace('.ts','')`** — `engine.ts:179` and `:231`; align with the `/\.ts$/` regex used in the fixed indexes (consistency + name-collision safety).
+- [ ] **Slack `runCommand` imports with `.ts`** — `slack.ts:407` `import(\`../commands/${name}.ts\`)` breaks in a compiled binary; use `.js` like the rest of the codebase.
+- [ ] **Unify `onMention`/`onDirectMessage`** — `slack.ts:268-352` are near-identical (extract → findAgent → sendChat → replyTo); one shared handler would avoid future drift.

@@ -57,7 +57,7 @@ export default class AgentsCommand extends Command {
         this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'agent:', agentId);
       } else {
         // send message to the LLM
-        const result = await this.engine.sendChat(chatId, agentId, answer);
+        const result = await this.engine.execChat(chatId, agentId, answer);
         if (result.error) {
           throw new Error(result.error);
         }

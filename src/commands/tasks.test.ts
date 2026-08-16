@@ -102,3 +102,28 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
     schema: constants.DEFAULT_SCHEMA,
   });
 });
+
+test('tasks add links configured integrations, skipping unknown ones', async () => {
+  const engine = new Engine(new Logger());
+  engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
+  engine.config = mockConfig({
+    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} },
+  });
+  engine.config.integrations = {
+    'gloobeam': { enabled: true, type: 'wordpress' },
+    'other-site': { enabled: true, type: 'wordpress' },
+  } as Config['integrations'];
+
+  const cmd = new TasksCommand(engine, new Logger(), []);
+  answers = ['', 'post-task', 'write a post', '60', '5', 'json', 'gloobeam, nope'];
+  await cmd.execAdd();
+
+  expect(engine.config.agents['my-agent']!.tasks!['post-task']).toEqual({
+    enabled: true,
+    schedule: 60,
+    maxSteps: 5,
+    format: 'json',
+    schema: constants.DEFAULT_SCHEMA,
+    integrations: ['gloobeam'],
+  });
+});

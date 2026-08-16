@@ -8,7 +8,7 @@ class FakeModel extends Model {
   constructor(engine: Engine, config: { [key: string]: any }) {
     super(engine, new Logger(), config);
   }
-  async sendChat(_chat: Chat): Promise<Reply> {
+  async execChat(_chat: Chat): Promise<Reply> {
     return { id: 'fake', stop: true, message: { role: 'assistant', content: 'hi' }, usage: { prompt: 0, completion: 0 } };
   }
 }

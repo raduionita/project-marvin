@@ -9,17 +9,18 @@ const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
 let skills: string[] = [];
 
-// default skill files shipped with marvin (src/skills/*.md)
+// default skill files shipped with marvin (src/skills/*.md), returned as
+// full file names (parseSkill expects the path, .md included)
 export function listSkills(engine: Engine): string[] {
   if (skills.length) return skills;
-  return skills = readdirSync(tdir).filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''));
+  return skills = readdirSync(tdir).filter(f => f.endsWith('.md'));
 }
 
 // custom skill files in the user workspace (~/.marvin/skills/*.md)
 export function listCustomSkills(engine: Engine): string[] {
   const cdir = join(engine.work, 'skills');
   if (!existsSync(cdir)) return [];
-  return readdirSync(cdir).filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''));
+  return readdirSync(cdir).filter(f => f.endsWith('.md'));
 }
 
 // parse the .md header into skill meta data: id = file name (lowercased),
