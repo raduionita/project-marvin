@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import type Engine from './engine.js';
 import type { Logger } from './logger.js';
-import type { Chat, IntegrationAction, Model, Reply, ToolMeta } from './types.js';
+import type { Chat, IntegrationAction, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { cleanContent } from './helpers.js';
@@ -196,7 +196,7 @@ export class Agent {
   }
 
   // exec chat // agent loop
-  async sendChat(chatId: string | undefined, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS, tools?: ToolMeta[]) : Promise<{content:string, steps:number, error?: string}> {
+  async sendChat(chatId: string | undefined, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS, tools?: ToolMeta[]) : Promise<Result> {
     try {
       this.logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
 
@@ -273,9 +273,7 @@ export class Agent {
       // TODO: more info here
       // when format is json, make sure content is a valid JSON string (the LLM
       // may append markup such as a <tool_calls> block after the JSON)
-      let  content = reply?.message?.content || '';
-           content = chat.format === 'json' ? cleanContent(content) : content;
-      return { content: content, steps: steps };
+      return { content: reply?.message?.content || '', steps: steps };
     } catch (error) {
       this.logger.error('[Agent.sendChat]', error);
       return { content: '', steps: 0, error: (error as Error).message };

@@ -213,6 +213,7 @@ export abstract class Model {
 // task keeps track of the setTimeout id, schedule
 export type TaskType = 'task' | 'monitor' | 'sweep';
 
+// single unit of work for the agent ai loop
 export interface Task {
   // same as id in tasks[id]
   id: string;
@@ -238,6 +239,7 @@ export interface Task {
   integrations?: string[];
 }
 
+// chat = message history + format + tools
 export interface Chat {
   // used for cache retrieval, restore chat state and continue
   id: string;
@@ -260,6 +262,7 @@ export interface Chat {
   }
 }
 
+// multi-purpose (models, channels) message
 export interface Message {
   role: Role;
   content: string;
@@ -279,6 +282,7 @@ export interface Message {
   }[];
 }
 
+// LLM Model sendChat reply
 export interface Reply {
   // chat completion id
   id: string;
@@ -293,5 +297,11 @@ export interface Reply {
     completion: number;
     prompt: number;
   };
-  // TODO: research if choices?! would be useful
+}
+
+// sendChat result
+export interface Result {
+  content: string;
+  steps: number;
+  error?: string;
 }

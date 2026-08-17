@@ -232,7 +232,7 @@ export default class SlackChannel extends Channel {
 
     // check if response is ok
     if (!response.ok) {
-      const hint = this.slackErrorHint(response.error);
+      const hint = this.errorToHint(response.error);
       this.logger.error('[SlackChannel.sendMessage]', 'response NOT ok:', response.error, hint);
       return { ts: '', ok: false, error: response.error, message: hint || '(slack response not ok)' };
     }
@@ -497,7 +497,7 @@ export default class SlackChannel extends Channel {
   }
 
   // translate common Slack API errors into actionable hints
-  protected slackErrorHint(error: string | undefined): string {
+  protected errorToHint(error: string | undefined): string {
     switch (error) {
       case 'not_authorized':
       case 'missing_scope':

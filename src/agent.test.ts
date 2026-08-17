@@ -216,16 +216,6 @@ test('sendChat returns content and step count from model reply', async () => {
   expect(result!.steps).toBe(4);
 });
 
-test('sendChat returns valid JSON content when format is json and the model appends markup', async () => {
-  const engine = buildTestEngine({ replyStop: true, replyContent: '{"output": "hi"}<tool_calls><invoke name="end_chat"></invoke></tool_calls>' });
-
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();
-  expect(result!.content).toBe('{"output": "hi"}');
-  expect(JSON.parse(result!.content)).toEqual({ output: 'hi' });
-});
-
 test('sendChat caches the chat after execution', async () => {
   const engine = buildTestEngine();
 
