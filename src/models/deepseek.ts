@@ -1,5 +1,5 @@
-import { extractLeadingJson, tryJsonParse } from '../helpers.js';
-import { Chat, Model, Provider, Reply, Message } from '../types.js';
+import { extractLeadingJsonObject, tryJsonParse } from '../helpers.js';
+import { Chat, Model, Provider, Reply } from '../types.js';
 
 export interface Choice {
   // [stop, length, content_filter, tool_calls, insufficient_system_resources]
@@ -33,24 +33,11 @@ export default class DeepseekModel extends Model {
   public baseUrl: string = 'https://api.deepseek.com';
 
   prepChoice(choice: Choice, format = 'text'): Choice {
-    // DSML tool_calls (possible regex: \<\/?.?DSML.+\>)
-    // <｜DSML｜tool_calls>
-    // <｜DSML｜invoke name="read">
-    // <｜DSML｜parameter name="filePath" string="true">/Users/Radu/Workspace/Projects/Marvin/src/engine.test.ts</｜DSML｜parameter>
-    // </｜DSML｜invoke>
-    // <｜DSML｜invoke name="read">
-    // <｜DSML｜parameter name="filePath" string="true">/Users/Radu/Workspace/Projects/Marvin/src/commands/serve.test.ts</｜DSML｜parameter>
-    // <｜DSML｜parameter name="offset" string="false">600</｜DSML｜parameter>
-    // <｜DSML｜parameter name="limit" string="false">430</｜DSML｜parameter>
-    // </｜DSML｜invoke>
-    // </｜DSML｜tool_calls>
-
-    // inside choice.message.content there might be stray DSML tags: parse them
-    // into choice.message.tool_calls (unless an identical call already exists),
-    // then strip the tags from the content
-    const dsmlBlock = /<tool_calls>([\s\S]*?)<\/tool_calls>/g;
+    // DSML tool_calls: <｜DSML｜tool_calls>...</｜DSML｜tool_calls>
+    const dsml = /<tool_calls>([\s\S]*?)<\/tool_calls>/g;
     let block: RegExpExecArray | null;
-    while ((block = dsmlBlock.exec(choice.message.content)) !== null) {
+    // inside choice.message.content there might be stray DSML tags: parse them
+    while ((block = dsml.exec(choice.message.content)) !== null) {
       const invokes = block[1]!.match(/<invoke name="([^"]+)"[^>]*>([\s\S]*?)<\/invoke>/g) || [];
       for (const invoke of invokes) {
         const name = invoke.match(/<invoke name="([^"]+)"[^>]*>/)?.[1];
@@ -63,16 +50,16 @@ export default class DeepseekModel extends Model {
           params[param[1]!] = param[2]!.trim();
         }
 
-        const argumentsStr = JSON.stringify(params);
+        const args = JSON.stringify(params);
         const exists = choice.message.tool_calls?.some(
-          (t) => t.function.name === name && t.function.arguments === argumentsStr
+          (t) => t.function.name === name && t.function.arguments === args
         );
         if (!exists) {
           choice.message.tool_calls = choice.message.tool_calls || [];
           choice.message.tool_calls.push({
             id: `call_${choice.message.tool_calls.length}`,
             type: 'function',
-            function: { name, arguments: argumentsStr },
+            function: { name, arguments: args },
           });
         }
       }
@@ -83,7 +70,7 @@ export default class DeepseekModel extends Model {
       case 'json':
         // extract JSON from the LLM response: there might be junk at the
         // beginning/end; keep only the first JSON value (e.g. '{"output": "hi"}')
-        choice.message.content = extractLeadingJson(choice.message.content) ?? choice.message.content;
+        choice.message.content = extractLeadingJsonObject(choice.message.content) ?? choice.message.content;
       // fall through: json output is trimmed too
       case 'text':
         // nothing else todo, just trim and continue

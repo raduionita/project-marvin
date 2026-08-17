@@ -30,7 +30,7 @@ export class OpenaiModel extends Model {
 
     // the engine snapshots the tools for this chat (agent tools + any
     // per-task deliverable tool); falls back to the model's own snapshot
-    const tools = chat.tools || this.tools;
+    const tools = chat.tools;
     if (tools?.length) {
       body.tools = tools;
       body.tool_choice = 'auto';

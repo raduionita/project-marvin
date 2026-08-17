@@ -81,30 +81,11 @@ export function cleanContent(content: string): string {
     // not valid JSON as-is: try to isolate the leading JSON value
   }
 
-  return extractLeadingJson(content) ?? content;
+  return extractLeadingJsonObject(content) ?? content;
 }
 
-// Pull the first JSON value (object or string) out of content that mixes JSON
-// with trailing markup (e.g. an LLM appending a <tool_calls> block). Returns
-// null when no JSON value can be isolated. Only objects and strings are
-// supported: the "output" schema always wraps the answer in an object.
-export function extractLeadingJson(content: string): string | null {
-  // leading quoted string ("answer text") -> find its closing quote
-  if (content.startsWith('"')) {
-    let escaped = false;
-    for (let i = 1; i < content.length; i++) {
-      const ch = content[i]!;
-      if (escaped) {
-        escaped = false;
-      } else if (ch === '\\') {
-        escaped = true;
-      } else if (ch === '"') {
-        return content.slice(0, i + 1);
-      }
-    }
-    return null;
-  }
-
+// Pull the first JSON object out of content that mixes JSON with trailing junk
+export function extractLeadingJsonObject(content: string): string | null {
   // leading object ({...}) -> match braces, ignoring braces inside strings
   const start = content.indexOf('{');
   if (start === -1) return null;

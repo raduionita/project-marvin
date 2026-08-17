@@ -3,8 +3,7 @@ import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import DeepseekModel, { Choice } from './deepseek.js';
 
-class DeepseekMock extends DeepseekModel {
-}
+class DeepseekMock extends DeepseekModel {}
 
 function mockdModel(): DeepseekModel {
   const engine = new Engine(new Logger());

@@ -6,6 +6,7 @@ import { join } from 'path';
 import { Config } from '../types.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
+import { captureLogger } from '../tests/helpers.js';
 
 // scripted answers consumed by the mocked terminal prompt. selects interpret
 // the answer as a 1-based option index (the numbered fallback behavior).
@@ -44,14 +45,6 @@ function buildEngine(...integrations: [string, { [key: string]: any }][]): Engin
 
 function readConfig(engine: Engine): { [key: string]: any } {
   return JSON.parse(readFileSync(join(engine.work, 'marvin.json'), 'utf8'));
-}
-
-// a logger that captures every emitted line (info-level and up), so tests can
-// assert on command output without patching console.*
-function captureLogger(): { logger: Logger; lines: string[] } {
-  const lines: string[] = [];
-  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
-  return { logger, lines };
 }
 
 test('execList lists configured integrations', async () => {

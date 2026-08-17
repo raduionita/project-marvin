@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { Logger, logger, resolveLogLevel, shouldLog, LEVEL_PREFIXES, setLoggerMode, LogMethod, LogOutput } from './logger.js';
+import { Logger, logger, resolveLogLevel, shouldLog, LEVEL_PREFIXES, setLoggerMode, setDefaultOutput, LogMethod, LogOutput } from './logger.js';
 
 test('resolveLogLevel reads MARVIN_LOG_LEVEL and falls back to default', () => {
   const prev = process.env.MARVIN_LOG_LEVEL;
@@ -161,16 +161,14 @@ test('setLoggerMode flips every Logger instance (daemon mode)', () => {
   }
 });
 
-test('Logger writes to the console when no output override is set', () => {
-  const lg = new Logger({ level: 'info' });
-
-  const orig = console.info;
+test('Logger uses the shared default output when no override is set', () => {
   const captured: unknown[][] = [];
-  console.info = (...args: unknown[]) => { captured.push(args); };
+  const prev = setDefaultOutput((_level, args) => { captured.push(args); });
   try {
+    const lg = new Logger({ level: 'info' });
     lg.info('hello', 42);
   } finally {
-    console.info = orig;
+    setDefaultOutput(prev);
   }
 
   expect(captured.length).toBe(1);

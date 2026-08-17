@@ -6,6 +6,7 @@ import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { Skill, Config } from '../types.js';
 import { Agent } from '../agent.js';
+import { captureLogger } from '../tests/helpers.js';
 
 // scripted answers consumed by the mocked terminal prompt
 let answers: string[] = [];
@@ -59,14 +60,6 @@ function mockEngine(isDry = false): Engine {
   agent.sendChat = async () => ({ content: '', steps: 0 });
   engine.agents['marvin'] = agent;
   return engine;
-}
-
-// a logger that captures every emitted line (info-level and up), so tests can
-// assert on command output without patching console.*
-function captureLogger(): { logger: Logger; lines: string[] } {
-  const lines: string[] = [];
-  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
-  return { logger, lines };
 }
 
 test('tools add writes a custom tool to ~/.marvin/tools', async () => {

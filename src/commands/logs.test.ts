@@ -5,6 +5,7 @@ import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import LogsCommand from './logs.js';
+import { captureLogger } from '../tests/helpers.js';
 
 function buildLogFile(lines: string[]): { engine: Engine; path: string } {
   const engine = new Engine(new Logger());
@@ -14,14 +15,6 @@ function buildLogFile(lines: string[]): { engine: Engine; path: string } {
   const path = join(dir, 'marvin.log');
   writeFileSync(path, lines.join('\n') + '\n');
   return { engine, path };
-}
-
-// a logger that captures every emitted line (info-level and up), so tests can
-// assert on command output without patching console.*
-function captureLogger(): { logger: Logger; lines: string[] } {
-  const lines: string[] = [];
-  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
-  return { logger, lines };
 }
 
 test('logs prints the default last 20 lines', async () => {

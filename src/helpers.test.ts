@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { extractOutput, cleanContent, withRetry, markdownToMrkdwn } from './helpers.js';
+import { extractOutput, cleanContent, extractLeadingJsonObject, withRetry, markdownToMrkdwn } from './helpers.js';
 
 test('extractOutput pulls the output field from JSON', () => {
   expect(extractOutput('{"output": "hello world"}')).toBe('hello world');
@@ -43,6 +43,40 @@ test('cleanContent handles braces inside the JSON string value', () => {
 
 test('cleanContent returns plain text unchanged when no JSON value is present', () => {
   expect(cleanContent('plain text <tool_calls>...</tool_calls>')).toBe('plain text <tool_calls>...</tool_calls>');
+});
+
+test('extractLeadingJsonObject extracts the leading object, dropping trailing markup', () => {
+  const content = '{"output": "hello world"}<tool_calls>\n<invoke name="end_chat">\n</invoke>\n</tool_calls>';
+  expect(extractLeadingJsonObject(content)).toBe('{"output": "hello world"}');
+});
+
+test('extractLeadingJsonObject extracts the object from content prefixed with junk', () => {
+  expect(extractLeadingJsonObject('Sure! Here it is: {"output": "hi"}')).toBe('{"output": "hi"}');
+});
+
+test('extractLeadingJsonObject extracts the object from content with multiple json blocks', () => {
+  expect(extractLeadingJsonObject('Sure! Here it is: {"output": "first"} junk {"output": "second"} more junk')).toBe('{"output": "first"}');
+});
+
+test('extractLeadingJsonObject handles braces inside the JSON string value', () => {
+  const content = '{"output": "use {this} and }that}"}<tool_calls>...</tool_calls>';
+  expect(extractLeadingJsonObject(content)).toBe('{"output": "use {this} and }that}"}');
+});
+
+test('extractLeadingJsonObject handles nested objects', () => {
+  const content = '{"a": {"b": {"c": 1}}} trailing';
+  expect(extractLeadingJsonObject(content)).toBe('{"a": {"b": {"c": 1}}}');
+});
+
+test('extractLeadingJsonObject rejects a leading JSON string', () => {
+  expect(extractLeadingJsonObject('"quoted value"')).toBeNull();
+  expect(extractLeadingJsonObject('"quoted" trailing')).toBeNull();
+});
+
+test('extractLeadingJsonObject returns null when no object is present', () => {
+  expect(extractLeadingJsonObject('plain text')).toBeNull();
+  expect(extractLeadingJsonObject('')).toBeNull();
+  expect(extractLeadingJsonObject('123')).toBeNull();
 });
 
 test('withRetry retries until success', async () => {

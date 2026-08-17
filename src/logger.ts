@@ -42,6 +42,21 @@ export function setLoggerMode(mode: { prefix?: boolean; stripTags?: boolean }): 
   }
 }
 
+// the sink every Logger writes to when no `output` override is passed: the
+// real console by default; tests and daemon consumers can swap it in one call
+let defaultOutput: LogOutput = (level, args) => {
+  console[level](...args);
+};
+
+// swap the default sink for every Logger (existing and future instances),
+// like setLoggerMode does for prefix/stripTags. returns the previous sink so
+// callers can save and restore it.
+export function setDefaultOutput(output: LogOutput): LogOutput {
+  const prev = defaultOutput;
+  defaultOutput = output;
+  return prev;
+}
+
 // would a message at `level` be emitted when the logger is at `current`?
 export function shouldLog(level: LogLevel, current: LogLevel): boolean {
   return LOG_LEVELS[level] >= LOG_LEVELS[current];
@@ -60,7 +75,8 @@ export function resolveLogLevel(): LogLevel {
 // prefixed with [LEVEL]); log is raw/unfiltered output (e.g. `marvin logs`).
 // an `output` override (e.g. Slack) can capture lines instead of printing.
 // prefix/stripTags fall back to the shared mode (setLoggerMode), so `marvin
-// serve` can switch every logger to daemon output in one call.
+// serve` can switch every logger to daemon output in one call; without an
+// `output` override the shared default sink (setDefaultOutput) is used.
 export class Logger {
   // undefined = resolve from MARVIN_LOG_LEVEL on every emit, so `--log-level`
   // (set at runtime in marvin.loadFlags) is honored without extra wiring
@@ -74,7 +90,7 @@ export class Logger {
     this.prefixEnabled = opts.prefix;
     this.stripTags = opts.stripTags;
     this.output = opts.output ?? ((level, args) => {
-      console[level](...args);
+      defaultOutput(level, args);
     });
   }
 

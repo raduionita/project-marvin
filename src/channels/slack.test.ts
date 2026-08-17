@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
+import { captureLogger } from '../tests/helpers.js';
 import { Config, Message, Model, Chat, Reply } from '../types.js';
 import { Agent } from '../agent.js';
 import SlackChannel from './slack.js';
@@ -247,14 +248,6 @@ function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine
 
   const channel = new MockSlackChannel(engine);
   return { engine, model, channel };
-}
-
-// a logger that captures every emitted line (info-level and up), so tests can
-// assert on command output without patching console.*
-function captureLogger(): { logger: Logger; lines: string[] } {
-  const lines: string[] = [];
-  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
-  return { logger, lines };
 }
 
 // build a channel wired to the mock Slack SDK clients with an injected logger
