@@ -88,7 +88,7 @@ export function cleanContent(content: string): string {
 // with trailing markup (e.g. an LLM appending a <tool_calls> block). Returns
 // null when no JSON value can be isolated. Only objects and strings are
 // supported: the "output" schema always wraps the answer in an object.
-function extractLeadingJson(content: string): string | null {
+export function extractLeadingJson(content: string): string | null {
   // leading quoted string ("answer text") -> find its closing quote
   if (content.startsWith('"')) {
     let escaped = false;

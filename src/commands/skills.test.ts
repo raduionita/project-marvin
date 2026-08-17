@@ -5,6 +5,7 @@ import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { Skill, Config } from '../types.js';
+import { Agent } from '../agent.js';
 
 // scripted answers consumed by the mocked terminal prompt
 let answers: string[] = [];
@@ -40,6 +41,11 @@ function mockEngine(isDry = false): Engine {
 
   // stub out heavy engine loading for the command test
   engine.load = async () => { engine.state = 'load'; };
+
+  // stub agent whose sendChat is scripted per-test
+  const agent = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
+  agent.sendChat = async () => ({ content: '', steps: 0 });
+  engine.agents['marvin'] = agent;
   return engine;
 }
 
@@ -57,7 +63,7 @@ test('skills add writes a custom skill file to ~/.marvin/skills', async () => {
   answers = [];
 
   // stub the LLM call to return generated skill content
-  engine.execChat = async () => ({ content: '# Release Notes\n\nTurn a changelog into release notes.', steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: '# Release Notes\n\nTurn a changelog into release notes.', steps: 1 });
 
   await cmd.execAdd();
 
@@ -73,7 +79,7 @@ test('skills add prompts for name and description when missing', async () => {
   const engine = mockEngine();
   const cmd = new SkillsCommand(engine, new Logger(), []);
   answers = ['my-skill', 'does something useful'];
-  engine.execChat = async () => ({ content: '# My Skill\n\nDoes something useful.', steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: '# My Skill\n\nDoes something useful.', steps: 1 });
 
   await cmd.execAdd();
 
@@ -99,7 +105,7 @@ test('skills add works in dry mode without calling the LLM', async () => {
   const cmd = new SkillsCommand(engine, new Logger(), ['add', 'dry-skill', 'desc']);
   answers = [];
   let called = false;
-  engine.execChat = async () => { called = true; return { content: "", steps: 0 }; };
+  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execAdd();
 
@@ -149,7 +155,7 @@ test('skills use runs the tools-create skill and saves the generated tool', asyn
   answers = ['fetch a URL and return the text'];
 
   // stub the LLM call to return generated tool source
-  engine.execChat = async () => ({ content: `import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class WebFetch extends Tool { /* ... */ }`, steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: `import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class WebFetch extends Tool { /* ... */ }`, steps: 1 });
 
   await cmd.execUse();
 
@@ -171,7 +177,7 @@ test('skills use prompts for the skill and info when missing', async () => {
   // answers: skill pick, tool name, tool purpose
   answers = ['tools-create', 'my_tool', 'does something'];
 
-  engine.execChat = async () => ({ content: 'export default class MyTool extends Tool { /* ... */ }', steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: 'export default class MyTool extends Tool { /* ... */ }', steps: 1 });
 
   await cmd.execUse();
 
@@ -210,7 +216,7 @@ test('skills use edits an existing tool with the tools-edit skill', async () => 
   const cmd = new SkillsCommand(engine, new Logger(), ['use', 'tools-edit', 'my_tool']);
   answers = ['make it return more data'];
 
-  engine.execChat = async () => ({ content: 'new code', steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: 'new code', steps: 1 });
 
   await cmd.execUse();
 
@@ -224,7 +230,7 @@ test('skills use works in dry mode without calling the LLM or writing the tool',
   const cmd = new SkillsCommand(engine, new Logger(), ['use', 'tools-create', 'dry_tool']);
   answers = ['does something'];
   let called = false;
-  engine.execChat = async () => { called = true; return { content: "", steps: 0 }; };
+  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execUse();
 

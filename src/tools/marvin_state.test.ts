@@ -1,7 +1,8 @@
 import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { Model, Config, Chat, Reply } from '../types.js';
+import { Model, Config, Chat, Reply, Task } from '../types.js';
+import { Agent } from '../agent.js';
 import MarvinStateTool from './marvin_state.js';
 
 class FakeModel extends Model {
@@ -25,16 +26,24 @@ function mockEngine(): Engine {
 
   engine.models['llm'] = new FakeModel(engine, { enabled: true, provider: 'deepseek', model: 'deepseek-chat' });
 
-  engine.agents['marvin'] = {
+  engine.agents['marvin'] = new Agent(engine, new Logger(), {
     id: 'marvin',
     enabled: true,
     identity: 'orchestrator',
     channels: { slack: 'C1' },
     model: engine.models['llm'] as Model,
-    tasks: {
-      status: { id: 'status', enabled: true, type: 'monitor', schedule: 3600000, timeout: null, maxSteps: 3, input: 'status' },
-    },
-  } as Engine['agents'][string];
+  });
+
+  engine.tasks['status'] = {
+    id: 'status',
+    enabled: true,
+    type: 'monitor',
+    agent: engine.agents['marvin'],
+    schedule: 3600000,
+    timeout: null,
+    maxSteps: 3,
+    input: 'status',
+  } as Task;
 
   return engine;
 }

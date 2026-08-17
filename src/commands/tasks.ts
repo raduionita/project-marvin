@@ -5,7 +5,7 @@ import { Command } from "../types";
 import * as constants from '../constants';
 import { ask } from '../terminal';
 
-// `marvin tasks [command] [--dry]` add/list tasks for an agent
+// `marvin tasks [command] [--dry]` add/list tasks
 export default class TasksCommand extends Command {
   async exec() {
     this.logger.debug('[TasksCommand.exec]');
@@ -18,7 +18,7 @@ export default class TasksCommand extends Command {
         this.logger.info('usage: marvin tasks [command] [--dry]');
         this.logger.info('commands:');
         this.logger.info('  help    ', 'show this help');
-        this.logger.info('  list    ', 'list tasks for each configured agent');
+        this.logger.info('  list    ', 'list tasks');
         this.logger.info('  add     ', 'add a task interactively');
       break;
       case 'list':
@@ -34,20 +34,13 @@ export default class TasksCommand extends Command {
   async execList() {
     this.logger.debug('[TasksCommand.execList]');
 
-    const agents = this.engine.config.agents;
-    if (Object.keys(agents).length === 0) {
-      this.logger.info('  no agents configured');
+    const tasks = this.engine.config.tasks || {};
+    if (Object.keys(tasks).length === 0) {
+      this.logger.info('  no tasks configured');
       return;
     }
-    for (const [agentId, agent] of Object.entries(agents)) {
-      this.logger.info(`  ${agentId}:`);
-      const tasks = agent.tasks || {};
-      if (Object.keys(tasks).length === 0) {
-        this.logger.info('    (no tasks)');
-      }
-      for (const [taskId, task] of Object.entries(tasks)) {
-        this.logger.info(`    - ${taskId} (enabled: ${task.enabled}, schedule: ${task.schedule}s)`);
-      }
+    for (const [taskId, task] of Object.entries(tasks)) {
+      this.logger.info(`  - ${taskId} (agent: ${task.agent || this.engine.config.settings.name}, enabled: ${task.enabled}, schedule: ${task.schedule}s)`);
     }
   }
 
@@ -55,16 +48,17 @@ export default class TasksCommand extends Command {
   async execAdd() {
     this.logger.debug('[TasksCommand.execAdd]', 'adding a task...');
 
-    // ask for agentId
+    // ask for agentId (defaults to the orchestrator, or the first configured agent)
     const agentIds = Object.keys(this.engine.config.agents);
     if (agentIds.length === 0) {
       this.logger.error('[TasksCommand.execAdd]', 'no agents configured, please run "marvin agents add" first');
       return;
     }
-    
-    const marvin = agentIds[0]!;
-    const agentId = (this.args[1] || await ask(`Enter agent name (press enter for "${marvin}"): `) || marvin);
-    if (!this.engine.config.agents[agentId!]) {
+
+    const marvin = this.engine.config.settings.name;
+    const defaultAgent = agentIds.includes(marvin) ? marvin : agentIds[0]!;
+    const agentId = (this.args[1] || await ask(`Enter agent name (press enter for "${defaultAgent}"): `) || defaultAgent);
+    if (!this.engine.config.agents[agentId!] && agentId !== marvin) {
       this.logger.error('[TasksCommand.execAdd]', `agent "${agentId}" not found`, 'available agents:', agentIds.join(', '));
       return;
     }
@@ -75,12 +69,12 @@ export default class TasksCommand extends Command {
       this.logger.error('[TasksCommand.execAdd]', 'invalid task name (use a-z, 0-9, _ and -):', taskId);
       return;
     }
-    if (this.engine.config.agents[agentId]?.tasks?.[taskId]) {
-      this.logger.warn('[TasksCommand.execAdd]', `task "${taskId}" already exists for agent "${agentId}"`);
+    if (this.engine.config.tasks?.[taskId]) {
+      this.logger.warn('[TasksCommand.execAdd]', `task "${taskId}" already exists`);
       return;
     }
 
-    // ask for the task prompt, saved to agents/<agentId>/tasks/<taskId>/TASK.md
+    // ask for the task prompt, saved to tasks/<taskId>/TASK.md
     const input = await ask('Enter task prompt (or press enter to skip): ');
 
     // ask for schedule (in seconds)
@@ -122,24 +116,24 @@ export default class TasksCommand extends Command {
 
     this.logger.log('');
 
-    // persist the task prompt to agents/<agentId>/tasks/<taskId>/TASK.md
-    const agent = this.engine.config.agents[agentId]!;
+    // persist the task prompt to tasks/<taskId>/TASK.md
     let pinn: string | null = null;
     if (input) {
-      const ppath = join(this.engine.work, 'agents', agentId, 'tasks', taskId, 'TASK.md');
+      const ppath = join(this.engine.work, 'tasks', taskId, 'TASK.md');
       if (this.engine.isDry) {
         this.logger.info('[TasksCommand.execAdd]', '[dry]', 'task prompt file:', ppath);
       } else {
-        mkdirSync(join(this.engine.work, 'agents', agentId, 'tasks', taskId), { recursive: true });
+        mkdirSync(join(this.engine.work, 'tasks', taskId), { recursive: true });
         writeFileSync(ppath, input + '\n');
       }
       pinn = ppath;
     }
 
     // register the task in config
-    agent.tasks = agent.tasks || {};
-    agent.tasks[taskId] = {
+    this.engine.config.tasks = this.engine.config.tasks || {};
+    this.engine.config.tasks[taskId] = {
       enabled: true,
+      agent: agentId,
       schedule,
       maxSteps,
       format,

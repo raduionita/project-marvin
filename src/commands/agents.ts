@@ -22,10 +22,14 @@ export default class AgentsCommand extends Command {
         this.logger.info('  chat    ', 'send a chat message to the specified agent');
       break;
       case 'add': // `marvin agents add [agentId]` // add an agent interactively
+        await this.engine.load();
         await this.execAdd();
+        await this.engine.drop();
       break;
       case 'chat': // `marvin agents chat [agentId]` // send message to agent
+        await this.engine.load();
         await this.execChat();
+        await this.engine.drop();
       break;
     }
   }
@@ -34,8 +38,6 @@ export default class AgentsCommand extends Command {
     this.logger.debug('[AgentsCommand.execChat]');
 
     try {
-      await this.engine.load();
-
       // default to orchestrator
       const agentId = this.args[0] || this.engine!.config.settings?.name;
       let   chatId = `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -57,95 +59,101 @@ export default class AgentsCommand extends Command {
         this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'agent:', agentId);
       } else {
         // send message to the LLM
-        const result = await this.engine.execChat(chatId, agentId, answer);
+        const agent = this.engine.agents[agentId];
+        if (!agent) {
+          throw new Error(`agent "${agentId}" not found`);
+        }
+        const result = await agent.sendChat(chatId, answer);
         if (result.error) {
           throw new Error(result.error);
         }
 
         // call send chat
         this.logger.log('LLM: ', result.content);
+
+        this.logger.debug('[AgentsCommand.execChat]', 'done');
       }
     } catch (error) {
       this.logger.error('[AgentsCommand.execChat]', 'error:', error);
-    } finally {
-      await this.engine.drop();
     }
-
-    this.logger.debug('[AgentsCommand.execChat]', 'done');
   }
 
   // `marvin agents add [agentId]` // add an agent interactively
   async execAdd() {
     this.logger.debug('[AgentsCommand.execAdd]', 'adding an agent...');
 
-    // ask for agentId
-    const agentId = this.args[1] || await ask('Enter agent name (e.g. my-agent): ');
-    if (!agentId || !/^[a-zA-Z0-9_-]+$/.test(agentId)) {
-      this.logger.error('[AgentsCommand.execAdd]', 'invalid agent name (use a-z, 0-9, _ and -):', agentId);
-      return;
-    }
-
-    // check if agent is already configured
-    if (this.engine.config.agents[agentId]) {
-      this.logger.warn('[AgentsCommand.execAdd]', `agent "${agentId}" is already configured`);
-      return;
-    }
-
-    // ask for model (known/configured models)
-    const modelIds = Object.keys(this.engine.config.models);
-    if (modelIds.length === 0) {
-      this.logger.error('[AgentsCommand.execAdd]', 'no models configured, please run "marvin models add" first');
-      return;
-    }
-    this.logger.info('[AgentsCommand.execAdd]', 'configured models:', modelIds.join(', '));
-    const defaultModel = modelIds[0]!;
-    const modelId = await ask(`Enter model id (press enter for "${defaultModel}"): `) || defaultModel;
-    if (!modelIds.includes(modelId)) {
-      this.logger.error('[AgentsCommand.execAdd]', `unknown model "${modelId}"`);
-      this.logger.error('[AgentsCommand.execAdd]', 'available models:', modelIds.join(', '));
-      return;
-    }
-
-    // ask for channels (known/configured channels)
-    const channelIds = Object.keys(this.engine.config.channels);
-    const channels: Record<string, string> = {};
-    const raw = channelIds.length
-      ? await ask(`Enter channels to bind (comma separated, e.g. ${channelIds.join(',')}), press enter for none: `)
-      : '';
-    for (const id of raw.split(',').map(s => s.trim()).filter(Boolean)) {
-      if (!channelIds.includes(id)) {
-        this.logger.warn('[AgentsCommand.execAdd]', `unknown channel "${id}", skipping`);
-        continue;
+    try {
+      // ask for agentId
+      const agentId = this.args[1] || await ask('Enter agent name (e.g. my-agent): ');
+      if (!agentId || !/^[a-zA-Z0-9_-]+$/.test(agentId)) {
+        this.logger.error('[AgentsCommand.execAdd]', 'invalid agent name (use a-z, 0-9, _ and -):', agentId);
+        return;
       }
-      const group = await ask(`Enter group id for "${id}" (e.g. general), press enter to skip: `);
-      channels[id] = group;
+  
+      // check if agent is already configured
+      if (this.engine.config.agents[agentId]) {
+        this.logger.warn('[AgentsCommand.execAdd]', `agent "${agentId}" is already configured`);
+        return;
+      }
+  
+      // ask for model (known/configured models)
+      const modelIds = Object.keys(this.engine.config.models);
+      if (modelIds.length === 0) {
+        this.logger.error('[AgentsCommand.execAdd]', 'no models configured, please run "marvin models add" first');
+        return;
+      }
+      this.logger.info('[AgentsCommand.execAdd]', 'configured models:', modelIds.join(', '));
+      const defaultModel = modelIds[0]!;
+      const modelId = await ask(`Enter model id (press enter for "${defaultModel}"): `) || defaultModel;
+      if (!modelIds.includes(modelId)) {
+        this.logger.error('[AgentsCommand.execAdd]', `unknown model "${modelId}"`);
+        this.logger.error('[AgentsCommand.execAdd]', 'available models:', modelIds.join(', '));
+        return;
+      }
+  
+      // ask for channels (known/configured channels)
+      const channelIds = Object.keys(this.engine.config.channels);
+      const channels: Record<string, string> = {};
+      const raw = channelIds.length
+        ? await ask(`Enter channels to bind (comma separated, e.g. ${channelIds.join(',')}), press enter for none: `)
+        : '';
+      for (const id of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+        if (!channelIds.includes(id)) {
+          this.logger.warn('[AgentsCommand.execAdd]', `unknown channel "${id}", skipping`);
+          continue;
+        }
+        const group = await ask(`Enter group id for "${id}" (e.g. general), press enter to skip: `);
+        channels[id] = group;
+      }
+  
+      // ask for identity, saved to agents/<agentId>/IDENTITY.md
+      const identity = await ask('Enter agent identity (or press enter for default): ') || constants.IDENTITY_MD;
+      this.logger.log('');
+  
+      // persist agent identity to ~/.marvin/agents/<agentId>/IDENTITY.md
+      const apath = join(this.engine.work, 'agents', agentId);
+      const ipath = join(apath, 'IDENTITY.md');
+      if (this.engine.isDry) {
+        this.logger.info('[AgentsCommand.execAdd]', '[dry]', 'identity file:', ipath);
+      } else {
+        mkdirSync(apath, { recursive: true });
+        writeFileSync(ipath, identity + '\n');
+      }
+  
+      // register the agent in config
+      this.engine.config.agents[agentId] = { enabled: true, model: modelId, channels };
+  
+      // persist to marvin.json
+      const cpath = join(this.engine.work, 'marvin.json');
+      if (this.engine.isDry) {
+        this.logger.info('[AgentsCommand.execAdd]', '[dry]', `would configure agent "${agentId}", config persisted to ${cpath}`);
+      } else {
+        writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+      }
+  
+      this.logger.info(`[AgentsCommand.execAdd]`, `agent "${agentId}" configured (model: ${modelId}, channels: ${Object.keys(channels).join(', ') || 'none'}), config persisted to ${cpath}`);
+    } catch (error) {
+      this.logger.error('[AgentsCommand.execAdd]', 'error:', error);
     }
-
-    // ask for identity, saved to agents/<agentId>/IDENTITY.md
-    const identity = await ask('Enter agent identity (or press enter for default): ') || constants.IDENTITY_MD;
-    this.logger.log('');
-
-    // persist agent identity to ~/.marvin/agents/<agentId>/IDENTITY.md
-    const apath = join(this.engine.work, 'agents', agentId);
-    const ipath = join(apath, 'IDENTITY.md');
-    if (this.engine.isDry) {
-      this.logger.info('[AgentsCommand.execAdd]', '[dry]', 'identity file:', ipath);
-    } else {
-      mkdirSync(apath, { recursive: true });
-      writeFileSync(ipath, identity + '\n');
-    }
-
-    // register the agent in config
-    this.engine.config.agents[agentId] = { enabled: true, model: modelId, channels, tasks: {} };
-
-    // persist to marvin.json
-    const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[AgentsCommand.execAdd]', '[dry]', `would configure agent "${agentId}", config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    }
-
-    this.logger.info(`[AgentsCommand.execAdd]`, `agent "${agentId}" configured (model: ${modelId}, channels: ${Object.keys(channels).join(', ') || 'none'}), config persisted to ${cpath}`);
   }
 }

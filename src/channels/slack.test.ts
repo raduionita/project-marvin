@@ -2,7 +2,8 @@ import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { Config, Message, Agent, Model, Chat, Reply } from '../types.js';
+import { Config, Message, Model, Chat, Reply } from '../types.js';
+import { Agent } from '../agent.js';
 import SlackChannel from './slack.js';
 import { type HandlerParams, type ISocketModeClient, type IWebClient } from './slack.js'
 import GetDateTool from '../tools/get_date.js';
@@ -229,21 +230,20 @@ function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine
 
   engine.config = mockConfig({
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xbot-test' } },
-    agents: { marvin: { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
+    agents: { marvin: { enabled: true, channels: { slack: 'C123' } } },
   });
 
   const model = new MockModel(engine, opts.replies || []);
   model.fail = !!opts.fail;
   engine.models['mock.model'] = model;
 
-  engine.agents['marvin'] = {
+  engine.agents['marvin'] = new Agent(engine, new Logger(), {
     id: 'marvin',
     enabled: true,
     identity: 'You are Marvin.',
     channels: { slack: 'C123' },
     model: model,
-    tasks: {},
-  } as Agent;
+  });
 
   const channel = new MockSlackChannel(engine);
   return { engine, model, channel };
@@ -329,8 +329,8 @@ test('extractText preserves links and formatting', () => {
 
 test('findAgent returns agent whose channels.slack matches the passed channel', () => {
   const engine = new Engine(new Logger());
-  engine.agents['agent-1'] = { id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, tasks: {}, model: {} as never } as Agent;
-  engine.agents['agent-2'] = { id: 'agent-2', enabled: true, identity: '', channels: { slack: 'C456' }, tasks: {}, model: {} as never } as Agent;
+  engine.agents['agent-1'] = new Agent(engine, new Logger(), { id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, model: {} as never });
+  engine.agents['agent-2'] = new Agent(engine, new Logger(), { id: 'agent-2', enabled: true, identity: '', channels: { slack: 'C456' }, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent('C123')!.id).toBe('agent-1');
@@ -339,7 +339,7 @@ test('findAgent returns agent whose channels.slack matches the passed channel', 
 test('findAgent returns default agent when no channel is passed', () => {
   const engine = new Engine(new Logger());
   engine.config = mockConfig();
-  engine.agents['marvin'] = { id: 'marvin', enabled: true, identity: '', channels: {}, tasks: {}, model: {} as never } as Agent;
+  engine.agents['marvin'] = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent()!.id).toBe('marvin');
@@ -348,8 +348,8 @@ test('findAgent returns default agent when no channel is passed', () => {
 test('findAgent skips disabled agents', () => {
   const engine = new Engine(new Logger());
   engine.config = mockConfig();
-  engine.agents['disabled-agent'] = { id: 'disabled-agent', enabled: false, identity: '', channels: { slack: 'C999' }, tasks: {}, model: {} as never } as Agent;
-  engine.agents['active-agent'] = { id: 'active-agent', enabled: true, identity: '', channels: { slack: 'C789' }, tasks: {}, model: {} as never } as Agent;
+  engine.agents['disabled-agent'] = new Agent(engine, new Logger(), { id: 'disabled-agent', enabled: false, identity: '', channels: { slack: 'C999' }, model: {} as never });
+  engine.agents['active-agent'] = new Agent(engine, new Logger(), { id: 'active-agent', enabled: true, identity: '', channels: { slack: 'C789' }, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent('C789')!.id).toBe('active-agent');
@@ -358,7 +358,7 @@ test('findAgent skips disabled agents', () => {
 test('findAgent falls back to the default agent when no channel matches', () => {
   const engine = new Engine(new Logger());
   engine.config = mockConfig();
-  engine.agents['marvin'] = { id: 'marvin', enabled: true, identity: '', channels: { slack: 'CDEFAULT' }, tasks: {}, model: {} as never } as Agent;
+  engine.agents['marvin'] = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: { slack: 'CDEFAULT' }, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent('CUNKNOWN')!.id).toBe('marvin');
@@ -600,7 +600,7 @@ test('E2E: app_mention runs tools then posts the final answer', async () => {
   expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('The date is 1/1/1970');
 
   // tool result was persisted to the thread's chat history
-  const chat = engine.loadChat('slack-C123-1700000000.001', engine.agents['marvin']!, 'json', {});
+  const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001', 'json', {});
   expect(chat).not.toBeNull();
   expect(chat!.messages.filter((m: Message) => m.role === 'tool').length).toBeGreaterThan(0);
 });

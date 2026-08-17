@@ -4,7 +4,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
-import { Config, Message, Agent, Chat, Reply, System, Model } from './types.js';
+import { Config, Message, Chat, Reply, System, Model } from './types.js';
+import { Agent } from './agent.js';
 import SlackChannel from './channels/slack.js';
 import { type ISocketModeClient, type IWebClient } from './channels/slack.js';
 import WebSearchTool from './tools/web_search.js';
@@ -179,7 +180,7 @@ function mockConfig(): Config {
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xbot-test' } },
     integrations: { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://wp.example.com' } },
     models: {},
-    agents: { marvin: { enabled: true, channels: { slack: 'C123' }, tasks: {} } },
+    agents: { marvin: { enabled: true, channels: { slack: 'C123' } } },
   };
 }
 
@@ -209,14 +210,13 @@ function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChan
   const model = new FlowModel(engine, new Logger(), {});
   engine.models['flow.model'] = model;
 
-  engine.agents['marvin'] = {
+  engine.agents['marvin'] = new Agent(engine, new Logger(), {
     id: 'marvin',
     enabled: true,
     identity: 'You are Marvin, a helpful assistant.',
     channels: { slack: 'C123' },
     model: model,
-    tasks: {},
-  } as Agent;
+  });
 
   // real tools
   engine.tools['web_search'] = new WebSearchTool(engine, new Logger());
@@ -284,7 +284,7 @@ test('full flow: the tool results are kept in the chat cache for context', async
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  const chat = engine.loadChat('slack-C123-1700000000.001', engine.agents['marvin']!, 'json', {});
+  const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001', 'json', {});
   expect(chat).not.toBeNull();
 
   const toolMessages = chat!.messages.filter(m => m.role === 'tool');

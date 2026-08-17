@@ -1,24 +1,22 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, unlinkSync } from "fs";
 
 import type { Logger } from './logger.js';
 import { listSystems } from "./systems";
-import { Command, Config, Channel, Tool, Model, Agent, System, ToolMeta, Task, Message, Reply, Chat, Integration, Skill, IntegrationAction } from "./types";
+import { Command, Config, Channel, Tool, Model, System, Task, Message, Integration, Skill, ToolMeta } from "./types";
+import { Agent } from './agent.js';
 import * as constants from './constants.js';
 import { listTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
-import { listIntegrations, loadIntegrationTools, splitIntegrationToolName } from "./integrations/index.js";
+import { listIntegrations, loadIntegrationTools } from "./integrations/index.js";
 import { listSkills, listCustomSkills, parseSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
-import { extractOutput, cleanContent } from "./helpers.js";
-import { readMemorySummary } from "./memory.js";
+import { extractOutput } from "./helpers.js";
 
 export default class Engine {
   public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
 
   public config: Config = constants.DEFAULT_CONFIG as Config;
-
-  private cache: Record<string, Chat> = {}; // chatId: chat
 
   // TODO: later consider moving browser, http, watch (file watcher) to a separate group "systems"
   public systems: Record<string, System> = {};
@@ -30,6 +28,7 @@ export default class Engine {
   public tools   : Record<string, Tool> = {};
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
+  public tasks   : Record<string, Task> = {};
 
   // workspace (~/.marvin) data folder
   public work: string = process.env.HOME + '/.marvin';
@@ -61,6 +60,7 @@ export default class Engine {
     await this.loadSkills();
     await this.loadModels();
     await this.loadAgents();
+    await this.loadTasks();
 
     this.state = 'load';
   }
@@ -76,14 +76,12 @@ export default class Engine {
     this.state = 'drop';
 
     await this.dropAgents();
+    await this.dropTasks();
     await this.dropModels();
     await this.dropChannels();
     await this.dropIntegrations();
     await this.dropSkills();
     await this.dropSystems();
-
-    // release all cached chats
-    this.cache = {};
 
     this.state = 'none';
   }
@@ -102,32 +100,30 @@ export default class Engine {
       return;
     }
 
-    // for each agent, for each task, start setTimeout
-    for (const [agentId, agent] of Object.entries(this.agents)) {
-      for (const [taskId, task] of Object.entries(agent.tasks)) {
-        if (this.isDry) {
-          this.logger.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${agentId})`);
-          continue;
-        }
-
-        // route each task to its handler by type
-        let run: (agentId: string, taskId: string) => void;
-        switch (task.type) {
-          case 'monitor':
-            run = this.execMonitor.bind(this);
-            break;
-          case 'sweep':
-            run = this.execSweep.bind(this);
-            break;
-          case 'task':
-          default:
-            run = this.execTask.bind(this);
-            break;
-        }
-
-        task.timeout = setTimeout(run, task.schedule, agentId, taskId);
-        this.logger.debug('[Engine.execAgents]', `task [${taskId}] (${task.type}) scheduled (${task.schedule}ms) (agent ${agentId})`);
+    // for each task, start setTimeout
+    for (const [taskId, task] of Object.entries(this.tasks)) {
+      if (this.isDry) {
+        this.logger.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${task.agent?.id})`);
+        continue;
       }
+
+      // route each task to its handler by type
+      let run: (taskId: string) => void;
+      switch (task.type) {
+        case 'monitor':
+          run = this.execMonitor.bind(this);
+          break;
+        case 'sweep':
+          run = this.execSweep.bind(this);
+          break;
+        case 'task':
+        default:
+          run = this.execTask.bind(this);
+          break;
+      }
+
+      task.timeout = setTimeout(run, task.schedule, taskId);
+      this.logger.debug('[Engine.execAgents]', `task [${taskId}] (${task.type}) scheduled (${task.schedule}ms) (agent ${task.agent?.id})`);
     }
 
     this.state = 'exec';
@@ -433,38 +429,13 @@ export default class Engine {
       }
 
       // add ochestrator agent
-      this.agents[marvinId] = {
+      this.agents[marvinId] = new Agent(this, this.logger, {
         id: marvinId,
         enabled: true,
         identity: identity,
         channels: {},
         model: model,
-        tasks: {},
-      } as Agent;
-
-      // add monitor task (state/health check) to the orchestrator agent
-      this.agents[marvinId].tasks['monitor'] = {
-        id: 'monitor',
-        enabled: true,
-        type: 'monitor',
-        schedule: 60*60*1000,
-        timeout: null,
-        maxSteps: 0,
-      } as Task;
-
-      this.logger.info('[Engine.loadAgents]', `task "monitor" created (agent ${marvinId})`);
-
-      // add sweep task (evict idle cached chats) to the orchestrator agent
-      this.agents[marvinId].tasks['sweep'] = {
-        id: 'sweep',
-        enabled: true,
-        type: 'sweep',
-        schedule: constants.CHAT_SWEEP_MS,
-        timeout: null,
-        maxSteps: 0,
-      } as Task;
-
-      this.logger.info('[Engine.loadAgents]', `task "sweep" created (agent ${marvinId})`);
+      });
 
       this.logger.info('[Engine.loadAgents]',`agent "${marvinId}" loaded`);
     }
@@ -479,50 +450,6 @@ export default class Engine {
         continue;
       }
 
-      const tasks: Record<string, Task> = {};
-      for (const [taskId, task] of Object.entries(agent.tasks || {})) {
-        let schedule = 1000 < task.schedule ? task.schedule : task.schedule * 1000;
-        let enabled = task.enabled;
-
-        // default input to task.input as string/prompt
-        let input = task.input;
-
-        // if ends with .md
-        if (input && !input.endsWith('.md')) {
-          // continue as is, input is a string
-        } else if (input && existsSync(input)) {
-          readFileSync(input, 'utf8').trim();
-        } else if (existsSync(join(this.work, 'agents', agentId, 'tasks', taskId, `TASK.md`))) {
-          input = readFileSync(join(this.work, 'agents', agentId, 'tasks', taskId, `TASK.md`), 'utf8').trim();
-        }
-
-        if (!input) {
-          this.logger.warn('[Engine.loadAgents]', `no input found for task "${taskId}", disabling`);
-          enabled = false;
-        }
-
-        if (this.isDry) {
-          this.logger.info('[Engine.loadAgents]', `[dry] task "${taskId}" created (agent ${agentId})`);
-          continue;
-        }
-
-        // add task to agent
-        tasks[taskId] = {
-          id: taskId,
-          enabled: enabled,
-          type: task.type || 'task',
-          schedule: schedule,
-          timeout: null,
-          maxSteps: task.maxSteps,
-          format: task.format || 'json',
-          schema: task.schema || constants.DEFAULT_SCHEMA,
-          input: input,
-          integrations: task.integrations,
-        } as Task;
-
-        this.logger.info('[Engine.loadAgents]', `task "${taskId}" created (agent ${agentId})`);
-      }
-
       // load agent system prompt (~/.marvin/agents/<agentId>/IDENTITY.md)
       let identity = constants.IDENTITY_MD;
       if (existsSync(join(this.work, 'agents', agentId, 'IDENTITY.md'))) {
@@ -531,32 +458,119 @@ export default class Engine {
         this.logger.warn('[Engine.loadAgents]', `no IDENTITY.md found for agent "${agentId}", using default`);
       }
 
-      this.agents[agentId] = {
+      this.agents[agentId] = new Agent(this, this.logger, {
         id: agentId,
         enabled: agent.enabled,
         identity: identity,
         channels: agent.channels,
         model: model,
-        tasks: tasks,
-      } as Agent;
+      });
 
       this.logger.info('[Engine.loadAgents]',`agent [${agentId}] loaded`);
     }
   }
 
+  // loads tasks: the internal monitor/sweep tasks run on the orchestrator
+  // agent, config tasks run on the agent referenced by task.agent
+  async loadTasks() {
+    this.logger.debug('[Engine.loadTasks]');
+
+    const marvinId = this.config.settings.name;
+    const marvin = this.agents[marvinId];
+
+    // internal tasks: monitor (state/health check) + sweep (evict idle chats)
+    if (marvin) {
+      this.tasks['monitor'] = {
+        id: 'monitor',
+        enabled: true,
+        type: 'monitor',
+        agent: marvin,
+        schedule: 60*60*1000,
+        timeout: null,
+        maxSteps: 0,
+        input: 'monitor',
+      } as Task;
+
+      this.tasks['sweep'] = {
+        id: 'sweep',
+        enabled: true,
+        type: 'sweep',
+        agent: marvin,
+        schedule: constants.CHAT_SWEEP_MS,
+        timeout: null,
+        maxSteps: 0,
+        input: 'sweep',
+      } as Task;
+
+      this.logger.info('[Engine.loadTasks]', `tasks "monitor" and "sweep" created (agent ${marvinId})`);
+    }
+
+    // config tasks
+    for (const [taskId, task] of Object.entries(this.config.tasks || {})) {
+      const agent = this.agents[task.agent || marvinId];
+      if (!agent) {
+        this.logger.error('[Engine.loadTasks]', `agent not found for task "${taskId}": ${task.agent || marvinId}, skipping`);
+        continue;
+      }
+
+      let schedule = 1000 < task.schedule ? task.schedule : task.schedule * 1000;
+      let enabled = task.enabled;
+
+      // task input: string prompt, file path, or TASK.md in the workspace
+      let input = task.input;
+      if (input && !input.endsWith('.md')) {
+        // continue as is, input is a string
+      } else if (input && existsSync(input)) {
+        input = readFileSync(input, 'utf8').trim();
+      } else if (existsSync(join(this.work, 'tasks', taskId, 'TASK.md'))) {
+        input = readFileSync(join(this.work, 'tasks', taskId, 'TASK.md'), 'utf8').trim();
+      }
+
+      if (!input) {
+        this.logger.warn('[Engine.loadTasks]', `no input found for task "${taskId}", disabling`);
+        enabled = false;
+      }
+
+      if (this.isDry) {
+        this.logger.info('[Engine.loadTasks]', `[dry] task "${taskId}" created (agent ${agent.id})`);
+        continue;
+      }
+
+      // add task to the engine
+      this.tasks[taskId] = {
+        id: taskId,
+        enabled: enabled,
+        type: task.type || 'task',
+        agent: agent,
+        schedule: schedule,
+        timeout: null,
+        maxSteps: task.maxSteps,
+        format: task.format || 'json',
+        schema: task.schema || constants.DEFAULT_SCHEMA,
+        input: input,
+        integrations: task.integrations,
+      } as Task;
+
+      this.logger.info('[Engine.loadTasks]', `task "${taskId}" created (agent ${agent.id})`);
+    }
+  }
+
   async dropAgents() {
     this.logger.debug('[Engine.dropAgents]');
-    for (const [agentId, agent] of Object.entries(this.agents)) {
-      for (const [taskId, task] of Object.entries(agent.tasks)) {
-        if (task.timeout) { 
-          this.logger.debug('[Engine.dropAgents]', `stopping task ${taskId}`);
-          clearTimeout(task.timeout);
-        } else {
-          this.logger.debug('[Engine.dropAgents]', `task ${taskId} not running, continuing`);
-        }
+    this.agents = {};
+  }
+
+  async dropTasks() {
+    this.logger.debug('[Engine.dropTasks]');
+    for (const [taskId, task] of Object.entries(this.tasks)) {
+      if (task.timeout) {
+        this.logger.debug('[Engine.dropTasks]', `stopping task ${taskId}`);
+        clearTimeout(task.timeout);
+      } else {
+        this.logger.debug('[Engine.dropTasks]', `task ${taskId} not running, continuing`);
       }
     }
-    this.agents = {};
+    this.tasks = {};
   }
 
   async dropModels() {
@@ -619,26 +633,30 @@ export default class Engine {
     this.systems = {};
   }
 
+  // drop and re-exec the engine
+  async execReload() {
+    this.logger.debug('[Engine.execReload]');
+
+    // drop in reverse order
+    await this.drop();
+    // re-load & in dependency order and exec
+    await this.exec();
+  }
+
   // for each agent, for each task, start setTimeout
 
   // monitors the state: checks agents and tasks, then reschedules itself
-  async execMonitor(agentId: string, taskId: string) {
-    this.logger.debug('[Engine.execMonitor]', agentId, taskId);
+  async execMonitor(taskId: string) {
+    this.logger.debug('[Engine.execMonitor]', taskId);
 
     // check assistant state
-    if (this.state  !== 'exec') {
+    if (this.state !== 'exec') {
       this.logger.info('[Engine.execMonitor]', `task ${taskId} skipped (assistant NOT running)`);
       return;
     }
 
-    // check if agent exists
-    const agent = this.agents[agentId];
-    if (!agent) {
-      this.logger.error('[Engine.execMonitor]', `agent ${agentId} NOT found`);
-      return;
-    }
     // check if task exists
-    const task = agent.tasks[taskId]!;
+    const task = this.tasks[taskId];
     if (!task) {
       this.logger.error('[Engine.execMonitor]', `task ${taskId} NOT found`);
       return;
@@ -647,26 +665,27 @@ export default class Engine {
     // log agents and their tasks
     this.logger.info('[Engine.execMonitor]', `marvin agents:`);
     for (const [agentId, agent] of Object.entries(this.agents)) {
-      this.logger.info('[Engine.execMonitor]', `  agent ${agentId}:`);
-      this.logger.info('[Engine.execMonitor]', `    enabled: ${agent.enabled?'yes':'no'}`);
-      this.logger.info('[Engine.execMonitor]', `    model: ${agent.model.model}`);
-      this.logger.info('[Engine.execMonitor]', `    channels:`);
-      for (const [channelId, channel] of Object.entries(agent.channels)) {
-        this.logger.info('[Engine.execMonitor]', `      channel: ${channelId} ${channel}`);
-      }
-      this.logger.info('[Engine.execMonitor]', `    tasks:`);
-      for (const [taskId, task] of Object.entries(agent.tasks)) {
-        this.logger.info('[Engine.execMonitor]', `      task ${taskId}: ${task.schedule}ms ${task.enabled?'enabled':'disabled'}`);
-      }
+      this.logger.info('[Engine.execMonitor]', `agent ${agentId}:`);
+      this.logger.info('[Engine.execMonitor]', `- enabled: ${agent.enabled?'yes':'no'}`);
+      this.logger.info('[Engine.execMonitor]', `- model: ${agent.model.model}`);
+      this.logger.info('[Engine.execMonitor]', `- channels: ${Object.keys(agent.channels)}`);
+    }
+
+    this.logger.info('[Engine.execMonitor]', `  tasks:`);
+    for (const [taskId, task] of Object.entries(this.tasks)) {
+      this.logger.info('[Engine.execMonitor]', `task ${taskId}`);
+      this.logger.info('[Engine.execMonitor]', `- input: ${task.input?.slice(0, 32)}`);
+      this.logger.info('[Engine.execMonitor]', `- format: ${task.format}`);
+      this.logger.info('[Engine.execMonitor]', `- schedule: ${task.schedule}ms`);
     }
     
     // re-schedule next execution
-    task.timeout = setTimeout(this.execMonitor.bind(this), task.schedule, agentId, taskId);
+    task.timeout = setTimeout(this.execMonitor.bind(this), task.schedule, taskId);
   }
 
   // removes cached chats idle for longer than the TTL, then reschedules itself
-  async execSweep(agentId: string, taskId: string) {
-    this.logger.debug('[Engine.execSweep]', `${agentId}/${taskId}`);
+  async execSweep(taskId: string) {
+    this.logger.debug('[Engine.execSweep]', taskId);
 
     // check assistant state
     if (this.state !== 'exec') {
@@ -674,33 +693,29 @@ export default class Engine {
       return;
     }
 
-    // check if agent exists
-    const agent = this.agents[agentId];
-    if (!agent) {
-      this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (agent not found)`);
-      return;
-    }
     // check if task exists
-    const task = agent.tasks[taskId]!;
+    const task = this.tasks[taskId];
     if (!task) {
       this.logger.info('[Engine.execSweep]', `task ${taskId} skipped (task not found)`);
       return;
     }
 
-    // remove cached chats idle for longer than the TTL
+    // remove cached chats idle for longer than the TTL (each agent owns its cache)
     const now = Date.now();
     let removed = 0;
-    for (const [chatId, chat] of Object.entries(this.cache)) {
-      if (now - (chat.updated || 0) > constants.CHAT_TTL_MS) {
-        this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
-        delete this.cache[chatId];
-        // also drop the persisted copy, so the chat is fully forgotten
-        try {
-          unlinkSync(join(this.work, 'chats', `${chatId}.json`));
-        } catch {
-          // no persisted copy, nothing to remove
+    for (const agent of Object.values(this.agents)) {
+      for (const [chatId, chat] of Object.entries(agent.cache)) {
+        if (now - (chat.updated || 0) > constants.CHAT_TTL_MS) {
+          this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
+          delete agent.cache[chatId];
+          // also drop the persisted copy, so the chat is fully forgotten
+          try {
+            unlinkSync(join(this.work, 'chats', `${chatId}.json`));
+          } catch {
+            // no persisted copy, nothing to remove
+          }
+          removed++;
         }
-        removed++;
       }
     }
 
@@ -714,12 +729,12 @@ export default class Engine {
     const schedule = Math.max(60*60*1000, Math.min(60*1000, removed === 0 ? task.schedule * 2 : task.schedule / 2));
 
     // re-schedule next execution
-    task.timeout = setTimeout(this.execSweep.bind(this), schedule, agentId, taskId);
+    task.timeout = setTimeout(this.execSweep.bind(this), schedule, taskId);
   }
 
   // prompts the LLM with the task input, sends the result through channels, then reschedules
-  async execTask(agentId: string, taskId: string) {
-    this.logger.debug('[Engine.execTask]', `${agentId}/${taskId}`);
+  async execTask(taskId: string) {
+    this.logger.debug('[Engine.execTask]', taskId);
 
     // check assistant state
     if (this.state !== 'exec') {
@@ -727,32 +742,35 @@ export default class Engine {
       return;
     }
 
-    // check if agent exists
-    const agent = this.agents[agentId];
-    if (!agent) {
-      this.logger.info('[Engine.execTask]', `task ${taskId} skipped (agent not found)`);
-      return;
-    }
-    // check if agent is enabled
-    if (!agent.enabled) {
-      this.logger.info('[Engine.execTask]', `task ${taskId} skipped (agent disabled)`);
-      return;
-    }
-
     // check if task exists
-    const task = agent.tasks[taskId]!;
+    const task = this.tasks[taskId];
     if (!task) {
       this.logger.info('[Engine.execTask]', `task ${taskId} skipped (task not found)`);
       return;
     }
+
     // check if task is enabled
     if (!task.enabled) {
       this.logger.info('[Engine.execTask]', `task ${taskId} skipped (task disabled)`);
       return;
     }
 
+    // task must have an input
     if (!task.input) {
       this.logger.info('[Engine.execTask]', `task ${taskId} skipped (no input)`);
+      return;
+    }
+
+    // check if agent exists
+    const agent = task.agent;
+    if (!agent) {
+      this.logger.info('[Engine.execTask]', `task ${taskId} skipped (agent not found)`);
+      return;
+    }
+
+    // check if agent is enabled
+    if (!agent.enabled) {
+      this.logger.info('[Engine.execTask]', `task ${taskId} skipped (agent disabled)`);
       return;
     }
 
@@ -769,9 +787,9 @@ export default class Engine {
     const tools = [...Object.values(this.tools).map(t => t.meta), ...taskTools];
 
     // set task input as user message to LLM
-    const result = await this.execChat(chatId, agentId, task.input, format, schema, maxSteps, tools);
+    const result = await agent.sendChat(chatId, task.input, format, schema, maxSteps, tools);
     if (result.error) {
-      this.logger.error('[Engine.execTask]', `no result from sendMessage for agent ${agentId}:`, result.error);
+      this.logger.error('[Engine.execTask]', `no result from sendChat for task ${taskId}:`, result.error);
       return;
     }
 
@@ -808,265 +826,6 @@ export default class Engine {
     }
 
     // re-schedule next execution
-    task.timeout = setTimeout(this.execTask.bind(this), task.schedule, agentId, taskId);
-  }
-
-  async execReload() {
-    this.logger.debug('[Engine.execReload]');
-
-    // drop in reverse order
-    await this.drop();
-    // re-load & in dependency order and exec
-    await this.exec();
-  }
-
-  // tool call
-  async execTool(tool: string, args: {[key:string]:any}) : Promise<{[key:string]:any}> {
-    this.logger.debug('[Engine.execTool]', tool);
-
-    const instance = this.tools[tool];
-    if (instance) {
-      try {
-        // ! tool call
-        return await instance.call(args);
-      } catch (err) {
-        this.logger.error('[Engine.execTool]', `tool ${tool} failed:`, err);
-        return {tool: tool, error: (err as Error).message};
-      }
-    }
-
-    // dynamic integration tools (<integrationId>__<action>) loaded per-task
-    const split = splitIntegrationToolName(tool);
-    const integration = split ? this.integrations[split.integrationId] : undefined;
-    if (integration) {
-      try {
-        return await integration.call({ action: split!.action, ...args });
-      } catch (err) {
-        this.logger.error('[Engine.execTool]', `tool ${tool} failed:`, err);
-        return {tool: tool, error: (err as Error).message};
-      }
-    }
-
-    this.logger.error('[Engine.execTool]', `tool ${tool} not found`);
-    return {tool: tool, error: `tool ${tool} does NOT exist`};
-  }
-
-  // get a chat for this id: reuse the cached/persisted one, or create a new
-  // chat seeded with the system prompt (identity + integrations + memory + format)
-  loadChat(chatId: string | undefined, agent: Agent, format: 'text' | 'json' = 'json', schema: { [key: string]: string } = constants.DEFAULT_SCHEMA, tools?: ToolMeta[]): Chat {
-    this.logger.debug('[Engine.loadChat]');
-
-    // try from cache or disk
-    if (chatId) {
-      const cached = this.cache[chatId];
-      if (cached) {
-        cached.updated = Date.now();
-        return cached;
-      }
-
-      if (!this.isDry) {
-        try {
-          const file = join(this.work, 'chats', `${chatId}.json`);
-          if (existsSync(file)) {
-            // load from disk, then re-cache
-            const chat = JSON.parse(readFileSync(file, 'utf-8')) as Chat;
-            chat.updated = Date.now();
-            this.cache[chatId] = chat;
-            return chat;
-          }
-        } catch (err) {
-          this.logger.debug('[Engine.makeChat]', 'failed to load chat from disk:', err);
-        }
-      }
-    }
-
-    // or make a new chat
-    return this.makeChat(chatId, agent, format, schema, tools);
-  }
-
-  // make new chat seeded with the system prompt (identity + integrations + memory + format)
-  makeChat(chatId: string | undefined, agent: Agent, format: 'text' | 'json', schema: { [key: string]: string }, tools?: ToolMeta[]): Chat {
-    this.logger.debug('[Engine.makeChat]');
-
-    let system = agent.identity;
-
-    const entries = Object.entries(this.integrations);
-    const configs = entries.length ? entries : Object.entries(this.config.integrations || {});
-
-    const blocks = configs.map(([id, integration]) => {
-      const isLoaded = integration instanceof Integration;
-      const config = isLoaded ? integration.config : integration;
-      const meta = isLoaded ? integration.meta :  {
-        type: config?.type || 'integration',
-        title: id,
-        description: '',
-        actions: [],
-      };
-      const endpoint = config?.endpoint || config?.url || config?.baseUrl || '';
-      const actions = meta.actions.length
-        ? `\nActions: ${meta.actions.map((a: IntegrationAction) => `${a.name} - ${a.description}`).join('; ')}`
-        : '';
-      const url = endpoint ? ` (${endpoint})` : '';
-      return `### ${id}${url}\n${meta.description || meta.title}${actions}`;
-    });
-
-    // inject the integrations block
-    if (blocks.length) {
-      system += '\n\n';
-      system += '## Integrations\n';
-      system += blocks.join('\n');
-    }
-
-    // inject a compact summary of the most recently updated memory notes, so
-    // the agent keeps cross-run context (facts, preferences, progress)
-    if (this.config.settings.memory || agent.memory) {
-      system += '\n\n';
-      system += '## Memory\n';
-      system += readMemorySummary(this.work) + '\n';
-      system += 'Use the memory tool (remember/recall) to read and update these notes.';
-    }
-
-    // add the JSON schema for JSON output
-    if (format === 'json') {
-      system += '\n\n';
-      system += `## Output format`;
-      system += 'Respond with exactly one JSON object, no other text::\n';
-      system += '```json\n' + JSON.stringify(schema) + '\n```\n';
-      system += '- Do not wrap the JSON in a code fence in your actual response.\n';
-      system += '- Do not include any text before or after the JSON object.';
-    }
-
-    // TODO: loadIntegrationTools(integrations)
-
-    return {
-      id: chatId,
-      messages: [{ role: 'system', content: system }],
-      thinking: false,
-      userId: '',
-      format: format,
-      tools: tools,
-      updated: Date.now(),
-    } as Chat;
-  }
-
-  // save chat to cache (and persist it to ~/.marvin/chats/<chatId>.json)
-  saveChat(chatId: string | undefined, chat: Chat): void {
-    this.logger.debug('[Engine.saveChat]', `chatId=${chatId}`);
-
-    if (!chatId) return;
-    chat.updated = Date.now();
-    this.cache[chatId] = chat;
-    if (this.isDry) return;
-
-    try {
-      mkdirSync(join(this.work, 'chats'), { recursive: true });
-      writeFileSync(join(this.work, 'chats', `${chatId}.json`), JSON.stringify(chat), 'utf-8');
-    } catch (err) {
-      this.logger.error('[Engine.saveChat]', 'failed to persist chat:', err);
-    }
-  }
-
-  // bound chat history to the system message + the last N messages
-  trimChat(chat: Chat): void {
-    if (!chat.messages || chat.messages.length <= constants.MAX_CHAT_MESSAGES) return;
-
-    // TODO: trim middle approach
-
-    // drop the oldest messages, always keeping the system message (index 0)
-    const drop = chat.messages.length - constants.MAX_CHAT_MESSAGES;
-    if (chat.messages[0]?.role === 'system') {
-      chat.messages = [chat.messages[0]!, ...chat.messages.slice(drop + 1)];
-    } else {
-      chat.messages = chat.messages.slice(drop);
-    }
-  }
-
-  // exec chat // agent loop
-  async execChat(chatId: string | undefined, agentId: string, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS, tools?: ToolMeta[]) : Promise<{content:string, steps:number, error?: string}> {
-    try {
-      this.logger.debug('[Engine.execChat]', `chatId=${chatId} agentId=${agentId}, message=${message.slice(0, 32)}`);
-
-      const agent = this.agents[agentId]!;
-
-      // get chat from cache/store, or create a new one seeded with the system prompt
-      const chat = this.loadChat(chatId, agent, format, schema, tools);
-
-      // load task input as user message
-      chat.messages.push({ role: 'user', content: message.trim() });
-
-      // return early
-      if (this.isDry) {
-        this.logger.info('[Engine.execChat]', '[dry]', 'send messages to:', agent.model.model);
-        this.saveChat(chatId, chat);
-        return { content: '(dry)', steps: 0 };
-      }
-
-      // AI loop: call model, execute tool calls, repeat until done
-      let reply: Reply;
-      let steps = -1;
-      let ended = false;
-      do {
-        steps++;
-
-        // keep the chat history bounded (system message + last N messages)
-        this.trimChat(chat);
-
-        // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
-        reply = await agent.model.execChat(chat);
-
-        // persist assistant reply to chat history
-        chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
-
-        // trim result, this can be really big
-        this.logger.debug('[Engine.execChat]', `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
-
-        // force stop
-        if (reply.stop) {
-          this.logger.debug('[Engine.execChat]', `force stop at step=#${steps}`);
-          break;
-        }
-
-        // execute any tool calls
-        for (const tool of reply.message.tools || []) {
-          this.logger.debug('[Engine.execChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
-
-          // if end_chat tool call is found, we're done
-          if (tool.name === constants.END_CHAT_NAME) {
-            ended = true;
-            break;
-          }
-
-          // ! tool call
-          let result = await this.execTool(tool.name, tool.arguments);
-
-          // add tool call to chat history
-          chat.messages.push({ role: 'tool', content: JSON.stringify(result), toolId: tool.id });
-        }
-
-        // if end_chat tool call is found, we're done
-        if (ended) {
-          this.logger.info('[Engine.execChat]', `tool stop (${constants.END_CHAT_NAME}) at step=#${steps}`);
-          break;
-        }
-      } while (steps < maxSteps - 1);
-
-      // warn if max steps reached
-      if (steps >= maxSteps) {
-        this.logger.warn('[Engine.execChat]', `max steps (${maxSteps}) reached for ${agentId}`);
-      }
-
-      // save chat to cache
-      this.saveChat(chatId, chat);
-
-      // TODO: more info here
-      // when format is json, make sure content is a valid JSON string (the LLM
-      // may append markup such as a <tool_calls> block after the JSON)
-      let  content = reply?.message?.content || '';
-           content = chat.format === 'json' ? cleanContent(content) : content;
-      return { content: content, steps: steps };
-    } catch (error) {
-      this.logger.error('[Engine.execChat]', error);
-      return { content: '', steps: 0, error: (error as Error).message };
-    } 
+    task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
   }
 }

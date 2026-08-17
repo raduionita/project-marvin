@@ -15,7 +15,7 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 - `src/tools/` - built-in executable actions (`web_search`, `get_date`, `read_file`, `memory`, `call_integration`, ...). `end_chat` (`constants.END_CHAT_NAME`) is special: calling it stops the AI loop.
 - `src/models/` - one file per provider (`openai`, `anthropic`, `deepseek`, `lmstudio`, `fallback`), each exporting a `default` class extending `Model` implementing `sendChat(chat): Promise<Reply>`. Tools are passed as `chat.tools`.
 - `src/channels/` - user-facing output channels (`slack`, `telegram`, `whatsapp`): `sendMessage(message)`, plus `load()`/`drop()`.
-- `src/integrations/` - external service integrations (`wordpress`) with named actions. Integrations can be linked to tasks (`task.integrations` in marvin.json): each linked action becomes a per-action tool named `<integrationId>__<action>` (built by `buildIntegrationTools` in `src/integrations/index.ts`, merged into `chat.tools` by `execTask`, routed by `execTool`). Standalone calls go through `call_integration`/`find_integration`.
+- `src/integrations/` - external service integrations (`wordpress`) with named actions. Integrations can be linked to tasks (`task.integrations` in marvin.json): each linked action becomes a per-action tool named `<integrationId>__<action>` (built by `loadIntegrationTools` in `src/integrations/index.ts`, merged into `chat.tools` by `execTask`, routed by `execTool`). Standalone calls go through `call_integration`/`find_integration`.
 - `src/systems/` - internal infrastructure (`api` HTTP server, `browser`, `watch` file watcher) with `load()`/`drop()`.
 - `src/skills/` - markdown skill docs (header + body, e.g. `META.md`, `TOOLS-CREATE.md`, `WORDPRESS.md`); parsed and injected into the system prompt. User skills in `~/.marvin/skills/` override.
 - `src/constants.ts` - project-wide constants (`END_CHAT_NAME`, `DEFAULT_MAX_STEPS`, `DEFAULT_CONFIG`).
@@ -23,16 +23,17 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 - `src/logger.ts`, `src/terminal.ts`, `src/memory.ts` - logging, terminal output helpers, and memory storage (see below).
 
 ## Workspace (`~/.marvin/`, created on first run)
-- `marvin.json` - the whole configuration: settings, channels, models, agents, tools, skills, integrations.
+- `marvin.json` - the whole configuration: settings, channels, models, agents, tasks, tools, skills, integrations.
 - `MARVIN.md` - assistant identity.
 - `marvin.service` - systemd unit file.
-- `agents/<agent>/IDENTITY.md` + `agents/<agent>/tasks/<task>/TASK.md` - agent identities and task prompts (TASK.md seeds the AI loop).
+- `agents/<agent>/IDENTITY.md` - agent identities.
+- `tasks/<task>/TASK.md` - task prompts (TASK.md seeds the AI loop).
 - `memories/<key>.md` - persistent memory, written/read by the `memory` tool and summarized into the system prompt.
 - `skills/*.md`, `tools/*.ts` - user-defined skills and tools (snake_case) that mirror the built-in folders.
 
 ## Core concepts and flows
 - **Registration pattern**: every `channels/`, `models/`, `tools/`, `integrations/`, `systems/`, `skills/`, `commands/` folder has an `index.ts` that lists its files by scanning the directory (skipping `.test.ts`, `.mock.ts`, `.d.ts`). To add a component: create the file, export `default`, done - no registry edits.
-- **The AI loop** (`engine.execChat`): keep chat history bounded (`trimChat`) -> `model.sendChat(chat)` -> persist assistant reply -> execute each tool call, pushing results back as `role: 'tool'` messages -> repeat until `end_chat`, max steps, or truncation (`reply.finish === 'length'`).
+- **The AI loop** (`Agent.sendChat` in `src/agent.ts`): keep chat history bounded (`packChat`) -> `model.execChat(chat)` -> persist assistant reply -> execute each tool call, pushing results back as `role: 'tool'` messages -> repeat until `end_chat`, max steps, or truncation (`reply.finish === 'length'`).
 - **Scheduling**: tasks run on schedules (`execMonitor`/`execSweep`) and each run reschedules itself; `serve` is the daemon that keeps this alive.
 - **Testing**: `bun test` (files `*.test.ts`, mocks in `*.mock.ts`) and `npx tsc --noEmit` for type checks.
 

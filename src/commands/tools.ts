@@ -21,10 +21,14 @@ export default class ToolsCommand extends Command {
         await this.listTools();
       break;
       case 'add':
+        await this.engine.load();
         await this.execAdd();
+        await this.engine.drop();
       break;
       case 'edit':
+        this.engine.load();
         await this.execEdit();
+        await this.engine.drop();
       break;
       default:
         // call a tool by name
@@ -164,11 +168,17 @@ export default class ToolsCommand extends Command {
       'Return ONLY the tool file content.',
     ].join('\n');
 
+    const marvin = this.engine.agents[this.engine.config.settings.name];
+    if (!marvin) {
+      this.logger.error('[ToolCommand.execAdd]', `agent "${this.engine.config.settings.name}" not found`);
+      return;
+    }
+
     let content = '';
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      const result = await marvin.sendChat(undefined, prompt, 'text');
       if (result.error || !result.content) {
         this.logger.error('[ToolCommand.execAdd]', 'no result from the LLM');
         return;
@@ -246,7 +256,7 @@ export default class ToolsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.execChat(undefined, this.engine.config.settings.name, prompt, 'text');
+      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt, 'text');
       if (result.error || !result.content) {
         this.logger.error('[ToolCommand.execEdit]', 'no result from the LLM');
         return;

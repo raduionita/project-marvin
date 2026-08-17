@@ -177,8 +177,15 @@ export default class ApiSystem extends System {
       const chatId = body.chatId || `http-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const agentId = (body.agentId as string) || this.engine.config.settings.name; // default to marvin (orchestrator)
 
+      const agent = this.engine.agents[agentId];
+      if (!agent) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: `agent "${agentId}" not found` }));
+        return;
+      }
+
       // send message to the LLM
-      const result = await this.engine.execChat(chatId, agentId, message);
+      const result = await agent.sendChat(chatId, message);
       if (result.error) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: `(ServeCommand.sendMessage ERROR - no LLM result: ${result.error})` }));

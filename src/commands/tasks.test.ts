@@ -15,13 +15,14 @@ mock.module('../terminal.js', () => ({
 
 import TasksCommand from './tasks.js';
 
-function mockConfig(agents: Config['agents']): Config {
+function mockConfig(agents: Config['agents'], tasks: Config['tasks'] = {}): Config {
   return {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: {},
     integrations: {},
     models: {},
     agents,
+    tasks,
   } as Config;
 }
 
@@ -29,7 +30,7 @@ test('tasks add writes TASK.md and persists config', async () => {
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
-    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} },
+    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} },
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
@@ -37,13 +38,14 @@ test('tasks add writes TASK.md and persists config', async () => {
   await cmd.execAdd();
 
   // TASK.md created with the prompt
-  const ppath = join(engine.work, 'agents', 'my-agent', 'tasks', 'my-task', 'TASK.md');
+  const ppath = join(engine.work, 'tasks', 'my-task', 'TASK.md');
   expect(existsSync(ppath)).toBe(true);
   expect(readFileSync(ppath, 'utf8').trim()).toBe('do the thing every hour');
 
   // config entry persisted
-  expect(engine.config.agents['my-agent']!.tasks!['my-task']).toEqual({
+  expect(engine.config.tasks!['my-task']).toEqual({
     enabled: true,
+    agent: 'my-agent',
     schedule: 7200,
     maxSteps: 5,
     format: 'text',
@@ -64,38 +66,40 @@ test('tasks add refuses unknown agent', async () => {
   answers = ['ghost-agent'];
   await cmd.execAdd();
 
-  expect(existsSync(join(engine.work, 'agents', 'ghost-agent'))).toBe(false);
+  expect(existsSync(join(engine.work, 'tasks', 'ghost-agent'))).toBe(false);
 });
 
 test('tasks add refuses existing task', async () => {
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
-  engine.config = mockConfig({
-    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: { 'my-task': { enabled: true, schedule: 3600, maxSteps: 20, format: 'json' } } },
-  });
+  engine.config = mockConfig(
+    { 'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} } },
+    { 'my-task': { enabled: true, agent: 'my-agent', schedule: 3600, maxSteps: 20, format: 'json' } },
+  );
 
   const cmd = new TasksCommand(engine, new Logger(), []);
   answers = ['my-agent', 'my-task'];
   await cmd.execAdd();
 
-  expect(Object.keys(engine.config.agents['my-agent']!.tasks!)).toEqual(['my-task']);
-  expect(existsSync(join(engine.work, 'agents', 'my-agent', 'tasks', 'my-task'))).toBe(false);
+  expect(Object.keys(engine.config.tasks!)).toEqual(['my-task']);
+  expect(existsSync(join(engine.work, 'tasks', 'my-task'))).toBe(false);
 });
 
 test('tasks add skips TASK.md when prompt is blank', async () => {
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
-    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} },
+    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} },
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
   answers = ['', 'empty-task', '', '60', '', ''];
   await cmd.execAdd();
 
-  expect(existsSync(join(engine.work, 'agents', 'my-agent', 'tasks', 'empty-task', 'TASK.md'))).toBe(false);
-  expect(engine.config.agents['my-agent']!.tasks!['empty-task']).toEqual({
+  expect(existsSync(join(engine.work, 'tasks', 'empty-task', 'TASK.md'))).toBe(false);
+  expect(engine.config.tasks!['empty-task']).toEqual({
     enabled: true,
+    agent: 'my-agent',
     schedule: 60,
     maxSteps: 20,
     format: 'json',
@@ -107,7 +111,7 @@ test('tasks add links configured integrations, skipping unknown ones', async () 
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
-    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} },
+    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} },
   });
   engine.config.integrations = {
     'gloobeam': { enabled: true, type: 'wordpress' },
@@ -118,8 +122,9 @@ test('tasks add links configured integrations, skipping unknown ones', async () 
   answers = ['', 'post-task', 'write a post', '60', '5', 'json', 'gloobeam, nope'];
   await cmd.execAdd();
 
-  expect(engine.config.agents['my-agent']!.tasks!['post-task']).toEqual({
+  expect(engine.config.tasks!['post-task']).toEqual({
     enabled: true,
+    agent: 'my-agent',
     schedule: 60,
     maxSteps: 5,
     format: 'json',

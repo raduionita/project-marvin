@@ -5,6 +5,7 @@ import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { Skill, Config } from '../types.js';
+import { Agent } from '../agent.js';
 
 // scripted answers consumed by the mocked terminal prompt
 let answers: string[] = [];
@@ -52,6 +53,11 @@ function mockEngine(isDry = false): Engine {
   // stub out heavy engine loading for the command test
   engine.load = async () => { engine.state = 'load'; };
   engine.loadTools = async () => {};
+
+  // stub agent whose sendChat is scripted per-test
+  const agent = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
+  agent.sendChat = async () => ({ content: '', steps: 0 });
+  engine.agents['marvin'] = agent;
   return engine;
 }
 
@@ -69,7 +75,7 @@ test('tools add writes a custom tool to ~/.marvin/tools', async () => {
   answers = [];
 
   // stub the LLM call to return generated tool source
-  engine.execChat = async () => ({ content: `import { Tool } from '${engine.root}/src/types.js';\nexport default class MyTool extends Tool { /* ... */ }`, steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: `import { Tool } from '${engine.root}/src/types.js';\nexport default class MyTool extends Tool { /* ... */ }`, steps: 1 });
 
   await cmd.execAdd();
 
@@ -82,7 +88,7 @@ test('tools add prompts for tool name and description when missing', async () =>
   const engine = mockEngine();
   const cmd = new ToolsCommand(engine, new Logger(), []);
   answers = ['prompted_tool', 'prompted purpose'];
-  engine.execChat = async () => ({ content: 'export default class PromptedTool extends Tool {}', steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: 'export default class PromptedTool extends Tool {}', steps: 1 });
 
   await cmd.execAdd();
 
@@ -106,7 +112,7 @@ test('tools add works in dry mode without calling the LLM', async () => {
   const cmd = new ToolsCommand(engine, new Logger(), ['add', 'dry_tool', 'desc']);
   answers = [];
   let called = false;
-  engine.execChat = async () => { called = true; return { content: "", steps: 0 }; };
+  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execAdd();
 
@@ -118,7 +124,7 @@ test('tools add replaces the MARVIN_ROOT placeholder in generated code', async (
   const engine = mockEngine();
   const cmd = new ToolsCommand(engine, new Logger(), ['add', 'rooted_tool', 'desc']);
   answers = [];
-  engine.execChat = async () => ({ content: "import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class RootedTool extends Tool {}", steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: "import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class RootedTool extends Tool {}", steps: 1 });
 
   await cmd.execAdd();
 
@@ -134,7 +140,7 @@ test('tools edit rewrites an existing custom tool', async () => {
 
   const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'add a ping parameter']);
   answers = [];
-  engine.execChat = async () => ({ content: "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = true }", steps: 1 });
+  engine.agents['marvin']!.sendChat = async () => ({ content: "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = true }", steps: 1 });
 
   await cmd.execEdit();
 
@@ -149,7 +155,7 @@ test('tools edit sends the current tool code to the LLM', async () => {
   const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'make it better']);
   answers = [];
   let prompt = '';
-  engine.execChat = async (_a: any, _b: any, p: string) => { prompt = p; return { content: 'updated', steps: 1 }; };
+  engine.agents['marvin']!.sendChat = async (_chatId: any, p: string) => { prompt = p; return { content: 'updated', steps: 1 }; };
 
   await cmd.execEdit();
 
@@ -175,7 +181,7 @@ test('tools edit works in dry mode without calling the LLM', async () => {
   const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'dry_tool', 'update']);
   answers = [];
   let called = false;
-  engine.execChat = async () => { called = true; return { content: "", steps: 0 }; };
+  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
 
   await cmd.execEdit();
 

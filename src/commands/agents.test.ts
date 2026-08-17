@@ -47,7 +47,6 @@ test('agents add writes IDENTITY.md and persists config', async () => {
     enabled: true,
     model: 'deepseek/deepseek-chat',
     channels: { slack: 'general' },
-    tasks: {},
   });
 
   // config file persisted too
@@ -78,7 +77,7 @@ test('agents add refuses existing agent', async () => {
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     {},
   );
-  engine.config.agents['my-agent'] = { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tasks: {} };
+  engine.config.agents['my-agent'] = { enabled: true, model: 'deepseek/deepseek-chat', channels: {} };
 
   const cmd = new AgentsCommand(engine, new Logger(), []);
   answers = ['my-agent'];

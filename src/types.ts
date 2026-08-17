@@ -1,4 +1,5 @@
 import type Engine from "./engine";
+import type { Agent } from './agent.js';
 import type { Logger } from "./logger.js";
 
 export type Mode = 'client' | 'server';
@@ -41,17 +42,18 @@ export interface Config {
     model?: string;
     channels: Record<string, string>;
     tools?: string[];
-    tasks?: Record<string, {
-      enabled: boolean;
-      type?: TaskType;
-      schedule: number;
-      maxSteps: number;
-      input?: string;
-      format?: 'text' | 'json';
-      schema?: {[key:string]:string};
-      // integrations linked to this task: their actions become tools
-      integrations?: string[];
-    }>;
+  }>;
+  tasks?: Record<string, {
+    enabled: boolean;
+    type?: TaskType;
+    agent?: string;
+    schedule: number;
+    maxSteps: number;
+    input?: string;
+    format?: 'text' | 'json';
+    schema?: {[key:string]:string};
+    // integrations linked to this task: their actions become tools
+    integrations?: string[];
   }>;
 }
 
@@ -176,25 +178,6 @@ export interface Skill {
   source: 'default' | 'custom';
 }
 
-// task keeps track of the setTimeout id, schedule
-export type TaskType = 'task' | 'monitor' | 'sweep';
-
-export interface Task {
-  id: string;
-  enabled: boolean;
-  // what the task does: prompt the LLM (input), watch the state (monitor), or clean up (sweep)
-  type: TaskType;
-  // TODO: persistant: boolean = false; // should tasks have persistent chats?
-  schedule: number;
-  maxSteps: number;
-  timeout: NodeJS.Timeout | null;
-  input?: string;
-  format?: 'text' | 'json';
-  schema?: {[key:string]:string};
-  // integrations linked to this task: their actions become tools for this task
-  integrations?: string[];
-}
-
 // model interface class
 export abstract class Model {
   // model is enabled or disabled
@@ -227,20 +210,32 @@ export abstract class Model {
   abstract execChat(chat: Chat): Promise<Reply>;
 }
 
-export interface Agent {
+// task keeps track of the setTimeout id, schedule
+export type TaskType = 'task' | 'monitor' | 'sweep';
+
+export interface Task {
+  // same as id in tasks[id]
   id: string;
-  // agent is enabled or disabled
+  // enabled=false = suspended for now
   enabled: boolean;
-  // memory
-  memory?: boolean;
-  // agent system prompt
-  identity: string;
-  // inside the task, the agent will send messages through these channels to the user/owner
-  channels: Record<string, string>;
-  // will use this model to communicate with the LLMs
-  model: Model;
-  // a task is basically a setTimeout that will execute the AI loop then rerun/reschedule itself
-  tasks: Record<string, Task>;
+  // what the task does: prompt the LLM (input), watch the state (monitor), or clean up (sweep)
+  type: TaskType;
+  // agent
+  agent?: Agent;
+  // TODO: schedule to cron-like format
+  schedule: number;
+  // max number of steps to run agent loop
+  maxSteps: number;
+  // timeout = setTimeout()
+  timeout: NodeJS.Timeout | null;
+  // task prompt for the LLM
+  input?: string;
+  // format, defaults to 'json'
+  format?: 'text' | 'json';
+  // is json, what schema
+  schema?: {[key:string]:string};
+  // integrations linked to this task: their actions become tools for this task
+  integrations?: string[];
 }
 
 export interface Chat {

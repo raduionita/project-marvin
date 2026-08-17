@@ -1,9 +1,9 @@
 import { test, expect } from 'bun:test';
-import { Channel, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta } from '../types.js';
+import { Channel, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta, Task } from '../types.js';
+import { Agent } from '../agent.js';
 import { writeFileSync, mkdirSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import * as constants from '../constants.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 
@@ -45,7 +45,7 @@ class MockModel extends Model {
   reasoning = 'high';
   format = 'text' as const;
   tools: any[] = [];
-  /** Tracks how many times sendMessage was called. */
+  /** Tracks how many times execChat was called. */
   callCount = 0;
 
   private _reply: Reply;
@@ -128,7 +128,6 @@ function buildTestEngine(opts?: {
         default: true,
         model: agentModel,
         channels: agentChannels,
-        tasks: {},
       },
     }
   );
@@ -144,14 +143,13 @@ function buildTestEngine(opts?: {
 
   // Install a mock agent with proper identity
   const identity = 'You are Marvin.';
-  engine.agents[agentId] = {
+  engine.agents[agentId] = new Agent(engine, new Logger(), {
     id: agentId,
     enabled: true,
     identity,
     channels: agentChannels,
     model: mockModelInstance,
-    tasks: {},
-  };
+  });
 
   // Install a mock channel
   if (channelEnabled) {
@@ -165,7 +163,7 @@ function buildTestEngine(opts?: {
   return engine;
 }
 
-// ==================== loadChannels tests (existing, kept) ====================
+// ==================== loadChannels tests ====================
 
 test('execChannels loads enabled channels with valid provider', async () => {
   const config = mockConfig({ 'channel.mock': { enabled: true } });
@@ -357,482 +355,100 @@ test('loadTools skips workspace files that do not export a Tool', async () => {
   expect(engine.tools['broken_tool']).toBeUndefined();
 });
 
-// ==================== sendMessage tests ====================
+// ==================== execTask tests ====================
 
-test('sendMessage returns dry result when engine.isDry is true', async () => {
-  const engine = buildTestEngine({ isDry: true });
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  // Dry mode returns early without calling the model
-  expect(result).toEqual({ content: '(dry)', steps: 0 });
-  // Verify the model was never invoked by checking the chat has no assistant messages
-  const chat = engine.loadChat('chat-1', engine.agents['marvin']!, 'json', {});
-  expect(chat).toBeDefined();
-  const assistantMessages = chat!.messages.filter((m: Message) => m.role === 'assistant');
-  expect(assistantMessages.length).toBe(0);
-});
-
-test('sendMessage pushes system and user messages to chat', async () => {
-  const engine = buildTestEngine();
-
-  await engine.execChat('chat-1', 'marvin', 'hello world', 'json', {"output": "text string of the answer"}, 5);
-
-  const chat = engine.loadChat('chat-1', engine.agents['marvin']!, 'json', {});
-  expect(chat).not.toBeNull();
-  // 2 system/user messages + 5 assistant replies from the AI loop
-  expect(chat!.messages.length).toBe(7);
-  expect(chat!.messages[0]!.role).toBe('system');
-  expect(chat!.messages[0]!.content).toContain('You are Marvin.');
-  expect(chat!.messages[1]!.role).toBe('user');
-  expect(chat!.messages[1]!.content).toBe('hello world');
-  // Verify assistant replies were persisted
-  const assistantMessages = chat!.messages.filter((m: Message) => m.role === 'assistant');
-  expect(assistantMessages.length).toBe(5);
-});
-
-test('sendMessage returns content and step count from model reply', async () => {
-  const engine = buildTestEngine({ replyContent: 'hello from model' });
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();
-
-  expect(result!.content).toBe('hello from model');
-  // The mock model returns stop=false, no tools, no end chat.
-  // The loop runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
-  expect(result!.steps).toBe(4);
-});
-
-test('sendChat returns valid JSON content when format is json and the model appends markup', async () => {
-  const engine = buildTestEngine({ replyStop: true, replyContent: '{"output": "hi"}<tool_calls><invoke name="end_chat"></invoke></tool_calls>' });
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();
-  expect(result!.content).toBe('{"output": "hi"}');
-  expect(JSON.parse(result!.content)).toEqual({ output: 'hi' });
-});
-
-test('sendMessage caches the chat after execution', async () => {
-  const engine = buildTestEngine();
-
-  await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  const cached = engine.loadChat('chat-1', engine.agents['marvin']!, 'json', {});
-  expect(cached).toBeDefined();
-  expect(cached!.id).toBe('chat-1');
-  expect(cached!.messages.length).toBeGreaterThan(0);
-});
-
-test('sendMessage reuses existing chat when chatId already exists', async () => {
-  const engine = buildTestEngine();
-
-  // First call
-  await engine.execChat('chat-1', 'marvin', 'first', 'json', {"output": "text string of the answer"}, 5);
-
-  // Second call with same chatId
-  await engine.execChat('chat-1', 'marvin', 'second', 'json', {"output": "text string of the answer"}, 5);
-
-  const chat = engine.loadChat('chat-1', engine.agents['marvin']!, 'json', {});
-  // Each call adds 2 messages (system + user) + 5 assistant replies (one per loop iteration)
-  // But the model always returns the same reply, so we get 2 calls * (2 + 5) = 14 messages
-  // Actually: first call: system + user + 5 assistant = 7
-  // second call: system + user + 5 assistant = 7 more
-  expect(chat!.messages.length).toBeGreaterThan(4);
-  expect(chat!.messages[chat!.messages.length - 1]!.content).toBe('end chat');
-});
-
-test('sendMessage calls agent.model.sendMessage maxSteps times when never stopping', async () => {
-  const engine = buildTestEngine();
-
-  await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  const model = engine.models['mock.model'] as MockModel;
-  // The model is called exactly maxSteps times (5) when it never stops
-  expect(model.callCount).toBe(5);
-});
-
-test('sendMessage stops when reply.stop is true', async () => {
-  const engine = buildTestEngine({ replyStop: true, replyContent: 'stopped early' });
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();
-
-  expect(result!.content).toBe('stopped early');
-  // With stop=true, the model is called only once
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
-});
-
-test('sendMessage executes tool calls from model reply', async () => {
-  const engine = buildTestEngine();
-
-  // Replace the model's reply (not the instance) so the agent's reference stays valid
-  const toolCallReply: Reply = {
-    id: 'reply-2',
-    stop: false,
-    finish: undefined,
-    usage: { completion: 5, prompt: 10 },
-    message: {
-      role: 'assistant',
-      content: '',
-      tools: [{ id: 'tool-1', name: 'mock_tool', arguments: {} }],
-    },
-  } as Reply;
-
-  (engine.models['mock.model'] as MockModel).setReply(toolCallReply);
-
-  await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  // After tool execution, the loop continues (no end chat, no stop).
-  // The model is called: 1 (tool call) + 4 (remaining iterations) = 5 total
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(5);
-
-  // Check that tool result was pushed to chat
-  const chat = engine.loadChat('chat-1', engine.agents['marvin']!, 'json', {});
-  const toolMessages = chat!.messages.filter((m: Message) => m.role === 'tool');
-  expect(toolMessages.length).toBeGreaterThan(0);
-});
-
-test('sendMessage handles invalid JSON in tool arguments gracefully', async () => {
-  const engine = buildTestEngine();
-
-  // Replace the model's reply (not the instance) so the agent's reference stays valid
-  const badToolReply: Reply = {
-    id: 'reply-3',
-    stop: false,
-    finish: undefined,
-    usage: { completion: 5, prompt: 10 },
-    message: {
-      role: 'assistant',
-      content: '',
-      tools: [{ id: 'tool-2', name: 'mock_tool', arguments: {} }],
-    },
-  } as Reply;
-
-  (engine.models['mock.model'] as MockModel).setReply(badToolReply);
-
-  // Should not throw - it should catch the JSON parse error and push an error result
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).toBeDefined();
-  // Verify tool error was pushed to chat
-  const chat = engine.loadChat('chat-1', engine.agents['marvin']!, 'json', {});
-  const toolMessages = chat!.messages.filter((m: Message) => m.role === 'tool');
-  expect(toolMessages.length).toBeGreaterThan(0);
-  // The tool error message should contain the parse error
-  const errorContent = toolMessages[0]!.content;
-  expect(typeof errorContent).toBe('string');
-});
-
-test('sendMessage stops the AI loop when end chat tool call is found', async () => {
-  const engine = buildTestEngine();
-
-  // Replace the model's reply (not the instance) so the agent's reference stays valid
-  const finalAnswerReply: Reply = {
-    id: 'reply-4',
-    stop: false,
-    finish: undefined,
-    usage: { completion: 5, prompt: 10 },
-    message: {
-      role: 'assistant',
-      content: '',
-      tools: [{ id: 'final-1', name: constants.END_CHAT_NAME, arguments: {"answer": "done"} }],
-    },
-  } as Reply;
-
-  (engine.models['mock.model'] as MockModel).setReply(finalAnswerReply);
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();;
-
-  // Should only call the model once - the end chat causes an immediate exit
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
-  expect(result!.content).toBe(''); // The end chat content is empty in our reply
-});
-
-test('sendMessage returns empty content when reply has no message content', async () => {
-  const engine = buildTestEngine();
-
-  // Replace the model's reply (not the instance) so the agent's reference stays valid
-  // Stop=true ensures the loop exits after 1 iteration
-  (engine.models['mock.model'] as MockModel).setReply({
-    id: 'reply-5',
-    stop: true,
-    finish: undefined,
-    usage: { completion: 0, prompt: 0 },
-    message: { role: 'assistant', content: '' },
-  } as Reply);
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();
-
-  expect(result!.content).toBe('');
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
-});
-
-test('sendMessage returns an error when agentId does not exist', async () => {
-  const engine = buildTestEngine();
-
-  // sendChat swallows internal errors and returns an error field for unknown agents
-  const result = await engine.execChat('chat-1', 'nonexistent', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result.content).toBe('');
-  expect(result.error).toBeDefined();
-});
-
-test('sendMessage returns content and steps from model reply', async () => {
-  const engine = buildTestEngine();
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();;
-
-  expect(result!.content).toBe('end chat');
-  // The model runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
-  expect(result!.steps).toBe(4);
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(5);
-});
-
-test('sendMessage passes correct agentId and chatId to cache', async () => {
-  const engine = buildTestEngine();
-
-  await engine.execChat('unique-chat-id', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  const chat = engine.loadChat('unique-chat-id', engine.agents['marvin']!, 'json', {});
-  expect(chat!.id).toBe('unique-chat-id');
-});
-
-test('sendMessage respects maxSteps limit (1 step)', async () => {
-  const engine = buildTestEngine();
-
-  // With maxSteps=1, the loop runs 1 time: steps=-1 -> 0, 0 < 0 false -> exit
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 1);
-
-  expect(result).not.toBeNull();;
-
-  expect(result!.steps).toBe(0);
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
-});
-
-test('sendMessage warns when max steps are reached (maxSteps=1 with never-stopping model)', async () => {
-  const engine = buildTestEngine();
-
-  // A model that never stops (no stop, no end chat, no tools)
-  // Replace the model's reply (not the instance) so the agent's reference stays valid
-  const neverStoppingReply: Reply = {
-    id: 'reply-6',
-    stop: false,
-    finish: undefined,
-    usage: { completion: 5, prompt: 10 },
-    message: { role: 'assistant', content: 'not done yet' },
-  } as Reply;
-
-  (engine.models['mock.model'] as MockModel).setReply(neverStoppingReply);
-
-  // maxSteps=1: steps=-1 -> steps=0 (0 < 0 false) -> exit, steps=0
-  // 0 >= 1 is true -> warning logged
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 1);
-
-  expect(result).not.toBeNull();;
-
-  expect(result!.steps).toBe(0);
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
-});
-
-test('sendChat returns empty string when reply.message is undefined', async () => {
-  const engine = buildTestEngine();
-
-  // Replace the model's reply (not the instance) so the agent's reference stays valid
-  // Stop=true ensures the loop exits after 1 iteration
-  (engine.models['mock.model'] as MockModel).setReply({
-    id: 'reply-7',
-    stop: true,
-    finish: undefined,
-    usage: { completion: 0, prompt: 0 },
-    message: {} as Message,
-  } as Reply);
-
-  const result = await engine.execChat('chat-1', 'marvin', 'hello', 'json', {"output": "text string of the answer"}, 5);
-
-  expect(result).not.toBeNull();
-
-  expect(result!.content).toBe('');
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
-});
-
-// ==================== execInput tests (integration with sendChat) ====================
-
-// execInput prompts the LLM with task.input via sendChat, sends the result
+// execTask prompts the LLM with task.input via agent.sendChat, sends the result
 // through the agent's channels, then reschedules itself.
 
-// Set up a task on the agent with an input, then call execInput('marvin', 'test-task').
-
-test('execInput calls sendChat and sends result through agent channels', async () => {
+test('execTask calls sendChat and sends result through agent channels', async () => {
   const engine = buildTestEngine();
 
-  // Add a task directly to the existing agent
-  engine.agents['marvin']!.tasks = {
-    'test-task': {
-      id: 'test-task',
-      enabled: true,
-      type: 'input',
-      schedule: 60_000,
-      maxSteps: 5,
-      input: 'task input',
-      timeout: null,
-    },
-  };
+  // Add a task directly to the engine
+  engine.tasks['test-task'] = {
+    id: 'test-task',
+    enabled: true,
+    type: 'task',
+    agent: engine.agents['marvin'],
+    schedule: 60_000,
+    maxSteps: 5,
+    input: 'task input',
+    timeout: null,
+  } as Task;
 
-  // Call execInput directly
-  await engine.execTask('marvin', 'test-task');
-  // stop the reschedule so the test does not keep firing execInput
-  clearTimeout(engine.agents['marvin']!.tasks['test-task']!.timeout!);
+  // Call execTask directly
+  await engine.execTask('test-task');
+  // stop the reschedule so the test does not keep firing execTask
+  clearTimeout(engine.tasks['test-task']!.timeout!);
 
   // The mock channel was loaded, so the result should have been sent through it
   expect(engine.channels['test.channel']).toBeDefined();
-  // sendChat was called by execInput
+  // sendChat was called by execTask
   expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
-test('execInput skips disabled tasks', async () => {
+test('execTask skips disabled tasks', async () => {
   const engine = buildTestEngine();
 
-  // Add a disabled task directly to the existing agent (identity is already set)
-  engine.agents['marvin']!.tasks = {
-    'disabled-task': {
-      id: 'disabled-task',
-      enabled: false,
-      type: 'input',
-      schedule: 0,
-      maxSteps: 5,
-      input: 'should not run',
-      timeout: null,
-    },
-  };
+  // Add a disabled task directly to the engine (identity is already set)
+  engine.tasks['disabled-task'] = {
+    id: 'disabled-task',
+    enabled: false,
+    type: 'task',
+    agent: engine.agents['marvin'],
+    schedule: 0,
+    maxSteps: 5,
+    input: 'should not run',
+    timeout: null,
+  } as Task;
 
-  // Should log and return without calling sendMessage
-  await engine.execTask('marvin', 'disabled-task');
+  // Should log and return without calling sendChat
+  await engine.execTask('disabled-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
-test('execInput skips disabled agents', async () => {
-  const engine = buildTestEngine();
-
-  (engine.agents['marvin'] as any).enabled = false;
-  engine.agents['marvin']!.tasks = {
-    'test-task': {
-      id: 'test-task',
-      enabled: true,
-      type: 'input',
-      schedule: 0,
-      maxSteps: 5,
-      input: 'task input',
-      timeout: null,
-    },
-  };
-
-  await engine.execTask('marvin', 'test-task');
-
-  // Verify the model was never invoked
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
-});
-
-test('execInput warns and skips when agent channel is not loaded', async () => {
-  const engine = buildTestEngine({ channelEnabled: false });
-
-  engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
-  engine.agents['marvin']!.tasks = {
-    'test-task': {
-      id: 'test-task',
-      enabled: true,
-      type: 'input',
-      schedule: 60_000,
-      maxSteps: 5,
-      input: 'task input',
-      timeout: null,
-    },
-  };
-
-  // Should log a warning but not throw
-  await engine.execTask('marvin', 'test-task');
-  // stop the reschedule so the test does not keep firing execInput
-  clearTimeout(engine.agents['marvin']!.tasks['test-task']!.timeout!);
-  // sendMessage was called (execInput tries it), but the channel send failed
-  expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
-});
-
-test('execInput skips disabled tasks', async () => {
-  const engine = buildTestEngine();
-
-  // Add a disabled task directly to the existing agent (identity is already set)
-  engine.agents['marvin']!.tasks = {
-    'disabled-task': {
-      id: 'disabled-task',
-      enabled: false,
-      type: 'input',
-      schedule: 0,
-      maxSteps: 5,
-      input: 'should not run',
-      timeout: null,
-    },
-  };
-
-  // Should log and return without calling sendMessage
-  await engine.execTask('marvin', 'disabled-task');
-
-  // Verify the model was never invoked
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
-});
-
-test('execInput skips disabled agents', async () => {
+test('execTask skips disabled agents', async () => {
   const engine = buildTestEngine();
 
   (engine.agents['marvin'] as any).enabled = false;
-  engine.agents['marvin']!.tasks = {
-    'test-task': {
-      id: 'test-task',
-      enabled: true,
-      type: 'input',
-      schedule: 0,
-      maxSteps: 5,
-      input: 'task input',
-      timeout: null,
-    },
-  };
+  engine.tasks['test-task'] = {
+    id: 'test-task',
+    enabled: true,
+    type: 'task',
+    agent: engine.agents['marvin'],
+    schedule: 0,
+    maxSteps: 5,
+    input: 'task input',
+    timeout: null,
+  } as Task;
 
-  await engine.execTask('marvin', 'test-task');
+  await engine.execTask('test-task');
 
   // Verify the model was never invoked
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(0);
 });
 
-test('execInput warns and skips when agent channel is not loaded', async () => {
+test('execTask warns and skips when agent channel is not loaded', async () => {
   const engine = buildTestEngine({ channelEnabled: false });
 
   engine.agents['marvin']!.channels = { 'missing.channel': 'default' };
-  engine.agents['marvin']!.tasks = {
-    'test-task': {
-      id: 'test-task',
-      enabled: true,
-      type: 'input',
-      schedule: 60_000,
-      maxSteps: 5,
-      input: 'task input',
-      timeout: null,
-    },
-  };
+  engine.tasks['test-task'] = {
+    id: 'test-task',
+    enabled: true,
+    type: 'task',
+    agent: engine.agents['marvin'],
+    schedule: 60_000,
+    maxSteps: 5,
+    input: 'task input',
+    timeout: null,
+  } as Task;
 
   // Should log a warning but not throw
-  await engine.execTask('marvin', 'test-task');
-  // stop the reschedule so the test does not keep firing execInput
-  clearTimeout(engine.agents['marvin']!.tasks['test-task']!.timeout!);
-  // sendMessage was called (execInput tries it), but the channel send failed
+  await engine.execTask('test-task');
+  // stop the reschedule so the test does not keep firing execTask
+  clearTimeout(engine.tasks['test-task']!.timeout!);
+  // sendChat was called (execTask tries it), but the channel send failed
   expect((engine.models['mock.model'] as MockModel).callCount).toBeGreaterThan(0);
 });
 
@@ -846,7 +462,6 @@ test('execReload drops and re-executes the engine, ending in the exec state', as
         default: true,
         model: 'mock.model',
         channels: {},
-        tasks: {},
       },
     },
   });
@@ -880,14 +495,13 @@ test('execReload drops and re-executes the engine, ending in the exec state', as
       message: { role: 'assistant', content: '' },
     } as Reply);
     engine.models['mock.model'] = mockModelInstance;
-    engine.agents['marvin'] = {
+    engine.agents['marvin'] = new Agent(engine, new Logger(), {
       id: 'marvin',
       enabled: true,
       identity: 'You are Marvin.',
       channels: {},
       model: mockModelInstance,
-      tasks: {},
-    };
+    });
   };
 
   await engine.execReload();
@@ -922,25 +536,36 @@ test('dropChannel does nothing for non-existent channel', async () => {
   expect(engine.channels['test.channel']).toBeDefined();
 });
 
-test('dropAgents clears all agents and clears their timeouts', async () => {
+test('dropAgents clears all agents', async () => {
   const engine = buildTestEngine();
-
-  // Add a task with a timeout
-  engine.agents['marvin']!.tasks['test-task'] = {
-    id: 'test-task',
-    enabled: true,
-    type: 'input',
-    schedule: 0,
-    maxSteps: 5,
-    input: 'input',
-    timeout: setTimeout(() => {}, 0),
-  };
 
   expect(Object.keys(engine.agents)).toContain('marvin');
 
   await engine.dropAgents();
 
   expect(Object.keys(engine.agents).length).toBe(0);
+});
+
+test('dropTasks clears all tasks and their timeouts', async () => {
+  const engine = buildTestEngine();
+
+  // Add a task with a timeout
+  engine.tasks['test-task'] = {
+    id: 'test-task',
+    enabled: true,
+    type: 'task',
+    agent: engine.agents['marvin'],
+    schedule: 0,
+    maxSteps: 5,
+    input: 'input',
+    timeout: setTimeout(() => {}, 0),
+  } as Task;
+
+  expect(Object.keys(engine.tasks)).toContain('test-task');
+
+  await engine.dropTasks();
+
+  expect(Object.keys(engine.tasks).length).toBe(0);
 });
 
 test('dropModels clears all models', async () => {
@@ -951,7 +576,7 @@ test('dropModels clears all models', async () => {
   expect(Object.keys(engine.models).length).toBe(0);
 });
 
-// ==================== task integration tools ====================
+// ==================== execTask integration tools tests ====================
 
 /** A mock integration that records every call and exposes discoverable actions. */
 class MockIntegration extends Integration {
@@ -972,51 +597,29 @@ class MockIntegration extends Integration {
   }
 }
 
-test('execTool routes integration tools to the linked integration', async () => {
-  const engine = buildTestEngine();
-  const integration = new MockIntegration(engine, new Logger(), { type: 'mock' });
-  engine.integrations['gloobeam'] = integration;
-
-  const result = await engine.execTool('gloobeam__create_post', { title: 'Hello' });
-
-  expect(integration.calls).toHaveLength(1);
-  expect(integration.calls[0]!.action).toBe('create_post');
-  expect(integration.calls[0]!.args).toEqual({ action: 'create_post', title: 'Hello' });
-  expect(result.ok).toBe(true);
-});
-
-test('execTool returns an error for unknown integration tools', async () => {
-  const engine = buildTestEngine();
-
-  const result = await engine.execTool('nope__create_post', {});
-
-  expect(result.error).toContain('does NOT exist');
-});
-
 test('execTask merges task integration tools into chat.tools', async () => {
   const engine = buildTestEngine();
   engine.integrations['gloobeam'] = new MockIntegration(engine, new Logger(), { type: 'mock' });
 
-  engine.agents['marvin']!.tasks = {
-    'test-task': {
-      id: 'test-task',
-      enabled: true,
-      type: 'task',
-      schedule: 60_000,
-      maxSteps: 2,
-      input: 'task input',
-      timeout: null,
-      integrations: ['gloobeam'],
-    },
-  };
+  engine.tasks['test-task'] = {
+    id: 'test-task',
+    enabled: true,
+    type: 'task',
+    agent: engine.agents['marvin'],
+    schedule: 60_000,
+    maxSteps: 2,
+    input: 'task input',
+    timeout: null,
+    integrations: ['gloobeam'],
+  } as Task;
 
   // capture the tool metas the model receives on each call
   const model = engine.models['mock.model'] as MockModel;
   const seen: ToolMeta[][] = [];
   model.execChat = async (chat: Chat) => { seen.push(chat.tools || []); return (model as any)._reply; };
 
-  await engine.execTask('marvin', 'test-task');
-  clearTimeout(engine.agents['marvin']!.tasks['test-task']!.timeout!);
+  await engine.execTask('test-task');
+  clearTimeout(engine.tasks['test-task']!.timeout!);
 
   expect(seen.length).toBeGreaterThan(0);
   const names = seen[0]!.map(t => t.function.name);

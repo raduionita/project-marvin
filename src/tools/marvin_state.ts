@@ -31,15 +31,15 @@ export default class MarvinStateTool extends Tool {
         provider: agent.model?.provider ?? null,
         channels: agent.channels,
       };
+    }
 
-      for (const [taskId, task] of Object.entries(agent.tasks)) {
-        tasks[`${agentId}/${taskId}`] = {
-          enabled: task.enabled,
-          schedule: task.schedule,
-          maxSteps: task.maxSteps,
-          format: task.format,
-        };
-      }
+    for (const [taskId, task] of Object.entries(this.engine.tasks)) {
+      tasks[`${task.agent?.id || '?'}/${taskId}`] = {
+        enabled: task.enabled,
+        schedule: task.schedule,
+        maxSteps: task.maxSteps,
+        format: task.format,
+      };
     }
 
     const models: Record<string, any> = {};

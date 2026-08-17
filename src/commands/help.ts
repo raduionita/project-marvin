@@ -23,7 +23,7 @@ export default class HelpCommand extends Command {
     this.logger.info('  integrations', 'list, add, drop integrations');
     this.logger.info('  skills  ', 'list, add skills');
     this.logger.info('  models  ', 'list, add, bind, drop models');
-    this.logger.info('  tasks   ', 'list, add tasks for an agent');
+    this.logger.info('  tasks   ', 'list, add tasks');
     this.logger.log('');
   }
 }

@@ -170,31 +170,23 @@ test('execInfo previews the discovered config without persisting', async () => {
   expect(readConfig(engine).integrations['gloobeam'].actions).toBeUndefined();
 });
 
-test('execAdd links the integration to selected agent tasks', async () => {
+test('execAdd links the integration to selected tasks', async () => {
   mockWordpressDiscovery();
   const engine = buildEngine();
-  engine.config.agents = {
-    journalist: {
-      enabled: true,
-      model: 'm',
-      channels: {},
-      tasks: {
-        post: { enabled: true, schedule: 3600, maxSteps: 5, format: 'json' },
-        digest: { enabled: true, schedule: 60, maxSteps: 5, format: 'json' },
-      },
-    },
-  } as Config['agents'];
+  engine.config.tasks = {
+    post: { enabled: true, agent: 'journalist', schedule: 3600, maxSteps: 5, format: 'json' },
+    digest: { enabled: true, agent: 'journalist', schedule: 60, maxSteps: 5, format: 'json' },
+  } as Config['tasks'];
   const cmd = new IntegrationsCommand(engine, new Logger(), ['add', 'gloobeam', 'wordpress']);
 
   // name+type via args: endpoint -> user -> appPassword -> action ("1") ->
-  // fields ("1,2") -> required ("1") -> finish -> meta blank -> agent
-  // "journalist" -> tasks "post" (digest stays unlinked)
-  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '1', '6', '', 'journalist', 'post'];
+  // fields ("1,2") -> required ("1") -> finish -> meta blank -> task "post"
+  // (digest stays unlinked)
+  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '1', '6', '', 'post'];
 
   await cmd.exec();
 
-  const agent = engine.config.agents['journalist']!;
-  expect(agent.tasks!['post']!.integrations).toEqual(['gloobeam']);
-  expect(agent.tasks!['digest']!.integrations).toBeUndefined();
+  expect(engine.config.tasks!['post']!.integrations).toEqual(['gloobeam']);
+  expect(engine.config.tasks!['digest']!.integrations).toBeUndefined();
   expect(readConfig(engine).integrations['gloobeam']).toBeDefined();
 });

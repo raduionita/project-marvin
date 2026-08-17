@@ -13,6 +13,23 @@
       "botToken": "xoxb-bot-token"
     }
   },
+  "agents": {
+    "my-agent": {
+      "enabled": true,
+      "channels": {
+        "slack": "C123"
+      }
+    }
+  },
+  "tasks": {
+    "my-task": {
+      "enabled": true,
+      "agent": "my-agent",
+      "schedule": 3600,
+      "maxSteps": 20,
+      "format": "json"
+    }
+  },
   "integrations": {
     "gloobeam": {
       "enabled": true,
@@ -29,6 +46,5 @@
       "apiKey": "sk-api-ket",
       "enabled": true
     }
-  },
-  "agents": {}
+  }
 }
