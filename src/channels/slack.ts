@@ -1,6 +1,6 @@
 import { SocketModeClient, LogLevel } from '@slack/socket-mode';
 import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
-import { Channel, Command, Message } from '../types.js';
+import { Channel, Command, Message, ChannelMeta } from '../types.js';
 import { Agent } from '../agent.js';
 import type Engine from '../engine.js';
 import { extractOutput, markdownToMrkdwn } from '../helpers.js';
@@ -43,9 +43,12 @@ export interface IWebClient {
 }
 
 export default class SlackChannel extends Channel {
-  public args = {
-    appToken: 'xapp-1-yout-app-token-here',
-    botToken: 'xbot-1-your-bot-token-here',
+  public meta: ChannelMeta = {
+    name: 'slack',
+    arguments: {
+      appToken: 'xapp-1-yout-app-token-here',
+      botToken: 'xbot-1-your-bot-token-here',
+    },
   }
 
   // slack uses its own logger, not the shared one passed down from the engine.

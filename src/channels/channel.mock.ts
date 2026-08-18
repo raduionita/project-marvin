@@ -1,8 +1,11 @@
-import { Channel, Message } from '../types.js';
+import { Channel, Message, ChannelMeta } from '../types.js';
 
 // Intentionally does NOT extend Channel - used to test validation in execChannels
 export default class MockChannel extends Channel {
-  public args = {}
+  public meta: ChannelMeta = {
+    name: 'mock',
+    arguments: {},
+  }
 
   async load(): Promise<void> {
     this.logger.debug('[MockChannel.load]', 'loaded');

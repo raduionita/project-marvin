@@ -85,14 +85,6 @@ export default class TasksCommand extends Command {
       return;
     }
 
-    // ask for maxSteps
-    const maxStepsRaw = await ask(`Enter max steps (press enter for ${constants.DEFAULT_MAX_STEPS}): `) || `${constants.DEFAULT_MAX_STEPS}`;
-    const maxSteps = parseInt(maxStepsRaw, 10);
-    if (isNaN(maxSteps) || maxSteps < 0) {
-      this.logger.error('[TasksCommand.execAdd]', 'invalid max steps, must be a positive number');
-      return;
-    }
-
     // ask for format
     const format = await ask('Enter output format "text" or "json" (press enter for "json"): ') || 'json';
     if (format !== 'text' && format !== 'json') {
@@ -135,7 +127,6 @@ export default class TasksCommand extends Command {
       enabled: true,
       agent: agentId,
       schedule,
-      maxSteps,
       format,
       schema: constants.DEFAULT_SCHEMA,
       ...(integrations.length ? { integrations } : {}),
@@ -149,7 +140,7 @@ export default class TasksCommand extends Command {
       writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
     }
 
-    this.logger.info(`[TasksCommand.execAdd]`, `task "${taskId}" configured for agent "${agentId}" (schedule: ${schedule}s, maxSteps: ${maxSteps})${pinn ? `, prompt saved to ${pinn}` : ''}`);
+    this.logger.info(`[TasksCommand.execAdd]`, `task "${taskId}" configured for agent "${agentId}" (schedule: ${schedule}s ${pinn ? `, prompt saved to ${pinn}` : ''}`);
     this.logger.warn('[TasksCommand.execAdd]', 'note: run "marvin reload" to apply the new task to the running daemon');
   }
 }

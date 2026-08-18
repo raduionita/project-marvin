@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { Channel, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta, Task } from '../types.js';
+import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta, Task } from '../types.js';
 import { Agent } from '../agent.js';
 import { writeFileSync, mkdirSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
@@ -75,7 +75,7 @@ class MockTool extends Tool {
 
 /** A mock channel that records sent messages. */
 class TestChannel extends Channel {
-  public args = {};
+  public meta: ChannelMeta = { name: 'test', arguments: {} };
   async load(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
@@ -99,7 +99,6 @@ function buildTestEngine(opts?: {
   replyContent?: string;
   replyStop?: boolean;
   toolCalls?: Message['tools'];
-  maxSteps?: number;
   customReply?: Reply;
   configAgents?: Record<string, any>;
 }): Engine {
@@ -580,12 +579,12 @@ test('dropModels clears all models', async () => {
 
 /** A mock integration that records every call and exposes discoverable actions. */
 class MockIntegration extends Integration {
-  args = { endpoint: 'https://example.com' };
   meta: IntegrationMeta = {
     type: 'mock',
     title: 'Mock',
     description: 'Mock integration',
-    actions: [{ name: 'create_post', description: 'Create a post' }],
+    arguments: { endpoint: 'https://example.com' },
+    actions: { create_post: 'Create a post' },
   };
   calls: { action: string; args: { [key: string]: any } }[] = [];
 

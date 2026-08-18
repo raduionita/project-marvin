@@ -11,20 +11,24 @@ import { captureLogger } from '../tests/helpers.js';
 // scripted answers consumed by the mocked terminal prompt. selects interpret
 // the answer as a 1-based option index (the numbered fallback behavior).
 let answers: string[] = [];
-mock.module('../terminal.js', () => ({
-  ask: mock(async () => answers.shift() ?? ''),
-  select: mock(async (_prompt: string, options: { value: string }[]) => {
-    const raw = answers.shift() ?? '';
-    const nums = raw.split(',').map(s => parseInt(s.trim(), 10) - 1).filter(i => i >= 0 && i < options.length);
-    return nums.length === 0 ? options[0]?.value : options[nums[0]!]!.value;
-  }),
-  multiselect: mock(async (_prompt: string, options: { value: string }[]) => {
-    const raw = answers.shift() ?? '';
-    const nums = raw.split(',').map(s => parseInt(s.trim(), 10) - 1).filter(i => i >= 0 && i < options.length);
-    if (raw.trim() === '') return options.map(o => o.value);
-    return nums.map(i => options[i]!.value);
-  }),
-}));
+let askMock: ReturnType<typeof mock>;
+mock.module('../terminal.js', () => {
+  askMock = mock(async () => answers.shift() ?? '');
+  return {
+    ask: askMock,
+    select: mock(async (_prompt: string, options: { value: string }[]) => {
+      const raw = answers.shift() ?? '';
+      const nums = raw.split(',').map(s => parseInt(s.trim(), 10) - 1).filter(i => i >= 0 && i < options.length);
+      return nums.length === 0 ? options[0]?.value : options[nums[0]!]!.value;
+    }),
+    multiselect: mock(async (_prompt: string, options: { value: string }[]) => {
+      const raw = answers.shift() ?? '';
+      const nums = raw.split(',').map(s => parseInt(s.trim(), 10) - 1).filter(i => i >= 0 && i < options.length);
+      if (raw.trim() === '') return options.map(o => o.value);
+      return nums.map(i => options[i]!.value);
+    }),
+  };
+});
 
 import IntegrationsCommand from './integrations.js';
 
@@ -182,4 +186,57 @@ test('execAdd links the integration to selected tasks', async () => {
   expect(engine.config.tasks!['post']!.integrations).toEqual(['gloobeam']);
   expect(engine.config.tasks!['digest']!.integrations).toBeUndefined();
   expect(readConfig(engine).integrations['gloobeam']).toBeDefined();
+});
+
+test('execAdd lists nested sub-fields with dotted paths in the required prompt', async () => {
+  // discovery returns an object field with sub-properties
+  globalThis.fetch = ((url: any, init?: any) => {
+    if (init?.method === 'OPTIONS') {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({
+          endpoints: [
+            { methods: ['GET'], args: {} },
+            {
+              methods: ['POST'],
+              args: {
+                slug: { type: 'string', description: 'The slug' },
+                meta: {
+                  type: 'object',
+                  properties: {
+                    keywords: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          ],
+        })),
+        json: () => Promise.resolve({}),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('{}'), json: () => Promise.resolve({}) } as Response);
+  }) as typeof fetch;
+
+  const engine = buildEngine();
+  const cmd = new IntegrationsCommand(engine, new Logger(), ['add']);
+
+  // name -> type ("1"=wordpress) -> endpoint -> user -> appPassword ->
+  // action ("1"=list_posts) -> fields ("1,2"=slug,meta) -> required (blank =
+  // all) -> finish ("6") -> meta loop (blank)
+  answers = ['gloobeam', '1', 'https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', ''];
+
+  await cmd.exec();
+
+  // the required prompt lists every picked field with its dotted path + type
+  const prompts = (askMock as any).mock.calls.map((c: any[]) => String(c[0]));
+  const required = prompts.filter((p: string) => p.includes('Mark required fields')).at(-1)!;
+  expect(required).toContain('gloobeam.slug (string):');
+  expect(required).toContain('gloobeam.meta.keywords (array):');
+
+  // nested sub-fields are persisted with dotted keys
+  const fields = readConfig(engine).integrations['gloobeam'].actions.list_posts.fields;
+  expect(fields['meta.keywords']).toBeDefined();
+  expect(fields['meta.keywords'].type).toBe('array');
+  expect(fields['meta.keywords'].required).toBe(true);
 });

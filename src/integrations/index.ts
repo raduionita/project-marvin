@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import { readdirSync } from 'fs';
 
 import type Engine from '../engine.js';
-import { Field, Integration, IntegrationAction, ToolMeta } from '../types.js';
+import { Field, Integration, ToolMeta } from '../types.js';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
 
@@ -50,14 +50,33 @@ export function splitIntegrationToolName(name: string): { integrationId: string,
 }
 
 // map a Field into a JSON-schema property for the tool parameters
-function fieldToProperty(field: { type?: string, description?: string, enum?: string[] }): { type: string, description: string, enum?: string[] } {
+function fieldToProperty(field: { type?: string, description?: string, enum?: string[], properties?: { [key: string]: Field } }): { [key: string]: any } {
   const type = field.type || 'string';
-  const prop: { type: string, description: string, enum?: string[] } = {
+  const prop: { [key: string]: any } = {
     type,
     description: field.description || '',
   };
   if (field.enum?.length) prop.enum = field.enum;
+  // object/array sub-fields become nested JSON-schema
+  if (field.properties && Object.keys(field.properties).length) {
+    const properties = Object.fromEntries(Object.entries(field.properties).map(([n, p]) => [n, fieldToProperty(p)]));
+    if (type === 'array') prop.items = { type: 'object', properties };
+    else prop.properties = properties;
+  }
   return prop;
+}
+
+// set a (possibly dotted) parameter path in the tool schema, creating nested
+// object levels as needed
+function setNested(properties: { [key: string]: any }, parts: string[], prop: { [key: string]: any }) {
+  const [head, ...rest] = parts;
+  if (!rest.length) {
+    properties[head!] = prop;
+    return;
+  }
+  if (!properties[head!] || typeof properties[head!] !== 'object') properties[head!] = { type: 'object', properties: {} };
+  if (!properties[head!].properties) properties[head!].properties = {};
+  setNested(properties[head!].properties, rest, prop);
 }
 
 // build the parameters for a single action from the configured fields (a
@@ -71,8 +90,8 @@ function actionParameters(config: { [key: string]: any }, action: string): { pro
   if (fieldsCfg && typeof fieldsCfg === 'object') {
     for (const [name, def] of Object.entries(fieldsCfg)) {
       if (!def) continue;
-      properties[name] = fieldToProperty(def);
-      if (def.required === true) required.push(name);
+      setNested(properties, name.split('.'), fieldToProperty(def));
+      if (def.required === true) required.push(name.split('.')[0]!);
     }
   }
 
@@ -90,9 +109,9 @@ function actionParameters(config: { [key: string]: any }, action: string): { pro
 }
 
 // build the ToolMeta for a single integration action
-function makeActionTool(integrationId: string, integration: Integration, action: IntegrationAction, fields: Field[]): ToolMeta {
+function makeActionTool(integrationId: string, integration: Integration, action: string, description: string, fields: Field[]): ToolMeta {
   const config = integration.config || {};
-  const { properties, required } = actionParameters(config, action.name);
+  const { properties, required } = actionParameters(config, action);
 
   // fall back to discovered fields when the config has none configured
   for (const f of fields) {
@@ -104,8 +123,8 @@ function makeActionTool(integrationId: string, integration: Integration, action:
   return {
     type: 'function',
     function: {
-      name: integrationToolName(integrationId, action.name),
-      description: `Run "${action.name}" on the "${integrationId}" integration: ${action.description}`,
+      name: integrationToolName(integrationId, action),
+      description: `Run "${action}" on the "${integrationId}" integration: ${description}`,
       parameters: {
         type: 'object',
         properties,
@@ -130,24 +149,24 @@ export async function loadIntegrationTools(engine: Engine, integrations: string[
     const actionsCfg = config.actions || {};
     const hasConfigured = Object.keys(actionsCfg).length > 0;
 
-    for (const action of integration.meta.actions) {
-      const cfg = actionsCfg[action.name];
+    for (const [action, description] of Object.entries(integration.meta.actions)) {
+      const cfg = actionsCfg[action];
       // when any action is configured, expose only the configured (enabled) ones
       if (hasConfigured && (!cfg || cfg.enabled === false)) continue;
 
       // configured fields (OPTIONS snapshot) drive the tool schema; fall back to
       // live discovery (best effort, never blocks the task loop)
-      let fields = actionParameters(config, action.name).properties;
+      let fields = actionParameters(config, action).properties;
       if (!Object.keys(fields).length) {
         try {
-          const discovered = await integration.discover(action.name);
+          const discovered = await integration.discover(action);
           fields = Object.fromEntries(discovered.map(f => [f.name, f]));
         } catch (err) {
-          engine.logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${action.name}":`, (err as Error).message);
+          engine.logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${action}":`, (err as Error).message);
         }
       }
 
-      tools.push(makeActionTool(id, integration, action, Object.values(fields)));
+      tools.push(makeActionTool(id, integration, action, description, Object.values(fields)));
     }
   }
   return tools;

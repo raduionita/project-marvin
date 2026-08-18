@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { Channel, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta } from './types.js';
+import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta } from './types.js';
 import { Agent } from './agent.js';
 import * as constants from './constants.js';
 import Engine from './engine.js';
@@ -77,7 +77,7 @@ class MockTool extends Tool {
 
 /** A mock channel that records sent messages. */
 class TestChannel extends Channel {
-  public args = {};
+  public meta: ChannelMeta = { name: 'test', arguments: {} };
   async load(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
@@ -101,7 +101,6 @@ function buildTestEngine(opts?: {
   replyContent?: string;
   replyStop?: boolean;
   toolCalls?: Message['tools'];
-  maxSteps?: number;
   customReply?: Reply;
   configAgents?: Record<string, any>;
 }): Engine {
@@ -174,7 +173,7 @@ function chatWith(messages: Chat['messages']): Chat {
 test('sendChat returns dry result when engine.isDry is true', async () => {
   const engine = buildTestEngine({ isDry: true });
 
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   // Dry mode returns early without calling the model
   expect(result).toEqual({ content: '(dry)', steps: 0 });
@@ -188,38 +187,38 @@ test('sendChat returns dry result when engine.isDry is true', async () => {
 test('sendChat pushes system and user messages to chat', async () => {
   const engine = buildTestEngine();
 
-  await engine.agents['marvin']!.sendChat('chat-1', 'hello world', 'json', {"output": "text string of the answer"}, 5);
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello world', 'json', {"output": "text string of the answer"});
 
   const chat = engine.agents['marvin']!.loadChat('chat-1', 'json', {});
   expect(chat).not.toBeNull();
-  // 2 system/user messages + 5 assistant replies from the AI loop
-  expect(chat!.messages.length).toBe(7);
+  // 2 system/user messages + 20 assistant replies from the AI loop
+  expect(chat!.messages.length).toBe(22);
   expect(chat!.messages[0]!.role).toBe('system');
   expect(chat!.messages[0]!.content).toContain('You are Marvin.');
   expect(chat!.messages[1]!.role).toBe('user');
   expect(chat!.messages[1]!.content).toBe('hello world');
   // Verify assistant replies were persisted
   const assistantMessages = chat!.messages.filter((m: Message) => m.role === 'assistant');
-  expect(assistantMessages.length).toBe(5);
+  expect(assistantMessages.length).toBe(20);
 });
 
 test('sendChat returns content and step count from model reply', async () => {
   const engine = buildTestEngine({ replyContent: 'hello from model' });
 
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result).not.toBeNull();
 
   expect(result!.content).toBe('hello from model');
   // The mock model returns stop=false, no tools, no end chat.
-  // The loop runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
-  expect(result!.steps).toBe(4);
+  // The loop runs DEFAULT_MAX_STEPS (20) times: steps goes -1, 0, ..., 18 -> final steps=19
+  expect(result!.steps).toBe(19);
 });
 
 test('sendChat caches the chat after execution', async () => {
   const engine = buildTestEngine();
 
-  await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   const cached = engine.agents['marvin']!.loadChat('chat-1', 'json', {});
   expect(cached).toBeDefined();
@@ -231,10 +230,10 @@ test('sendChat reuses existing chat when chatId already exists', async () => {
   const engine = buildTestEngine();
 
   // First call
-  await engine.agents['marvin']!.sendChat('chat-1', 'first', 'json', {"output": "text string of the answer"}, 5);
+  await engine.agents['marvin']!.sendChat('chat-1', 'first', 'json', {"output": "text string of the answer"});
 
   // Second call with same chatId
-  await engine.agents['marvin']!.sendChat('chat-1', 'second', 'json', {"output": "text string of the answer"}, 5);
+  await engine.agents['marvin']!.sendChat('chat-1', 'second', 'json', {"output": "text string of the answer"});
 
   const chat = engine.agents['marvin']!.loadChat('chat-1', 'json', {});
   // Each call adds 2 messages (system + user) + 5 assistant replies (one per loop iteration)
@@ -245,20 +244,20 @@ test('sendChat reuses existing chat when chatId already exists', async () => {
   expect(chat!.messages[chat!.messages.length - 1]!.content).toBe('end chat');
 });
 
-test('sendChat calls agent.model.execChat maxSteps times when never stopping', async () => {
+test('sendChat calls agent.model.execChat DEFAULT_MAX_STEPS times when never stopping', async () => {
   const engine = buildTestEngine();
 
-  await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   const model = engine.models['mock.model'] as MockModel;
-  // The model is called exactly maxSteps times (5) when it never stops
-  expect(model.callCount).toBe(5);
+  // The model is called exactly DEFAULT_MAX_STEPS times (20) when it never stops
+  expect(model.callCount).toBe(20);
 });
 
 test('sendChat stops when reply.stop is true', async () => {
   const engine = buildTestEngine({ replyStop: true, replyContent: 'stopped early' });
 
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result).not.toBeNull();
 
@@ -285,11 +284,11 @@ test('sendChat executes tool calls from model reply', async () => {
 
   (engine.models['mock.model'] as MockModel).setReply(toolCallReply);
 
-  await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   // After tool execution, the loop continues (no end chat, no stop).
-  // The model is called: 1 (tool call) + 4 (remaining iterations) = 5 total
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(5);
+  // The model is called: 1 (tool call) + 19 (remaining iterations) = 20 total
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(20);
 
   // Check that tool result was pushed to chat
   const chat = engine.agents['marvin']!.loadChat('chat-1', 'json', {});
@@ -316,7 +315,7 @@ test('sendChat handles invalid JSON in tool arguments gracefully', async () => {
   (engine.models['mock.model'] as MockModel).setReply(badToolReply);
 
   // Should not throw - it should catch the JSON parse error and push an error result
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result).toBeDefined();
   // Verify tool error was pushed to chat
@@ -346,7 +345,7 @@ test('sendChat stops the AI loop when end chat tool call is found', async () => 
 
   (engine.models['mock.model'] as MockModel).setReply(finalAnswerReply);
 
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result).not.toBeNull();;
 
@@ -368,7 +367,7 @@ test('sendChat returns empty content when reply has no message content', async (
     message: { role: 'assistant', content: '' },
   } as Reply);
 
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result).not.toBeNull();
 
@@ -382,7 +381,7 @@ test('sendChat returns an error when the agent has no model', async () => {
   // sendChat swallows internal errors and returns an error field when the
   // agent cannot run (e.g. no model attached)
   const agent = new Agent(engine, new Logger(), { id: 'nonexistent', enabled: true, identity: '', channels: {}, model: undefined as any });
-  const result = await agent.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await agent.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result.content).toBe('');
   expect(result.error).toBeDefined();
@@ -391,60 +390,23 @@ test('sendChat returns an error when the agent has no model', async () => {
 test('sendChat returns content and steps from model reply', async () => {
   const engine = buildTestEngine();
 
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result).not.toBeNull();;
 
   expect(result!.content).toBe('end chat');
-  // The model runs maxSteps (5) times: steps goes -1, 0, 1, 2, 3 -> final steps=4
-  expect(result!.steps).toBe(4);
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(5);
+  // The model runs DEFAULT_MAX_STEPS (20) times: steps goes -1, 0, ..., 18 -> final steps=19
+  expect(result!.steps).toBe(19);
+  expect((engine.models['mock.model'] as MockModel).callCount).toBe(20);
 });
 
 test('sendChat passes correct chatId to cache', async () => {
   const engine = buildTestEngine();
 
-  await engine.agents['marvin']!.sendChat('unique-chat-id', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  await engine.agents['marvin']!.sendChat('unique-chat-id', 'hello', 'json', {"output": "text string of the answer"});
 
   const chat = engine.agents['marvin']!.loadChat('unique-chat-id', 'json', {});
   expect(chat!.id).toBe('unique-chat-id');
-});
-
-test('sendChat respects maxSteps limit (1 step)', async () => {
-  const engine = buildTestEngine();
-
-  // With maxSteps=1, the loop runs 1 time: steps=-1 -> 0, 0 < 0 false -> exit
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 1);
-
-  expect(result).not.toBeNull();;
-
-  expect(result!.steps).toBe(0);
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
-});
-
-test('sendChat warns when max steps are reached (maxSteps=1 with never-stopping model)', async () => {
-  const engine = buildTestEngine();
-
-  // A model that never stops (no stop, no end chat, no tools)
-  // Replace the model's reply (not the instance) so the agent's reference stays valid
-  const neverStoppingReply: Reply = {
-    id: 'reply-6',
-    stop: false,
-    finish: undefined,
-    usage: { completion: 5, prompt: 10 },
-    message: { role: 'assistant', content: 'not done yet' },
-  } as Reply;
-
-  (engine.models['mock.model'] as MockModel).setReply(neverStoppingReply);
-
-  // maxSteps=1: steps=-1 -> steps=0 (0 < 0 false) -> exit, steps=0
-  // 0 >= 1 is true -> warning logged
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 1);
-
-  expect(result).not.toBeNull();;
-
-  expect(result!.steps).toBe(0);
-  expect((engine.models['mock.model'] as MockModel).callCount).toBe(1);
 });
 
 test('sendChat returns empty string when reply.message is undefined', async () => {
@@ -460,7 +422,7 @@ test('sendChat returns empty string when reply.message is undefined', async () =
     message: {} as Message,
   } as Reply);
 
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"}, 5);
+  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello', 'json', {"output": "text string of the answer"});
 
   expect(result).not.toBeNull();
 
@@ -472,12 +434,12 @@ test('sendChat returns empty string when reply.message is undefined', async () =
 
 /** A mock integration that records every call and exposes discoverable actions. */
 class MockIntegration extends Integration {
-  args = { endpoint: 'https://example.com' };
   meta: IntegrationMeta = {
     type: 'mock',
     title: 'Mock',
     description: 'Mock integration',
-    actions: [{ name: 'create_post', description: 'Create a post' }],
+    arguments: { endpoint: 'https://example.com' },
+    actions: { create_post: 'Create a post' },
   };
   calls: { action: string; args: { [key: string]: any } }[] = [];
 
@@ -608,15 +570,15 @@ test('makeChat creates a fresh chat (with system prompt) when none was saved', (
 test('makeChat seeds a system prompt with an integrations block for loaded integrations', () => {
   const engine = mockEngine();
   engine.integrations['gloobeam'] = new class extends Integration {
-    args = { endpoint: 'https://gloobeam.com' };
     meta = {
       type: 'wordpress',
       title: 'Wordpress',
       description: 'Post articles to a Wordpress site via its REST API',
-      actions: [
-        { name: 'create_post', description: 'Create a new post' },
-        { name: 'publish_post', description: 'Publish an existing draft post' },
-      ],
+      arguments: { endpoint: 'https://gloobeam.com' },
+      actions: {
+        create_post: 'Create a new post',
+        publish_post: 'Publish an existing draft post',
+      },
     };
     async load() {}
     async drop() {}

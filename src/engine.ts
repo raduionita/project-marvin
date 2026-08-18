@@ -544,7 +544,6 @@ export default class Engine {
         agent: agent,
         schedule: schedule,
         timeout: null,
-        maxSteps: task.maxSteps,
         format: task.format || 'json',
         schema: task.schema || constants.DEFAULT_SCHEMA,
         input: input,
@@ -774,8 +773,6 @@ export default class Engine {
       return;
     }
 
-    const maxSteps = task.maxSteps || constants.DEFAULT_MAX_STEPS;
-
     // TODO: should tasks have cached chats? chatId = `task-${agentId}-${taskId}-${Date.now()}`;
     const chatId = undefined; // stateless, design choice, for not
 
@@ -787,7 +784,7 @@ export default class Engine {
     const tools = [...Object.values(this.tools).map(t => t.meta), ...taskTools];
 
     // set task input as user message to LLM
-    const result = await agent.sendChat(chatId, task.input, format, schema, maxSteps, tools);
+    const result = await agent.sendChat(chatId, task.input, format, schema, tools);
     if (result.error) {
       this.logger.error('[Engine.execTask]', `no result from sendChat for task ${taskId}:`, result.error);
       return;

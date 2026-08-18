@@ -51,15 +51,15 @@ test('loadIntegration returns null for an unknown type', async () => {
 // --- per-action integration tools ---
 
 class MockIntegration extends Integration {
-  args = { endpoint: 'https://example.com' };
   meta: IntegrationMeta = {
     type: 'mock',
     title: 'Mock',
     description: 'Mock integration',
-    actions: [
-      { name: 'create_post', description: 'Create a post' },
-      { name: 'publish_post', description: 'Publish a post' },
-    ],
+    arguments: { endpoint: 'https://example.com' },
+    actions: {
+      create_post: 'Create a post',
+      publish_post: 'Publish a post',
+    },
   };
   discoverResults: Record<string, Field[]> = {};
 

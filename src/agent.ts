@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import type Engine from './engine.js';
 import type { Logger } from './logger.js';
-import type { Chat, IntegrationAction, Model, Reply, Result, ToolMeta } from './types.js';
+import type { Chat, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { cleanContent } from './helpers.js';
@@ -83,11 +83,12 @@ export class Agent {
         type: config?.type || 'integration',
         title: id,
         description: '',
-        actions: [],
+        actions: {},
+        arguments: {},
       };
       const endpoint = config?.endpoint || config?.url || config?.baseUrl || '';
-      const actions = meta.actions.length
-        ? `\nActions: ${meta.actions.map((a: IntegrationAction) => `${a.name} - ${a.description}`).join('; ')}`
+      const actions = Object.keys(meta.actions).length
+        ? `\nActions: ${Object.entries(meta.actions).map(([name, description]) => `${name} - ${description}`).join('; ')}`
         : '';
       const url = endpoint ? ` (${endpoint})` : '';
       return `### ${id}${url}\n${meta.description || meta.title}${actions}`;
@@ -196,7 +197,7 @@ export class Agent {
   }
 
   // exec chat // agent loop
-  async sendChat(chatId: string | undefined, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, maxSteps: number = constants.DEFAULT_MAX_STEPS, tools?: ToolMeta[]) : Promise<Result> {
+  async sendChat(chatId: string | undefined, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, tools?: ToolMeta[]) : Promise<Result> {
     try {
       this.logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
 
@@ -260,11 +261,11 @@ export class Agent {
           this.logger.info('[Agent.sendChat]', `tool stop (${constants.END_CHAT_NAME}) at step=#${steps}`);
           break;
         }
-      } while (steps < maxSteps - 1);
+      } while (steps < constants.DEFAULT_MAX_STEPS - 1);
 
       // warn if max steps reached
-      if (steps >= maxSteps) {
-        this.logger.warn('[Agent.sendChat]', `max steps (${maxSteps}) reached for ${this.id}`);
+      if (steps >= constants.DEFAULT_MAX_STEPS) {
+        this.logger.warn('[Agent.sendChat]', `max steps reached for ${this.id}`);
       }
 
       // save chat to cache

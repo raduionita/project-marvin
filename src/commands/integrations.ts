@@ -6,6 +6,24 @@ import { listIntegrations, loadIntegration } from '../integrations';
 import { select, multiselect, ask } from '../terminal';
 import { Option, Field } from '../types';
 
+// flatten a Field tree into dotted paths (e.g. meta.keywords) so the wizard can
+// list and select sub-fields of object/array types individually
+function flattenFields(fields: Field[], prefix = ''): { name: string, type: string, required: boolean, description: string, enum?: string[] }[] {
+  const out: { name: string, type: string, required: boolean, description: string, enum?: string[] }[] = [];
+  for (const f of fields) {
+    const name = prefix ? `${prefix}.${f.name}` : f.name;
+    out.push({ name, type: f.type, required: f.required, description: f.description, ...(f.enum ? { enum: f.enum } : {}) });
+    if (f.properties) out.push(...flattenFields(Object.values(f.properties), name));
+  }
+  return out;
+}
+
+// list picked fields as `<integration>.<path> (type):` lines + the required question
+function requiredPrompt(integrationName: string, fields: { name: string, type: string }[]): string {
+  const list = fields.map(f => `${integrationName}.${f.name} (${f.type}):`).join('\n');
+  return `${list}\nMark required fields (comma-separated, enter = all selected): `;
+}
+
 // `marvin integrations [command] [--dry]` list, add, drop integrations
 export default class IntegrationsCommand extends Command {
   async exec() {
@@ -116,15 +134,15 @@ export default class IntegrationsCommand extends Command {
     }
 
     // ask for each arg value (url, credentials, ...)
-    for (const [key, placeholder] of Object.entries(integration.args)) {
+    for (const [key, placeholder] of Object.entries(integration.meta.arguments)) {
       config[key] = await ask(`Enter ${type} ${key} (${placeholder}): `);
     }
 
     // ask for the actions and their fields in a loop (until the user is done)
     const actionsCfg: { [key: string]: any } = {};
-    const actionOptions: Option<string>[] = integration.meta.actions.map(a => ({
-      label: `${a.name} - ${a.description}`,
-      value: a.name,
+    const actionOptions: Option<string>[] = Object.entries(integration.meta.actions).map(([name, description]) => ({
+      label: `${name} - ${description}`,
+      value: name,
     }));
 
     while (actionOptions.length) {
@@ -145,26 +163,27 @@ export default class IntegrationsCommand extends Command {
         return;
       }
 
-      // ask which fields to use (checkbox select), marked ones are sent
-      const fieldOptions: Option<string>[] = fields.map(f => ({
+      // ask which fields to use (checkbox select), marked ones are sent;
+      // picking an object/array field includes its sub-fields
+      const picked = await multiselect(`Select fields for "${name}" "${action}" (required ones are sent):`, fields.map(f => ({
         label: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}${f.enum ? ` [${f.enum.join(', ')}]` : ''}`,
         value: f.name,
-      }));
-      const picked = await multiselect(`Select fields for "${name}" "${action}" (required ones are sent):`, fieldOptions, ask);
+      })), ask);
       const pickedSet = new Set(picked || []);
+      const pickedFields = flattenFields(fields.filter(f => pickedSet.has(f.name)));
+      const pathSet = new Set(pickedFields.map(f => f.name));
 
       // ask which of the picked fields are required
-      const requiredNames = fields.filter(f => pickedSet.has(f.name)).map(f => f.name);
-      const requiredRaw = await ask(`Mark required fields (comma-separated, enter = all selected): `);
+      const requiredRaw = await ask(requiredPrompt(name, pickedFields));
+      const requiredTokens = requiredRaw.trim() ? requiredRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
       const requiredSet = new Set(
-        requiredRaw.trim()
-          ? requiredRaw.split(',').map(s => s.trim()).filter(Boolean)
-          : requiredNames
+        requiredTokens.length
+          ? requiredTokens.map(t => t.startsWith(`${name}.`) ? t.slice(name.length + 1) : t).filter(t => pathSet.has(t))
+          : pickedFields.map(f => f.name)
       );
 
       const fieldsCfg: { [key: string]: any } = {};
-      for (const f of fields) {
-        if (!pickedSet.has(f.name)) continue;
+      for (const f of pickedFields) {
         fieldsCfg[f.name] = {
           type: f.type,
           required: requiredSet.has(f.name),
@@ -186,7 +205,7 @@ export default class IntegrationsCommand extends Command {
     // ask for custom meta fields (site specific, not discoverable via OPTIONS)
     const metaFields: { [key: string]: any } = {};
     this.logger.log('');
-    this.logger.info('[IntegrationsCommand.execAdd]', 'optional: add custom meta fields (e.g. ACF fields on gloobeam)');
+    this.logger.info('optional: add custom meta fields (e.g. ACF fields on gloobeam)');
     while (true) {
       const mname = await ask('Enter a custom meta field name (blank to stop): ');
       if (!mname.trim()) break;
@@ -239,7 +258,7 @@ export default class IntegrationsCommand extends Command {
   async execInfo() {
     this.logger.debug('[IntegrationsCommand.execInfo]');
 
-    const pname = this.args[1];
+    const pname = this.args[1] || await ask('Enter integration name (e.g. mycoolsite): ');
     if (!pname) {
       this.logger.warn('[IntegrationsCommand.execInfo]', 'usage: marvin integrations info <name>');
       return;
@@ -258,17 +277,17 @@ export default class IntegrationsCommand extends Command {
     }
 
     // run discovery for every action and preview the resulting config
-    const actionsCfg: { [key: string]: any } = {};
-    for (const a of integration.meta.actions) {
+    const actions: { [key: string]: any } = {};
+    for (const name of Object.keys(integration.meta.actions)) {
       let fields: Field[] = [];
       try {
-        fields = await integration.discover(a.name);
+        fields = await integration.discover(name);
       } catch (err) {
-        this.logger.error('[IntegrationsCommand.execInfo]', 'discovery failed for', a.name, ':', (err as Error).message);
+        this.logger.error('[IntegrationsCommand.execInfo]', 'discovery failed for', name, ':', (err as Error).message);
         return;
       }
       if (!fields.length) {
-        this.logger.error('[IntegrationsCommand.execInfo]', `no fields found for action "${a.name}"`);
+        this.logger.error('[IntegrationsCommand.execInfo]', `no fields found for action "${name}"`);
         return;
       }
       const fieldsCfg: { [key: string]: any } = {};
@@ -280,12 +299,11 @@ export default class IntegrationsCommand extends Command {
           ...(f.enum ? { enum: f.enum } : {}),
         };
       }
-      actionsCfg[a.name] = { enabled: true, fields: fieldsCfg };
+      actions[name] = { enabled: true, fields: fieldsCfg };
     }
 
-    this.logger.log('');
-    this.logger.info('[IntegrationsCommand.execInfo]', `config preview for "${pname}" (not persisted):`);
-    this.logger.info(JSON.stringify({ ...config, actions: actionsCfg }, null, 2));
+    this.logger.info(`config preview for "${pname}" (not persisted):`);
+    this.logger.info(JSON.stringify({ ...config, actions: actions }, null, 2));
   }
 
   // `marvin integrations edit [name]`
@@ -316,8 +334,8 @@ export default class IntegrationsCommand extends Command {
 
     const current = Object.keys(actionsCfg).length
       ? Object.keys(actionsCfg)
-      : (info.actions.map(a => a.name).length ? [info.actions[0]!.name] : []);
-    const action = await select(`Select an action to edit for "${pname}" (current: ${current.join(', ') || 'none'}):`, info.actions.map(a => ({ label: `${a.name} - ${a.description}`, value: a.name }) as Option<string>), ask);
+      : (Object.keys(info.actions).length ? [Object.keys(info.actions)[0]!] : []);
+    const action = await select(`Select an action to edit for "${pname}" (current: ${current.join(', ') || 'none'}):`, Object.entries(info.actions).map(([name, description]) => ({ label: `${name} - ${description}`, value: name }) as Option<string>), ask);
     if (!action) return;
 
     let fields: Field[] = [];
@@ -334,16 +352,23 @@ export default class IntegrationsCommand extends Command {
 
     // pre-select the currently configured fields
     const currentFields = actionsCfg[action]?.fields as { [key: string]: any } | undefined;
-    const prePicked = currentFields ? Object.keys(currentFields) : fields.filter(f => f.required).map(f => f.name);
-    const picked = await multiselect(`Select fields for "${pname}" "${action}" (current: ${prePicked.join(', ') || 'none'}):`, fields.map(f => ({ label: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}`, value: f.name }) as Option<string>), ask) || prePicked;
+    const flat = flattenFields(fields);
+    const prePicked = currentFields ? Object.keys(currentFields) : flat.filter(f => f.required).map(f => f.name);
+    const picked = await multiselect(`Select fields for "${pname}" "${action}" (current: ${prePicked.join(', ') || 'none'}):`, flat.map(f => ({ label: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}`, value: f.name }) as Option<string>), ask) || prePicked;
     const pickedSet = new Set(picked);
+    const pickedFields = flat.filter(f => pickedSet.has(f.name));
+    const pathSet = new Set(pickedFields.map(f => f.name));
 
-    const requiredRaw = await ask('Mark required fields (comma-separated, enter = all selected): ');
-    const requiredSet = new Set(requiredRaw.trim() ? requiredRaw.split(',').map(s => s.trim()).filter(Boolean) : Array.from(pickedSet));
+    const requiredRaw = await ask(requiredPrompt(pname, pickedFields));
+    const requiredTokens = requiredRaw.trim() ? requiredRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const requiredSet = new Set(
+      requiredTokens.length
+        ? requiredTokens.map(t => t.startsWith(`${pname}.`) ? t.slice(pname.length + 1) : t).filter(t => pathSet.has(t))
+        : Array.from(pickedSet)
+    );
 
     const fieldsCfg: { [key: string]: any } = {};
-    for (const f of fields) {
-      if (!pickedSet.has(f.name)) continue;
+    for (const f of pickedFields) {
       fieldsCfg[f.name] = {
         type: f.type,
         required: requiredSet.has(f.name),

@@ -34,7 +34,7 @@ test('tasks add writes TASK.md and persists config', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'my-task', 'do the thing every hour', '7200', '5', 'text'];
+  answers = ['', 'my-task', 'do the thing every hour', '7200', 'text'];
   await cmd.execAdd();
 
   // TASK.md created with the prompt
@@ -47,7 +47,6 @@ test('tasks add writes TASK.md and persists config', async () => {
     enabled: true,
     agent: 'my-agent',
     schedule: 7200,
-    maxSteps: 5,
     format: 'text',
     schema: constants.DEFAULT_SCHEMA,
   });
@@ -74,7 +73,7 @@ test('tasks add refuses existing task', async () => {
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} } },
-    { 'my-task': { enabled: true, agent: 'my-agent', schedule: 3600, maxSteps: 20, format: 'json' } },
+    { 'my-task': { enabled: true, agent: 'my-agent', schedule: 3600, format: 'json' } },
   );
 
   const cmd = new TasksCommand(engine, new Logger(), []);
@@ -101,7 +100,6 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
     enabled: true,
     agent: 'my-agent',
     schedule: 60,
-    maxSteps: 20,
     format: 'json',
     schema: constants.DEFAULT_SCHEMA,
   });
@@ -119,14 +117,13 @@ test('tasks add links configured integrations, skipping unknown ones', async () 
   } as Config['integrations'];
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'post-task', 'write a post', '60', '5', 'json', 'gloobeam, nope'];
+  answers = ['', 'post-task', 'write a post', '60', 'json', 'gloobeam, nope'];
   await cmd.execAdd();
 
   expect(engine.config.tasks!['post-task']).toEqual({
     enabled: true,
     agent: 'my-agent',
     schedule: 60,
-    maxSteps: 5,
     format: 'json',
     schema: constants.DEFAULT_SCHEMA,
     integrations: ['gloobeam'],

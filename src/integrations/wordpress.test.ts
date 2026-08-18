@@ -263,8 +263,8 @@ test('meta lists the wordpress actions', async () => {
   const info = integration.meta;
 
   expect(info.type).toBe('wordpress');
-  expect(info.actions.map(a => a.name)).toContain('create_post');
-  expect(info.actions.map(a => a.name)).toContain('list_posts');
+  expect(Object.keys(info.actions)).toContain('create_post');
+  expect(Object.keys(info.actions)).toContain('list_posts');
 });
 
 // --- discover (OPTIONS) ---
@@ -297,6 +297,38 @@ test('discover parses the OPTIONS endpoint args into FieldDefs', async () => {
   expect(fields.find(f => f.name === 'content')?.required).toBe(false);
   expect(fields.find(f => f.name === 'status')?.enum).toEqual(['publish', 'draft', 'pending']);
   expect(fields.find(f => f.name === 'content')?.type).toBe('string');
+});
+
+test('discover keeps array and object types with their sub-properties', async () => {
+  mockFetch({
+    endpoints: [
+      { methods: ['GET'], args: {} },
+      {
+        methods: ['POST'],
+        args: {
+          tags: { type: 'array', items: { type: 'integer' } },
+          meta: {
+            type: 'object',
+            properties: {
+              keywords: { type: 'array', items: { type: 'string' } },
+              description: { type: 'string' },
+            },
+          },
+        },
+      },
+    ],
+  });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+
+  const fields = await integration.discover('create_post');
+
+  const tags = fields.find(f => f.name === 'tags')!;
+  expect(tags.type).toBe('array');
+
+  const meta = fields.find(f => f.name === 'meta')!;
+  expect(meta.type).toBe('object');
+  expect(meta.properties?.keywords?.type).toBe('array');
+  expect(meta.properties?.description?.type).toBe('string');
 });
 
 test('discover throws when the OPTIONS payload has no POST endpoint', async () => {
@@ -373,6 +405,19 @@ test('create_post sends custom meta fields under the meta object', async () => {
 
   const [, init] = fetchMock.calls[0]!;
   expect(JSON.parse(init.body)).toEqual({ title: 'Hi', meta: { custom_author: 'Ada', featured: true } });
+});
+
+test('create_post nests dotted configured fields under their parent object', async () => {
+  const fetchMock = mockFetch({ id: 12 });
+  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+    type: 'wordpress', endpoint: 'https://example.com',
+    actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true }, 'meta.keywords': { type: 'array' } } } },
+  });
+
+  await integration.call({ action: 'create_post', title: 'Hi', 'meta.keywords': ['ai', 'ml'] });
+
+  const [, init] = fetchMock.calls[0]!;
+  expect(JSON.parse(init.body)).toEqual({ title: 'Hi', meta: { keywords: ['ai', 'ml'] } });
 });
 
 test('create_post sends custom fields under acf when target is acf', async () => {

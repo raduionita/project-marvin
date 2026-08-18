@@ -5,8 +5,7 @@ import FindIntegrationTool from './find_integration.js';
 import { Integration } from '../types.js';
 
 class WordpressLikeIntegration extends Integration {
-  args = { endpoint: 'https://gloobeam.com' };
-  meta = { type: 'wordpress', title: 'Wordpress', description: 'Post articles to a wordpress site', actions: [{ name: 'create_post', description: 'Create a post' }] };
+  meta = { type: 'wordpress', title: 'Wordpress', description: 'Post articles to a wordpress site', arguments: { endpoint: 'https://gloobeam.com' }, actions: { create_post: 'Create a post' } };
   async load() {}
   async drop() {}
   async call() { return {}; }

@@ -48,7 +48,6 @@ export interface Config {
     type?: TaskType;
     agent?: string;
     schedule: number;
-    maxSteps: number;
     input?: string;
     format?: 'text' | 'json';
     schema?: {[key:string]:string};
@@ -87,9 +86,14 @@ export abstract class Tool {
   public abstract call(args: {[key:string]:any}): Promise<{[key:string]:any}>;
 }
 
+export interface ChannelMeta {
+  name: string;
+  arguments: { [key: string]: any };
+};
+
 // channel interface
 export abstract class Channel {
-  abstract args: {[key: string]: any};
+  abstract meta: ChannelMeta;
 
   constructor(public engine: Engine, public logger: Logger) {
     this.logger.debug(`[${this.constructor.name||'Channel'}.constructor]`);
@@ -118,13 +122,8 @@ export interface Field {
   enum?: string[];
   // target when the field is a custom/meta field: meta, acf or undefined
   meta?: 'meta' | 'acf';
-}
-
-export interface IntegrationAction {
-  // action name passed to Integration.call (e.g. create_post)
-  name: string;
-  // one line description shown to the user and the LLM
-  description: string;
+  // nested sub-fields for object/array types (e.g. meta.keywords), keyed by name
+  properties?: { [key: string]: Field };
 }
 
 // what an integration type is capable of, without any per-site configuration.
@@ -135,14 +134,15 @@ export interface IntegrationMeta {
   title: string;
   // one line description (e.g. "Post articles to a Wordpress site")
   description: string;
-  // all actions this integration type supports
-  actions: IntegrationAction[];
+  // all actions this integration type supports: action name -> description
+  actions: { [key: string]: string };
+  // config keys the integration needs (endpoint, credentials, ...) with placeholder values
+  arguments: { [key: string]: any };
 }
 
 // integration interface: a bridge to a 3rd party endpoint (e.g. Wordpress API)
 export abstract class Integration {
-  abstract args: {[key: string]: any};
-  // static info about this integration type (type, title, description, actions).
+  // static info about this integration type (type, title, description, actions, arguments).
   // used to build the ## Integrations system-prompt block and the wizard prompts.
   abstract meta: IntegrationMeta;
 
@@ -225,8 +225,6 @@ export interface Task {
   agent?: Agent;
   // TODO: schedule to cron-like format
   schedule: number;
-  // max number of steps to run agent loop
-  maxSteps: number;
   // timeout = setTimeout()
   timeout: NodeJS.Timeout | null;
   // task prompt for the LLM

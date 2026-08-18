@@ -13,8 +13,7 @@ function mockEngine(integrations: Record<string, Integration> = {}, configIntegr
 }
 
 class FakeIntegration extends Integration {
-  args = { endpoint: 'https://example.com' };
-  meta = { type: 'fake', title: 'Fake', description: '', actions: [] };
+  meta = { type: 'fake', title: 'Fake', description: '', arguments: { endpoint: 'https://example.com' }, actions: {} };
   calls: { action: string, params: { [key: string]: any } }[] = [];
   async load() {}
   async drop() {}
@@ -25,8 +24,7 @@ class FakeIntegration extends Integration {
 }
 
 class WordpressLikeIntegration extends Integration {
-  args = { endpoint: 'https://example.com' };
-  meta = { type: 'wordpress', title: 'Wordpress', description: '', actions: [{ name: 'create_post', description: 'Create a post' }, { name: 'publish_post', description: 'Publish a post' }] };
+  meta = { type: 'wordpress', title: 'Wordpress', description: '', arguments: { endpoint: 'https://example.com' }, actions: { create_post: 'Create a post', publish_post: 'Publish a post' } };
   async load() {}
   async drop() {}
   async call() { return {}; }

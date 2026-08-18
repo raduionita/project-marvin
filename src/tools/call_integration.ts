@@ -1,4 +1,4 @@
-import { Tool, ToolMeta, IntegrationAction } from '../types.js';
+import { Tool, ToolMeta } from '../types.js';
 
 export default class CallIntegrationTool extends Tool {
   // the meta is dynamic: rebuilt from the configured integrations so the LLM
@@ -13,11 +13,11 @@ export default class CallIntegrationTool extends Tool {
     for (const [id, config] of Object.entries(this.engine.config.integrations || {})) {
       const type = config.type || '';
       const integration = this.engine.integrations[id];
-      const info = integration ? integration.meta : { actions: [] as IntegrationAction[] };
-      for (const a of info.actions) {
-        if (!actions.has(a.name)) actions.set(a.name, a.description);
+      const info = integration ? integration.meta : { actions: {} };
+      for (const [name, description] of Object.entries(info.actions)) {
+        if (!actions.has(name)) actions.set(name, description);
       }
-      if (type && !info.actions.length && !actions.has('request')) {
+      if (type && !Object.keys(info.actions).length && !actions.has('request')) {
         // unknown/undescribed integration type: fall back to a generic action
         actions.set('request', 'Run a raw request against the integration');
       }

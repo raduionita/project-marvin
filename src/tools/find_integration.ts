@@ -32,11 +32,11 @@ export default class FindIntegrationTool extends Tool {
     }
 
     const info = integration.meta;
-    const action = info.actions.find(a => a.name === args.action);
-    if (!action) {
+    const description = info.actions[args.action];
+    if (description === undefined) {
       return {
         error: `action "${args.action}" does not exist on integration "${args.integration}"`,
-        actions: info.actions.map(a => a.name),
+        actions: Object.keys(info.actions),
       };
     }
 
@@ -69,7 +69,7 @@ export default class FindIntegrationTool extends Tool {
       type: info.type,
       url: integration.config?.endpoint || integration.config?.url || '',
       action: args.action,
-      description: action.description,
+      description,
       fields: [...fields, ...metaFields],
       required_fields: [...fields, ...metaFields].filter(f => f.required).map(f => f.name),
     };

@@ -1,8 +1,11 @@
-import { Channel, Message } from '../types.js';
+import { Channel, Message, ChannelMeta } from '../types.js';
 
 export default class WhatsAppChannel extends Channel {
-  public args = {
-    token: '',
+  public meta: ChannelMeta = {
+    name: 'whatsapp',
+    arguments: {
+      token: '',
+    },
   }
 
   async load() : Promise<void> {

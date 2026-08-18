@@ -1,8 +1,11 @@
-import { Channel, Message } from '../types.js';
+import { Channel, Message, ChannelMeta } from '../types.js';
 
 export default class TelegramChannel extends Channel {
-  public args ={
-    token: '',
+  public meta: ChannelMeta = {
+    name: 'telegram',
+    arguments: {
+      token: '',
+    },
   }
 
   async load() : Promise<void> {

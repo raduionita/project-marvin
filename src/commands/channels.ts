@@ -102,7 +102,7 @@ export default class ChannelsCommand extends Command {
     const config: Record<string, string> = {};
 
     // ask for arguments (for each arg in args, ask for value)
-    for (const [arg, placeholder] of Object.entries(channel.args)) {
+    for (const [arg, placeholder] of Object.entries(channel.meta.arguments)) {
       config[arg] = await ask(`Enter ${channelId} ${arg} (e.g. ${placeholder}): `) as string;
     }
 

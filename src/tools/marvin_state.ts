@@ -37,7 +37,6 @@ export default class MarvinStateTool extends Tool {
       tasks[`${task.agent?.id || '?'}/${taskId}`] = {
         enabled: task.enabled,
         schedule: task.schedule,
-        maxSteps: task.maxSteps,
         format: task.format,
       };
     }
