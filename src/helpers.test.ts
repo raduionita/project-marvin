@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { extractOutput, cleanContent, extractLeadingJsonObject, withRetry, markdownToMrkdwn } from './helpers.js';
+import { extractOutput, cleanContent, extractLeadingJsonObject, withRetry, markdownToMrkdwn, mergeConfig } from './helpers.js';
 
 test('extractOutput pulls the output field from JSON', () => {
   expect(extractOutput('{"output": "hello world"}')).toBe('hello world');
@@ -139,4 +139,50 @@ test('markdownToMrkdwn leaves code blocks and inline code untouched', () => {
 
 test('markdownToMrkdwn handles empty content', () => {
   expect(markdownToMrkdwn('')).toBe('');
+});
+
+test('mergeConfig fills missing keys with defaults', () => {
+  const defaults = { settings: { name: 'marvin', port: 7331 }, channels: {}, integrations: {} };
+  const incoming = { settings: { name: 'other' } };
+
+  const merged = mergeConfig(defaults as any, incoming);
+
+  expect(merged.settings.name).toBe('other');
+  expect(merged.settings.port).toBe(7331);
+  expect(merged.channels).toEqual({});
+  expect(merged.integrations).toEqual({});
+});
+
+test('mergeConfig keeps incoming top-level keys not in defaults', () => {
+  const defaults = { settings: { name: 'marvin' }, channels: {} };
+  const incoming = { tasks: { daily: { enabled: true } } };
+
+  const merged = mergeConfig(defaults as any, incoming);
+
+  expect(merged.tasks).toEqual({ daily: { enabled: true } });
+});
+
+test('mergeConfig merges nested objects recursively, incoming wins', () => {
+  const defaults = { models: {}, agents: { marvin: { enabled: false, channels: {} } } };
+  const incoming = { agents: { marvin: { enabled: true, channels: { slack: 'C123' } } } };
+
+  const merged = mergeConfig(defaults as any, incoming);
+
+  expect(merged.agents.marvin.enabled).toBe(true);
+  expect(merged.agents.marvin.channels).toEqual({ slack: 'C123' });
+});
+
+test('mergeConfig treats empty incoming as full defaults', () => {
+  const defaults = { settings: { name: 'marvin', port: 7331 }, integrations: {} };
+
+  expect(mergeConfig(defaults as any, {})).toEqual(defaults);
+});
+
+test('mergeConfig does not merge arrays', () => {
+  const defaults = { tasks: { a: { integrations: [] } } };
+  const incoming = { tasks: { a: { integrations: ['wp'] } } };
+
+  const merged = mergeConfig(defaults as any, incoming);
+
+  expect(merged.tasks.a.integrations).toEqual(['wp']);
 });

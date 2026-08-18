@@ -77,11 +77,12 @@ export default class IntegrationsCommand extends Command {
   async execList() {
     this.logger.debug('[IntegrationsCommand.execList]');
     this.logger.log('integrations:');
-    const configured = Object.keys(this.engine.config.integrations).length;
+    const integrations = this.engine.config.integrations || {};
+    const configured = Object.keys(integrations).length;
     if (configured === 0) {
       this.logger.log('  (none)');
     }
-    for (const [id, config] of Object.entries(this.engine.config.integrations)) {
+    for (const [id, config] of Object.entries(integrations)) {
       this.logger.log(`  ${id}`);
       this.logger.log('  - type:', config.type);
       this.logger.log('  - enabled:', config.enabled);

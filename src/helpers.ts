@@ -17,6 +17,24 @@ export function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Deep merge: defaults fill in missing keys, incoming values win. Used to
+// combine DEFAULT_CONFIG with a parsed marvin.json so missing sections
+// (integrations, channels, ...) never end up undefined.
+export function mergeConfig<T>(defaults: T, incoming: any): T {
+  const out: any = { ...defaults };
+  for (const [key, value] of Object.entries(incoming || {})) {
+    if (
+      value && typeof value === 'object' && !Array.isArray(value) &&
+      out[key] && typeof out[key] === 'object' && !Array.isArray(out[key])
+    ) {
+      out[key] = mergeConfig(out[key], value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out as T;
+}
+
 // retry an async call a few times on failure, with a short backoff between
 // attempts. used for transient failures (timeouts, 5xx, network hiccups).
 export async function withRetry<T>(fn: () => Promise<T>, opts: { retries?: number; delayMs?: number; shouldRetry?: (err: unknown) => boolean } = {}): Promise<T> {

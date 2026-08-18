@@ -6,7 +6,7 @@ import { configDotenv } from 'dotenv';
 
 import {  Command, Config } from './types.js';
 import * as constants from './constants.js';
-import { tryJsonParse } from './helpers.js';
+import { mergeConfig, tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
 import { Logger, setLoggerMode } from './logger.js';
 import Engine from './engine.js';
@@ -71,13 +71,11 @@ await (new class Marvin {
   loadConfig(config?: Config | undefined) {
     this.logger.debug('[Marvin.loadConfig]');
     if (config) {
-      this.engine.config = config;
+      this.engine.config = mergeConfig(constants.DEFAULT_CONFIG as Config, config);
       return;
     }
 
     configDotenv({ encoding: 'utf8', quiet: true, path: ['.env', '.env.local'] });
-
-    config = {} as Config;
 
     // at this stage marvin.json MUST exist, but just in case
     const cpath = join(this.engine.work, 'marvin.json');
@@ -88,7 +86,7 @@ await (new class Marvin {
 
     const data = readFileSync(cpath, 'utf8');
 
-    this.engine.config = tryJsonParse(data)!;
+    this.engine.config = mergeConfig(constants.DEFAULT_CONFIG as Config, tryJsonParse(data));
   }
 
   loadFlags() {
