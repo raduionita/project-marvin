@@ -1,3 +1,4 @@
+import { input } from '@inquirer/prompts';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -6,7 +7,6 @@ import { listSystems } from "../systems";
 import { listTools, listCustomTools } from "../tools";
 import { readSkill } from "../skills";
 import { Command, System, Tool, ToolMeta } from "../types";
-import { ask } from '../terminal';
 
 export default class ToolsCommand extends Command {
   async exec() {
@@ -127,14 +127,19 @@ export default class ToolsCommand extends Command {
     this.logger.debug('[ToolCommand.execAdd]', 'creating a custom tool...');
 
     // ask for the tool name
-    const name = this.args[1] || await ask('Tool name (e.g. web_search): ');
+    const name = this.args[1] || await input({
+      message: 'Tool name (e.g. web_search):',
+      required: true,
+      pattern: /^[a-zA-Z0-9_-]+$/,
+      patternError: 'invalid tool name (use a-z, 0-9, _ and -)',
+    });
     if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
       this.logger.error('[ToolCommand.execAdd]', 'invalid tool name (use a-z, 0-9, _ and -):', name);
       return;
     }
 
     // ask for what the tool should do
-    const description = this.args.slice(2).join(' ') || await ask('What should the tool do? ');
+    const description = this.args.slice(2).join(' ') || await input({ message: 'What should the tool do?', required: true });
     if (!description) {
       this.logger.error('[ToolCommand.execAdd]', 'no description provided, exiting');
       return;
@@ -206,7 +211,12 @@ export default class ToolsCommand extends Command {
     this.logger.debug('[ToolCommand.execEdit]', 'editing a custom tool...');
 
     // ask for the tool name
-    const name = this.args[1] || await ask('Tool name (e.g. web_search): ');
+    const name = this.args[1] || await input({
+      message: 'Tool name (e.g. web_search):',
+      required: true,
+      pattern: /^[a-zA-Z0-9_-]+$/,
+      patternError: 'invalid tool name (use a-z, 0-9, _ and -)',
+    });
     if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
       this.logger.error('[ToolCommand.execEdit]', 'invalid tool name (use a-z, 0-9, _ and -):', name);
       return;
@@ -221,7 +231,7 @@ export default class ToolsCommand extends Command {
     const current = readFileSync(tpath, 'utf8');
 
     // ask for what to change
-    const description = this.args.slice(2).join(' ') || await ask('What should change about the tool? ');
+    const description = this.args.slice(2).join(' ') || await input({ message: 'What should change about the tool?', required: true });
     if (!description) {
       this.logger.error('[ToolCommand.execEdit]', 'no description provided, exiting');
       return;

@@ -6,12 +6,12 @@ import { Config } from '../types.js';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
+import { buildPromptMocks } from '../tests/promptMock.js';
 
-// scripted answers consumed by the mocked terminal prompt
+// scripted answers consumed by the mocked @inquirer/prompts prompts
 let answers: string[] = [];
-mock.module('../terminal.js', () => ({
-  ask: mock(async () => answers.shift() ?? ''),
-}));
+const promptMocks = buildPromptMocks(() => answers);
+mock.module('@inquirer/prompts', () => promptMocks);
 
 import TasksCommand from './tasks.js';
 
@@ -61,8 +61,7 @@ test('tasks add refuses unknown agent', async () => {
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({});
 
-  const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['ghost-agent'];
+  const cmd = new TasksCommand(engine, new Logger(), ['add', 'ghost-agent']);
   await cmd.execAdd();
 
   expect(existsSync(join(engine.work, 'tasks', 'ghost-agent'))).toBe(false);
@@ -105,7 +104,7 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
   });
 });
 
-test('tasks add links configured integrations, skipping unknown ones', async () => {
+test('tasks add links configured integrations via checkbox', async () => {
   const engine = new Engine(new Logger());
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
@@ -117,7 +116,7 @@ test('tasks add links configured integrations, skipping unknown ones', async () 
   } as Config['integrations'];
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'post-task', 'write a post', '60', 'json', 'gloobeam, nope'];
+  answers = ['', 'post-task', 'write a post', '60', 'json', '1'];
   await cmd.execAdd();
 
   expect(engine.config.tasks!['post-task']).toEqual({

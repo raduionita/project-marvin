@@ -6,12 +6,12 @@ import { Config } from '../types.js';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
+import { buildPromptMocks } from '../tests/promptMock.js';
 
-// scripted answers consumed by the mocked terminal prompt
+// scripted answers consumed by the mocked @inquirer/prompts prompts
 let answers: string[] = [];
-mock.module('../terminal.js', () => ({
-  ask: mock(async () => answers.shift() ?? ''),
-}));
+const promptMocks = buildPromptMocks(() => answers);
+mock.module('@inquirer/prompts', () => promptMocks);
 
 import AgentsCommand from './agents.js';
 
@@ -34,7 +34,7 @@ test('agents add writes IDENTITY.md and persists config', async () => {
   );
 
   const cmd = new AgentsCommand(engine, new Logger(), []);
-  answers = ['my-agent', '', 'slack', 'general', 'I am a test agent'];
+  answers = ['my-agent', '', '1', 'general', 'I am a test agent'];
   await cmd.execAdd();
 
   // IDENTITY.md created with the provided identity
@@ -52,22 +52,6 @@ test('agents add writes IDENTITY.md and persists config', async () => {
   // config file persisted too
   const cpath = join(engine.work, 'marvin.json');
   expect(existsSync(cpath)).toBe(true);
-});
-
-test('agents add refuses unknown model', async () => {
-  const engine = new Engine(new Logger());
-  engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
-  engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
-    {},
-  );
-
-  const cmd = new AgentsCommand(engine, new Logger(), []);
-  answers = ['my-agent', 'gpt-4'];
-  await cmd.execAdd();
-
-  expect(engine.config.agents['my-agent']).toBeUndefined();
-  expect(existsSync(join(engine.work, 'agents', 'my-agent'))).toBe(false);
 });
 
 test('agents add refuses existing agent', async () => {
@@ -102,4 +86,38 @@ test('agents add uses default identity when blank', async () => {
 
   const ipath = join(engine.work, 'agents', 'my-agent', 'IDENTITY.md');
   expect(readFileSync(ipath, 'utf8').trim()).toBe(constants.IDENTITY_MD.trim());
+});
+
+test('agents add picks the group from cached channel info', async () => {
+  const engine = new Engine(new Logger());
+  engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
+  engine.config = mockConfig(
+    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { slack: { enabled: true, groups: { C1: 'general', C2: 'random' } } },
+  );
+
+  const cmd = new AgentsCommand(engine, new Logger(), []);
+  answers = ['my-agent', '', '', 'C2', 'I am a test agent'];
+  await cmd.execAdd();
+
+  expect(engine.config.agents['my-agent']).toEqual({
+    enabled: true,
+    model: 'deepseek/deepseek-chat',
+    channels: { slack: 'C2' },
+  });
+});
+
+test('agents add falls back to manual group entry via the (type manually) choice', async () => {
+  const engine = new Engine(new Logger());
+  engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
+  engine.config = mockConfig(
+    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { slack: { enabled: true, groups: { C1: 'general' } } },
+  );
+
+  const cmd = new AgentsCommand(engine, new Logger(), []);
+  answers = ['my-agent', '', '', '__manual__', 'C9', 'I am a test agent'];
+  await cmd.execAdd();
+
+  expect(engine.config.agents['my-agent']!.channels.slack).toBe('C9');
 });

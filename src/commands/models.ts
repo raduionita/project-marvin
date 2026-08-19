@@ -1,8 +1,8 @@
+import { input, password, select } from '@inquirer/prompts';
 import { listModels } from "../models";
 import { Command, Config, Provider } from "../types";
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { ask } from '../terminal';
 
 export default class ModelsCommand extends Command {
   async exec() {
@@ -37,10 +37,19 @@ export default class ModelsCommand extends Command {
         const config = {} as Config['models'][string];
         
         this.logger.log('');
-        config['provider'] = await ask('Enter provider [openai, anthropic, deepseek, lmstudio]: ') as Provider;
-        config['model']    = await ask('Enter model name (e.g. gpt-3.5-turbo): ');
-        config['baseUrl']  = await ask('Enter baseUrl (e.g. http://localhost:1234): ');
-        config['apiKey']   = await ask('Enter apiKey (e.g. sk-1234): ');
+        config['provider'] = await select<Provider>({
+          message: 'Select provider:',
+          choices: [
+            { name: 'openai', value: 'openai' },
+            { name: 'anthropic', value: 'anthropic' },
+            { name: 'deepseek', value: 'deepseek' },
+            { name: 'lmstudio', value: 'lmstudio' },
+          ],
+          default: 'openai',
+        });
+        config['model']    = await input({ message: 'Enter model name (e.g. gpt-3.5-turbo):', required: true });
+        config['baseUrl']  = await input({ message: 'Enter baseUrl (e.g. http://localhost:1234):' });
+        config['apiKey']   = await password({ message: 'Enter apiKey (e.g. sk-1234):' });
         this.logger.log('');
         
         if (!config['baseUrl']) delete config['baseUrl'];

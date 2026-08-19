@@ -1,9 +1,9 @@
+import { checkbox, input, select } from '@inquirer/prompts';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from "../types";
 import * as constants from '../constants';
-import { ask } from '../terminal';
 
 // `marvin agents [command] [--dry]` list, add, bind, chat, drop agents
 export default class AgentsCommand extends Command {
@@ -45,7 +45,7 @@ export default class AgentsCommand extends Command {
       // TODO: start interactive prompt mode here...loop until /exit/quit/stop
 
       // prompt interactively
-      const answer = await ask('You: ');
+      const answer = await input({ message: 'You:' });
 
       // if empty answer, exit
       if (!answer) {
@@ -84,7 +84,7 @@ export default class AgentsCommand extends Command {
 
     try {
       // ask for agentId
-      const agentId = this.args[1] || await ask('Enter agent name (e.g. my-agent): ');
+      const agentId = this.args[1] || await input({ message: 'Enter agent name (e.g. my-agent):', required: true });
       if (!agentId || !/^[a-zA-Z0-9_-]+$/.test(agentId)) {
         this.logger.error('[AgentsCommand.execAdd]', 'invalid agent name (use a-z, 0-9, _ and -):', agentId);
         return;
@@ -102,9 +102,13 @@ export default class AgentsCommand extends Command {
         this.logger.error('[AgentsCommand.execAdd]', 'no models configured, please run "marvin models add" first');
         return;
       }
-      this.logger.info('[AgentsCommand.execAdd]', 'configured models:', modelIds.join(', '));
+
       const defaultModel = modelIds[0]!;
-      const modelId = await ask(`Enter model id (press enter for "${defaultModel}"): `) || defaultModel;
+      const modelId = await select({
+        message: `Select model (default "${defaultModel}"):`,
+        choices: modelIds.map(mid => ({ name: mid, value: mid })),
+        default: defaultModel,
+      });
       if (!modelIds.includes(modelId)) {
         this.logger.error('[AgentsCommand.execAdd]', `unknown model "${modelId}"`);
         this.logger.error('[AgentsCommand.execAdd]', 'available models:', modelIds.join(', '));
@@ -114,20 +118,38 @@ export default class AgentsCommand extends Command {
       // ask for channels (known/configured channels)
       const channelIds = Object.keys(this.engine.config.channels);
       const channels: Record<string, string> = {};
-      const raw = channelIds.length
-        ? await ask(`Enter channels to bind (comma separated, e.g. ${channelIds.join(',')}), press enter for none: `)
-        : '';
-      for (const id of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+      const pickedChannelIds = channelIds.length ? await checkbox({
+        message: 'Select channels to bind (space to toggle, enter to confirm):',
+        choices: channelIds.map(id => ({ name: id, value: id })),
+      }) : [];
+      for (const id of pickedChannelIds) {
         if (!channelIds.includes(id)) {
           this.logger.warn('[AgentsCommand.execAdd]', `unknown channel "${id}", skipping`);
           continue;
         }
-        const group = await ask(`Enter group id for "${id}" (e.g. general), press enter to skip: `);
+        // prefer the groups cached by "marvin channels info", fall back to free text
+        const groups = this.engine.config.channels[id]?.groups || {};
+        const groupKeys = Object.keys(groups);
+        let group: string;
+        if (groupKeys.length) {
+          group = await select({
+            message: `Select group for "${id}" (from cached channel info):`,
+            choices: [
+              ...Object.entries(groups).map(([gid, name]) => ({ name: `${name} (${gid})`, value: gid })),
+              { name: '(type manually)', value: '__manual__' },
+            ],
+          });
+          if (group === '__manual__') {
+            group = await input({ message: `Enter group id for "${id}" (e.g. general), press enter to skip:` });
+          }
+        } else {
+          group = await input({ message: `Enter group id for "${id}" (e.g. general), press enter to skip:` });
+        }
         channels[id] = group;
       }
   
       // ask for identity, saved to agents/<agentId>/IDENTITY.md
-      const identity = await ask('Enter agent identity (or press enter for default): ') || constants.IDENTITY_MD;
+      const identity = (await input({ message: 'Enter agent identity (or press enter for default):' })) || constants.IDENTITY_MD;
       this.logger.log('');
   
       // persist agent identity to ~/.marvin/agents/<agentId>/IDENTITY.md

@@ -19,8 +19,8 @@ export default class MockChannel extends Channel {
     this.logger.debug('[MockChannel.detach]', 'dropped');
   }
 
-  async listGroups(): Promise<{ [key: string]: string }> {
+  async info(): Promise<{ groups: { [key: string]: string } }> {
     this.logger.debug('[MockChannel.listGroups]', 'no groups');
-    return {};
+    return { groups: {} };
   }
 }

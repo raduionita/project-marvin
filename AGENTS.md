@@ -20,7 +20,7 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 - `src/skills/` - markdown skill docs (header + body, e.g. `META.md`, `TOOLS-CREATE.md`, `WORDPRESS.md`); parsed and injected into the system prompt. User skills in `~/.marvin/skills/` override.
 - `src/constants.ts` - project-wide constants (`END_CHAT_NAME`, `DEFAULT_MAX_STEPS`, `DEFAULT_CONFIG`).
 - `src/helpers.ts` - pure helpers: `tryJsonParse`, `extractOutput`, `cleanContent`, `markdownToHtml`, `safeJoin`, ...
-- `src/logger.ts`, `src/terminal.ts`, `src/memory.ts` - logging, terminal output helpers, and memory storage (see below).
+- `src/logger.ts`, `src/memory.ts` - logging and memory storage (see below). Interactive prompts use `@inquirer/prompts` directly in commands (mock it in tests via `src/tests/promptMock.ts`).
 
 ## Workspace (`~/.marvin/`, created on first run)
 - `marvin.json` - the whole configuration: settings, channels, models, agents, tasks, tools, skills, integrations.

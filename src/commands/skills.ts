@@ -1,10 +1,10 @@
+import { input, select } from '@inquirer/prompts';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from "../types";
 import { listSkills, listCustomSkills, readSkill, parseSkill } from '../skills';
 import * as constants from '../constants';
-import { ask } from '../terminal';
 
 // `marvin skills [command] [--dry]` list and add (create) skills
 export default class SkillsCommand extends Command {
@@ -75,7 +75,12 @@ export default class SkillsCommand extends Command {
     this.logger.debug('[SkillsCommand.execAdd]', 'creating a skill...');
 
     // ask for the skill name
-    const name = this.args[1] || await ask('Enter skill name (e.g. release-notes): ');
+    const name = this.args[1] || await input({
+      message: 'Enter skill name (e.g. release-notes):',
+      required: true,
+      pattern: /^[a-zA-Z0-9_-]+$/,
+      patternError: 'invalid skill name (use a-z, 0-9, _ and -)',
+    });
     if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
       this.logger.error('[SkillsCommand.execAdd]', 'invalid skill name (use a-z, 0-9, _ and -):', name);
       return;
@@ -85,7 +90,7 @@ export default class SkillsCommand extends Command {
     const id = name.toLowerCase();
 
     // ask for what the skill should do
-    const description = this.args.slice(2).join(' ') || await ask('Enter what the skill should do (e.g. write release notes from a changelog): ');
+    const description = this.args.slice(2).join(' ') || await input({ message: 'Enter what the skill should do (e.g. write release notes from a changelog):', required: true });
     if (!description) {
       this.logger.error('[SkillsCommand.execAdd]', 'no description provided, exiting');
       return;
@@ -157,12 +162,14 @@ export default class SkillsCommand extends Command {
     // pick a skill (positional arg or prompt)
     let id = (this.args[1] || '').toLowerCase();
     if (!id) {
-      this.logger.info('available skills:');
-      for (const sid of ids) {
-        const skill = this.engine.skills[sid];
-        this.logger.info(`  ${sid}`, skill?.description ? '- ' + skill.description : '');
-      }
-      id = (await ask('Pick a skill: ')).toLowerCase();
+      id = await select({
+        message: 'Pick a skill:',
+        choices: ids.map(sid => ({
+          name: sid,
+          value: sid,
+          description: this.engine.skills[sid]?.description,
+        })),
+      });
       if (!id) {
         this.logger.error('[SkillsCommand.execUse]', 'no skill selected, exiting');
         return;
@@ -182,7 +189,7 @@ export default class SkillsCommand extends Command {
     const isToolCreate = id === 'tools-create';
     const isToolEdit = id === 'tools-edit';
     if (isToolCreate || isToolEdit) {
-      toolName = this.args[2] || await ask('Tool name (e.g. web_search): ');
+      toolName = this.args[2] || await input({ message: 'Tool name (e.g. web_search):', required: true });
       // replace non-alphanumeric characters with underscores
       toolName = toolName.replace(/[^a-zA-Z0-9_]/g, '_');
       toolName = toolName.replace(/_+/g, '_');
@@ -192,7 +199,7 @@ export default class SkillsCommand extends Command {
         return;
       }
       if (isToolCreate) {
-        info = await ask('What should the tool do? ');
+        info = await input({ message: 'What should the tool do?', required: true });
       } else {
         // editing an existing tool: read the current code so we can send it to the LLM
         const tpath = join(this.engine.work, 'tools', `${toolName}.ts`);
@@ -200,14 +207,14 @@ export default class SkillsCommand extends Command {
           this.logger.error('[SkillsCommand.execUse]', 'tool does not exist in ~/.marvin/tools:', toolName);
           return;
         }
-        info = await ask('What should change about the tool? ');
+        info = await input({ message: 'What should change about the tool?', required: true });
       }
       if (!info) {
         this.logger.error('[SkillsCommand.execUse]', 'no tool description provided, exiting');
         return;
       }
     } else {
-      info = await ask('Describe what you want to do with this skill: ');
+      info = await input({ message: 'Describe what you want to do with this skill:', required: true });
       if (!info) {
         this.logger.error('[SkillsCommand.execUse]', 'no task provided, exiting');
         return;

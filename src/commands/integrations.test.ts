@@ -7,28 +7,13 @@ import { Config } from '../types.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { captureLogger } from '../tests/helpers.js';
+import { buildPromptMocks } from '../tests/promptMock.js';
 
-// scripted answers consumed by the mocked terminal prompt. selects interpret
-// the answer as a 1-based option index (the numbered fallback behavior).
+// scripted answers consumed by the mocked @inquirer/prompts prompts. selects
+// interpret the answer as a 1-based option index (the old numbered fallback).
 let answers: string[] = [];
-let askMock: ReturnType<typeof mock>;
-mock.module('../terminal.js', () => {
-  askMock = mock(async () => answers.shift() ?? '');
-  return {
-    ask: askMock,
-    select: mock(async (_prompt: string, options: { value: string }[]) => {
-      const raw = answers.shift() ?? '';
-      const nums = raw.split(',').map(s => parseInt(s.trim(), 10) - 1).filter(i => i >= 0 && i < options.length);
-      return nums.length === 0 ? options[0]?.value : options[nums[0]!]!.value;
-    }),
-    multiselect: mock(async (_prompt: string, options: { value: string }[]) => {
-      const raw = answers.shift() ?? '';
-      const nums = raw.split(',').map(s => parseInt(s.trim(), 10) - 1).filter(i => i >= 0 && i < options.length);
-      if (raw.trim() === '') return options.map(o => o.value);
-      return nums.map(i => options[i]!.value);
-    }),
-  };
-});
+const promptMocks = buildPromptMocks(() => answers);
+mock.module('@inquirer/prompts', () => promptMocks);
 
 import IntegrationsCommand from './integrations.js';
 
@@ -116,9 +101,10 @@ test('execAdd configures an integration via the discovery wizard', async () => {
   const cmd = new IntegrationsCommand(engine, logger, ['add']);
 
   // scripted answers: name -> type ("1"=wordpress) -> endpoint -> user ->
-  // appPassword -> action ("1"=list_posts) -> fields ("1,2") -> required ("1")
-  // -> action ("6"=finish, after list_posts is removed) -> meta loop (blank)
-  answers = ['gloobeam', '1', 'https://gloobeam.com', 'admin', 'secret', '1', '1,2', '1', '6', ''];
+  // appPassword -> action ("1"=list_posts) -> fields ("1,2") -> required
+  // (blank = all) -> action ("6"=finish, after list_posts is removed) ->
+  // meta loop (blank)
+  answers = ['gloobeam', '1', 'https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', ''];
 
   await cmd.exec();
 
@@ -139,9 +125,9 @@ test('execAdd registers meta fields from the wizard', async () => {
   const cmd = new IntegrationsCommand(engine, new Logger(), ['add', 'gloobeam', 'wordpress']);
 
   // name+type given via args: endpoint -> user -> appPassword -> action ("1")
-  // -> field select ("1,2") -> required ("1") -> finish -> meta name
-  // "custom_author" -> type "string" -> description -> blank stops
-  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '1', '6', 'custom_author', 'string', 'Byline', ''];
+  // -> field select ("1,2") -> required (blank) -> finish -> meta name
+  // "custom_author" -> type ("string") -> description -> blank stops
+  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', 'custom_author', 'string', 'Byline', ''];
 
   await cmd.exec();
 
@@ -177,9 +163,9 @@ test('execAdd links the integration to selected tasks', async () => {
   const cmd = new IntegrationsCommand(engine, new Logger(), ['add', 'gloobeam', 'wordpress']);
 
   // name+type via args: endpoint -> user -> appPassword -> action ("1") ->
-  // fields ("1,2") -> required ("1") -> finish -> meta blank -> task "post"
+  // fields ("1,2") -> required (blank) -> finish -> meta blank -> task ("1"=post)
   // (digest stays unlinked)
-  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '1', '6', '', 'post'];
+  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', '', '1'];
 
   await cmd.exec();
 
@@ -228,11 +214,12 @@ test('execAdd lists nested sub-fields with dotted paths in the required prompt',
 
   await cmd.exec();
 
-  // the required prompt lists every picked field with its dotted path + type
-  const prompts = (askMock as any).mock.calls.map((c: any[]) => String(c[0]));
-  const required = prompts.filter((p: string) => p.includes('Mark required fields')).at(-1)!;
-  expect(required).toContain('gloobeam.slug (string):');
-  expect(required).toContain('gloobeam.meta.keywords (array):');
+  // the required checkbox lists every picked field with its dotted path + type
+  type CheckboxConfig = { message: string, choices: { name: string }[] };
+  const checkboxCalls = ((promptMocks.checkbox as any).mock.calls as CheckboxConfig[][]);
+  const required = checkboxCalls.map(call => call[0]!).filter(cfg => cfg.message.includes('Mark required fields')).at(-1)!;
+  expect(required.choices.map(c => c.name)).toContain('gloobeam.slug (string):');
+  expect(required.choices.map(c => c.name)).toContain('gloobeam.meta.keywords (array):');
 
   // nested sub-fields are persisted with dotted keys
   const fields = readConfig(engine).integrations['gloobeam'].actions.list_posts.fields;

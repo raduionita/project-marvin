@@ -1,9 +1,9 @@
+import { checkbox, expand, input, number, select } from '@inquirer/prompts';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from "../types";
 import * as constants from '../constants';
-import { ask } from '../terminal';
 
 // `marvin tasks [command] [--dry]` add/list tasks
 export default class TasksCommand extends Command {
@@ -57,14 +57,23 @@ export default class TasksCommand extends Command {
 
     const marvin = this.engine.config.settings.name;
     const defaultAgent = agentIds.includes(marvin) ? marvin : agentIds[0]!;
-    const agentId = (this.args[1] || await ask(`Enter agent name (press enter for "${defaultAgent}"): `) || defaultAgent);
+    const agentId = this.args[1] || await select({
+      message: `Select agent (default "${defaultAgent}"):`,
+      choices: agentIds.map(id => ({ name: id, value: id })),
+      default: defaultAgent,
+    });
     if (!this.engine.config.agents[agentId!] && agentId !== marvin) {
       this.logger.error('[TasksCommand.execAdd]', `agent "${agentId}" not found`, 'available agents:', agentIds.join(', '));
       return;
     }
 
     // ask for taskId
-    const taskId = this.args[2]! || await ask('Enter task name (e.g. my-task): ');
+    const taskId = this.args[2]! || await input({
+      message: 'Enter task name (e.g. my-task):',
+      required: true,
+      pattern: /^[a-zA-Z0-9_-]+$/,
+      patternError: 'invalid task name (use a-z, 0-9, _ and -)',
+    });
     if (!taskId || !/^[a-zA-Z0-9_-]+$/.test(taskId)) {
       this.logger.error('[TasksCommand.execAdd]', 'invalid task name (use a-z, 0-9, _ and -):', taskId);
       return;
@@ -75,18 +84,24 @@ export default class TasksCommand extends Command {
     }
 
     // ask for the task prompt, saved to tasks/<taskId>/TASK.md
-    const input = await ask('Enter task prompt (or press enter to skip): ');
+    const taskPrompt = await input({ message: 'Enter task prompt (or press enter to skip):' });
 
     // ask for schedule (in seconds)
-    const scheduleRaw = await ask('Enter schedule in seconds (press enter for 3600): ') || '3600';
-    const schedule = parseInt(scheduleRaw, 10);
-    if (isNaN(schedule) || schedule < 0) {
+    const schedule = (await number({ message: 'Enter schedule in seconds (default 3600):', default: 3600, min: 0 })) ?? 3600;
+    if (schedule < 0) {
       this.logger.error('[TasksCommand.execAdd]', 'invalid schedule, must be a positive number of seconds');
       return;
     }
 
     // ask for format
-    const format = await ask('Enter output format "text" or "json" (press enter for "json"): ') || 'json';
+    const format = await expand({
+      message: 'Select output format:',
+      choices: [
+        { key: 'j', name: 'json', value: 'json' },
+        { key: 't', name: 'text', value: 'text' },
+      ],
+      default: 'j',
+    });
     if (format !== 'text' && format !== 'json') {
       this.logger.error('[TasksCommand.execAdd]', 'invalid format, use "text" or "json"');
       return;
@@ -96,8 +111,11 @@ export default class TasksCommand extends Command {
     const integrationIds = Object.keys(this.engine.config.integrations || {});
     const integrations: string[] = [];
     if (integrationIds.length) {
-      const raw = await ask(`Enter integrations to link (comma separated, e.g. ${integrationIds.join(',')}), press enter for none: `);
-      for (const id of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+      const picked = await checkbox({
+        message: 'Select integrations to link (space to toggle, enter to confirm):',
+        choices: integrationIds.map(id => ({ name: id, value: id })),
+      });
+      for (const id of picked) {
         if (!integrationIds.includes(id)) {
           this.logger.warn('[TasksCommand.execAdd]', `unknown integration "${id}", skipping`);
           continue;
@@ -110,13 +128,13 @@ export default class TasksCommand extends Command {
 
     // persist the task prompt to tasks/<taskId>/TASK.md
     let pinn: string | null = null;
-    if (input) {
+    if (taskPrompt) {
       const ppath = join(this.engine.work, 'tasks', taskId, 'TASK.md');
       if (this.engine.isDry) {
         this.logger.info('[TasksCommand.execAdd]', '[dry]', 'task prompt file:', ppath);
       } else {
         mkdirSync(join(this.engine.work, 'tasks', taskId), { recursive: true });
-        writeFileSync(ppath, input + '\n');
+        writeFileSync(ppath, taskPrompt + '\n');
       }
       pinn = ppath;
     }

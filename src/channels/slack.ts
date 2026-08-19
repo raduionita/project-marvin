@@ -3,7 +3,7 @@ import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@s
 import { Channel, Command, Message, ChannelMeta } from '../types.js';
 import { Agent } from '../agent.js';
 import type Engine from '../engine.js';
-import { extractOutput, markdownToMrkdwn } from '../helpers.js';
+import { extractOutput, markdownToMrkdwn, markdownToRichTextBlocks } from '../helpers.js';
 import { listCommands } from '../commands/index.js';
 import { Logger } from '../logger.js';
 
@@ -137,6 +137,31 @@ export default class SlackChannel extends Channel {
     }
   }
 
+  async info() : Promise<{ groups: { [key: string]: string } }> {
+    this.logger.debug('[SlackChannel.info]');
+    const response = await this.web.conversations.list({ 
+      exclude_archived: true, 
+      limit: 100,
+    });
+    if (!response || !response.ok || !response.channels) {
+      this.logger.error('[SlackChannel.info]', 'error:', response.error);
+      return {
+        groups: {},
+      };
+    }
+    // id=>name map
+    const channels: {[key:string]:string} = {};
+    for (const channel of response.channels) {
+      const id = channel.id || channel.user || channel.name;
+      if (!id) continue;
+      channels[id] = channel.name || id;
+    }
+
+    return {
+      'groups': channels,
+    }
+  }
+
   // verify the Slack app is correctly set up before attaching
   protected async checkPrereqs(appToken: string | undefined, botToken: string | undefined): Promise<{ ok: boolean; botId?: string; error?: string }> {
     this.logger.debug('[SlackChannel.checkPrereqs]');
@@ -186,26 +211,6 @@ export default class SlackChannel extends Channel {
     return { ok: true, botId: auth.user_id };
   }
 
-  public async listGroups() : Promise<{[key:string]:string}> {
-    this.logger.debug('[SlackChannel.listGroups]');
-    const response = await this.web.conversations.list({ 
-      exclude_archived: true, 
-      limit: 100,
-    });
-    if (!response || !response.ok || !response.channels) {
-      this.logger.error('[SlackChannel.listGroups]', 'error:', response.error);
-      return {};
-    }
-    // id=>name map
-    const channels: {[key:string]:string} = {};
-    for (const channel of response.channels) {
-      const id = channel.id || channel.user || channel.name;
-      if (!id) continue;
-      channels[id] = channel.name || id;
-    }
-    return channels;
-  }
-
   // send a message to Slack, optionally as a thread reply
   public async sendMessage(message: Message) : Promise<SlackResponse> {
     this.logger.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
@@ -226,11 +231,13 @@ export default class SlackChannel extends Channel {
       return { ts: '', ok: false, error: 'no channel provided', message: '(no channel)' };
     }
 
-    // send the message (LLM markdown is converted to Slack mrkdwn)
+    // send the message (LLM markdown is converted to Slack mrkdwn; the rich
+    // format renders via Block Kit rich_text blocks, text stays as fallback)
     const response = await this.web.chat.postMessage({
       text: markdownToMrkdwn(message.content),
       channel: message.channel,
       thread_ts: message.thread || undefined,
+      ...(message.format === 'rich' ? { blocks: markdownToRichTextBlocks(message.content) } : {}),
     });
 
     // check if response is ok

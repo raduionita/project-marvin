@@ -1,10 +1,10 @@
+import { checkbox, input, password, rawlist, select } from '@inquirer/prompts';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
 
 import { Command } from "../types";
 import { listIntegrations, loadIntegration } from '../integrations';
-import { select, multiselect, ask } from '../terminal';
-import { Option, Field } from '../types';
+import { Field } from '../types';
 
 // flatten a Field tree into dotted paths (e.g. meta.keywords) so the wizard can
 // list and select sub-fields of object/array types individually
@@ -16,12 +16,6 @@ function flattenFields(fields: Field[], prefix = ''): { name: string, type: stri
     if (f.properties) out.push(...flattenFields(Object.values(f.properties), name));
   }
   return out;
-}
-
-// list picked fields as `<integration>.<path> (type):` lines + the required question
-function requiredPrompt(integrationName: string, fields: { name: string, type: string }[]): string {
-  const list = fields.map(f => `${integrationName}.${f.name} (${f.type}):`).join('\n');
-  return `${list}\nMark required fields (comma-separated, enter = all selected): `;
 }
 
 // `marvin integrations [command] [--dry]` list, add, drop integrations
@@ -57,8 +51,6 @@ export default class IntegrationsCommand extends Command {
         await this.execDrop();
       break;
     }
-
-    this.logger.debug('[IntegrationsCommand.exec]', `done`);
   }
 
   // `marvin integrations help`
@@ -101,20 +93,28 @@ export default class IntegrationsCommand extends Command {
     const types = listIntegrations(this.engine);
 
     // ask for the integration name
-    let name = this.args[1] || await ask('Enter integration name (e.g. mycoolsite): ');
+    let name = this.args[1] || await input({
+      message: 'Enter integration name (e.g. mycoolsite):',
+      required: true,
+      pattern: /^[a-zA-Z0-9_-]+$/,
+      patternError: 'invalid name (use a-z, 0-9, _ and -)',
+    });
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
       this.logger.error('[IntegrationsCommand.execAdd]', 'invalid name (use a-z, 0-9, _ and -):', name);
       return;
     }
 
-    // check if the integration is already configured
+    // must NOT exist
     if (this.engine.config.integrations[name]) {
       this.logger.error('[IntegrationsCommand.execAdd]', `integration "${name}" is already configured`);
       return;
     }
 
     // ask for the type (radio select from the available types)
-    const type = this.args[2] || await select('Select integration type:', types.map(t => ({ label: t, value: t }) as Option<string>), ask);
+    const type = this.args[2] || await select({
+      message: 'Select integration type:',
+      choices: types.map(t => ({ name: t, value: t })),
+    });
     if (!type) {
       this.logger.error('[IntegrationsCommand.execAdd]', 'no integration type selected');
       return;
@@ -136,19 +136,25 @@ export default class IntegrationsCommand extends Command {
 
     // ask for each arg value (url, credentials, ...)
     for (const [key, placeholder] of Object.entries(integration.meta.arguments)) {
-      config[key] = await ask(`Enter ${type} ${key} (${placeholder}): `);
+      config[key] = await input({ 
+        message: `Enter ${type}.${key} (${placeholder}):`,
+        required: true,
+      });
     }
 
     // ask for the actions and their fields in a loop (until the user is done)
     const actionsCfg: { [key: string]: any } = {};
-    const actionOptions: Option<string>[] = Object.entries(integration.meta.actions).map(([name, description]) => ({
-      label: `${name} - ${description}`,
+    const actionOptions = Object.entries(integration.meta.actions).map(([name, description]) => ({
+      name: `${name} - ${description}`,
       value: name,
     }));
 
     while (actionOptions.length) {
       this.logger.log('');
-      const action = await select(`Select an action for "${name}" (or finish to stop):`, [...actionOptions, { label: 'finish (done adding actions)', value: '' }], ask);
+      const action = await rawlist({
+        message: `Select an action for "${name}" (or finish to stop):`,
+        choices: [...actionOptions, { name: 'finish (done adding actions)', value: '' }],
+      });
       if (!action) break;
 
       // discover the available fields for this action (OPTIONS request)
@@ -166,22 +172,27 @@ export default class IntegrationsCommand extends Command {
 
       // ask which fields to use (checkbox select), marked ones are sent;
       // picking an object/array field includes its sub-fields
-      const picked = await multiselect(`Select fields for "${name}" "${action}" (required ones are sent):`, fields.map(f => ({
-        label: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}${f.enum ? ` [${f.enum.join(', ')}]` : ''}`,
-        value: f.name,
-      })), ask);
+      const picked = await checkbox({
+        message: `Select fields for "${name}" "${action}" (required ones are sent):`,
+        choices: fields.map(f => ({
+          name: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}${f.enum ? ` [${f.enum.join(', ')}]` : ''}`,
+          value: f.name,
+        })),
+      });
       const pickedSet = new Set(picked || []);
       const pickedFields = flattenFields(fields.filter(f => pickedSet.has(f.name)));
-      const pathSet = new Set(pickedFields.map(f => f.name));
 
-      // ask which of the picked fields are required
-      const requiredRaw = await ask(requiredPrompt(name, pickedFields));
-      const requiredTokens = requiredRaw.trim() ? requiredRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-      const requiredSet = new Set(
-        requiredTokens.length
-          ? requiredTokens.map(t => t.startsWith(`${name}.`) ? t.slice(name.length + 1) : t).filter(t => pathSet.has(t))
-          : pickedFields.map(f => f.name)
-      );
+      // ask which of the picked fields are required (all are checked by default)
+      const requiredSet = new Set(pickedFields.length
+        ? await checkbox({
+            message: `Mark required fields for "${name}" "${action}":`,
+            choices: pickedFields.map(f => ({
+              name: `${name}.${f.name} (${f.type}):`,
+              value: f.name,
+              checked: true,
+            })),
+          })
+        : []);
 
       const fieldsCfg: { [key: string]: any } = {};
       for (const f of pickedFields) {
@@ -208,14 +219,29 @@ export default class IntegrationsCommand extends Command {
     this.logger.log('');
     this.logger.info('optional: add custom meta fields (e.g. ACF fields on gloobeam)');
     while (true) {
-      const mname = await ask('Enter a custom meta field name (blank to stop): ');
+      const mname = await input({ message: 'Enter a custom meta field name (blank to stop):' });
       if (!mname.trim()) break;
-      const mtype = await ask(`  type for "${mname}" (string/number/boolean, enter=string): `) || 'string';
-      const mdesc = await ask(`  description for "${mname}": `);
+      const mtype = await select({
+        message: `Type for "${mname}" (default string):`,
+        choices: [
+          { name: 'string', value: 'string' },
+          { name: 'number', value: 'number' },
+          { name: 'boolean', value: 'boolean' },
+        ],
+        default: 'string',
+      });
+      const mdesc = await input({ message: `  description for "${mname}":` });
       metaFields[mname] = { type: mtype, required: false, description: mdesc };
     }
     if (Object.keys(metaFields).length) {
-      const metaTarget = await ask('Meta target (meta or acf, enter=meta): ') || 'meta';
+      const metaTarget = await select({
+        message: 'Meta target (default meta):',
+        choices: [
+          { name: 'meta', value: 'meta' },
+          { name: 'acf', value: 'acf' },
+        ],
+        default: 'meta',
+      });
       config.meta = { target: metaTarget, fields: metaFields };
     }
 
@@ -224,8 +250,11 @@ export default class IntegrationsCommand extends Command {
     // ask which tasks to link this integration to (their actions become tools)
     const taskIds = Object.keys(this.engine.config.tasks || {});
     if (taskIds.length) {
-      const raw = await ask(`Link "${name}" to tasks (comma separated, e.g. ${taskIds.join(',')}), press enter for none: `);
-      for (const taskId of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+      const pickedTasks = await checkbox({
+        message: `Link "${name}" to tasks (space to toggle, enter to confirm):`,
+        choices: taskIds.map(taskId => ({ name: taskId, value: taskId })),
+      });
+      for (const taskId of pickedTasks) {
         const task = this.engine.config.tasks?.[taskId];
         if (!task) {
           this.logger.warn('[IntegrationsCommand.execAdd]', `unknown task "${taskId}", skipping`);
@@ -259,7 +288,7 @@ export default class IntegrationsCommand extends Command {
   async execInfo() {
     this.logger.debug('[IntegrationsCommand.execInfo]');
 
-    const pname = this.args[1] || await ask('Enter integration name (e.g. mycoolsite): ');
+    const pname = this.args[1] || await input({ message: 'Enter integration name (e.g. mycoolsite):' });
     if (!pname) {
       this.logger.warn('[IntegrationsCommand.execInfo]', 'usage: marvin integrations info <name>');
       return;
@@ -312,12 +341,18 @@ export default class IntegrationsCommand extends Command {
     this.logger.debug('[IntegrationsCommand.execEdit]');
 
     // TODO: add ask here
-    const pname = this.args[1];
-    if (!pname) {
-      this.logger.warn('[IntegrationsCommand.execEdit]', 'usage: marvin integrations edit <name>');
+    const pname = this.args[1] || await input({
+      message: 'Enter integration name (e.g. mycoolsite):',
+      required: true,
+      pattern: /^[a-zA-Z0-9_-]+$/,
+      patternError: 'invalid name (use a-z, 0-9, _ and -)',
+    });
+    if (!/^[a-zA-Z0-9_-]+$/.test(pname)) {
+      this.logger.error('[IntegrationsCommand.execEdit]', 'invalid name (use a-z, 0-9, _ and -):', name);
       return;
     }
 
+    // must exist
     const config = this.engine.config.integrations[pname];
     if (!config) {
       this.logger.error('[IntegrationsCommand.execEdit]', `integration "${pname}" not found in config`);
@@ -336,7 +371,10 @@ export default class IntegrationsCommand extends Command {
     const current = Object.keys(actionsCfg).length
       ? Object.keys(actionsCfg)
       : (Object.keys(info.actions).length ? [Object.keys(info.actions)[0]!] : []);
-    const action = await select(`Select an action to edit for "${pname}" (current: ${current.join(', ') || 'none'}):`, Object.entries(info.actions).map(([name, description]) => ({ label: `${name} - ${description}`, value: name }) as Option<string>), ask);
+    const action = await select({
+      message: `Select an action to edit for "${pname}" (current: ${current.join(', ') || 'none'}):`,
+      choices: Object.entries(info.actions).map(([name, description]) => ({ name: `${name} - ${description}`, value: name })),
+    });
     if (!action) return;
 
     let fields: Field[] = [];
@@ -355,18 +393,26 @@ export default class IntegrationsCommand extends Command {
     const currentFields = actionsCfg[action]?.fields as { [key: string]: any } | undefined;
     const flat = flattenFields(fields);
     const prePicked = currentFields ? Object.keys(currentFields) : flat.filter(f => f.required).map(f => f.name);
-    const picked = await multiselect(`Select fields for "${pname}" "${action}" (current: ${prePicked.join(', ') || 'none'}):`, flat.map(f => ({ label: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}`, value: f.name }) as Option<string>), ask) || prePicked;
+    const picked = await checkbox({
+      message: `Select fields for "${pname}" "${action}" (current: ${prePicked.join(', ') || 'none'}):`,
+      choices: flat.map(f => ({
+        name: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}`,
+        value: f.name,
+        checked: prePicked.includes(f.name),
+      })),
+    });
     const pickedSet = new Set(picked);
     const pickedFields = flat.filter(f => pickedSet.has(f.name));
-    const pathSet = new Set(pickedFields.map(f => f.name));
-
-    const requiredRaw = await ask(requiredPrompt(pname, pickedFields));
-    const requiredTokens = requiredRaw.trim() ? requiredRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-    const requiredSet = new Set(
-      requiredTokens.length
-        ? requiredTokens.map(t => t.startsWith(`${pname}.`) ? t.slice(pname.length + 1) : t).filter(t => pathSet.has(t))
-        : Array.from(pickedSet)
-    );
+    const requiredSet = new Set(pickedFields.length
+      ? await checkbox({
+          message: `Mark required fields for "${pname}" "${action}":`,
+          choices: pickedFields.map(f => ({
+            name: `${pname}.${f.name} (${f.type}):`,
+            value: f.name,
+            checked: true,
+          })),
+        })
+      : []);
 
     const fieldsCfg: { [key: string]: any } = {};
     for (const f of pickedFields) {

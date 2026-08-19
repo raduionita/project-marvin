@@ -43,6 +43,7 @@ interface PostMessageCall {
   channel?: string;
   thread_ts?: string;
   text?: string;
+  blocks?: any[];
 }
 
 class MockWebClient implements IWebClient {
@@ -490,6 +491,100 @@ test('sendMessage() converts markdown to Slack mrkdwn', async () => {
   await channel.sendMessage({ role: 'assistant', content: '**bold** [link](https://x.com)', channel: 'C123' });
 
   expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('*bold* <https://x.com|link>');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks).toBeUndefined();
+});
+
+test('sendMessage() renders rich format content into Block Kit rich_text blocks', async () => {
+  const { channel } = buildEngine();
+  await channel.load();
+
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.125', channel: 'C123',
+    message: { text: 'reply', ts: '1700000000.125' },
+  } as ChatPostMessageResponse);
+
+  await channel.sendMessage({
+    role: 'assistant',
+    content: '# Title\n\n- one\n- two\n\n**bold** and `code` and [link](https://x.com)',
+    format: 'rich',
+    channel: 'C123',
+  });
+
+  const call = channel.mockWeb.postMessageCalls[0]!;
+  expect(call.blocks).toBeDefined();
+  expect(call.blocks!.length).toBe(1);
+  const block = call.blocks![0]!;
+  expect(block.type).toBe('rich_text');
+
+  const elements = block.elements;
+  // heading -> bold section
+  expect(elements[0]).toEqual({
+    type: 'rich_text_section',
+    elements: [{ type: 'text', text: 'Title', style: { bold: true } }],
+  });
+  // list -> bullet list of sections
+  expect(elements[1]).toEqual({
+    type: 'rich_text_list',
+    style: 'bullet',
+    elements: [
+      { type: 'rich_text_section', elements: [{ type: 'text', text: 'one' }] },
+      { type: 'rich_text_section', elements: [{ type: 'text', text: 'two' }] },
+    ],
+  });
+  // paragraph with inline styles
+  expect(elements[2]).toEqual({
+    type: 'rich_text_section',
+    elements: [
+      { type: 'text', text: 'bold', style: { bold: true } },
+      { type: 'text', text: ' and ' },
+      { type: 'text', text: 'code', style: { code: true } },
+      { type: 'text', text: ' and ' },
+      { type: 'text', text: 'link', link: 'https://x.com' },
+    ],
+  });
+});
+
+test('sendMessage() keeps the mrkdwn text fallback and routing for rich format', async () => {
+  const { channel } = buildEngine();
+  await channel.load();
+
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.126', channel: 'C123',
+    message: { text: 'reply', ts: '1700000000.126' },
+  } as ChatPostMessageResponse);
+
+  await channel.sendMessage({
+    role: 'assistant', content: '# Hi', format: 'rich', channel: 'C123', thread: '1700000000.999',
+  });
+
+  const call = channel.mockWeb.postMessageCalls[0]!;
+  expect(call.text).toBe('*Hi*');
+  expect(call.channel).toBe('C123');
+  expect(call.thread_ts).toBe('1700000000.999');
+  expect(call.blocks![0]!.elements[0]).toEqual({
+    type: 'rich_text_section',
+    elements: [{ type: 'text', text: 'Hi', style: { bold: true } }],
+  });
+});
+
+test('sendMessage() renders code blocks as rich_text_preformatted', async () => {
+  const { channel } = buildEngine();
+  await channel.load();
+
+  channel.mockWeb.setPostMessageResult({
+    ok: true, ts: '1700000000.127', channel: 'C123',
+    message: { text: 'reply', ts: '1700000000.127' },
+  } as ChatPostMessageResponse);
+
+  await channel.sendMessage({
+    role: 'assistant', content: '```\nconst x = 1;\n```', format: 'rich', channel: 'C123',
+  });
+
+  const block = channel.mockWeb.postMessageCalls[0]!.blocks![0]!;
+  expect(block.elements[0]).toEqual({
+    type: 'rich_text_preformatted',
+    elements: [{ type: 'text', text: 'const x = 1;' }],
+  });
 });
 
 test('sendMessage() reports failure on channel mismatch', async () => {
@@ -542,8 +637,8 @@ test('listGroups() maps Slack channels to ids', async () => {
     channels: [{ id: 'C1', name: 'general' }, { id: 'C2', name: 'random' }],
   });
 
-  const groups = await channel.listGroups();
-  expect(groups).toEqual({ C1: 'general', C2: 'random' });
+  const info = await channel.info();
+  expect(info).toEqual({ groups: { C1: 'general', C2: 'random' } });
 });
 
 // ============================================================================

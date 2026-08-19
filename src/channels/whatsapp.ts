@@ -20,7 +20,7 @@ export default class WhatsAppChannel extends Channel {
     this.logger.debug('[WhatsAppChannel.sendMessage]', JSON.stringify(message));
   }
 
-  async listGroups(): Promise<{ [key: string]: string; }> {
+  async info(): Promise<{ groups: { [key: string]: string } }> {
     throw new Error('Method not implemented.');
   }
 }

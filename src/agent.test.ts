@@ -85,8 +85,8 @@ class TestChannel extends Channel {
     return message;
   }
 
-  async listGroups(): Promise<{ [key: string]: string }> {
-    return {};
+  async info(): Promise<{ groups: { [key: string]: string } }> {
+    return { groups: {} };
   }
 }
 

@@ -1,10 +1,10 @@
 
+import { input, password, select } from '@inquirer/prompts';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
 
 import { Command, Message } from "../types";
 import { listChannels, loadChannel } from '../channels';
-import { ask } from '../terminal';
 
 // `marvin channels [command] [--dry]` list, add, bind, chat, drop channels
 export default class ChannelsCommand extends Command {
@@ -26,6 +26,10 @@ export default class ChannelsCommand extends Command {
       case 'add' : 
         await this.execAdd();
       break;
+      // fetch channel info (e.g. slack groups) and cache it in marvin.json
+      case 'info' : 
+        await this.execInfo();
+      break;
       // bind a channel:group to an agent
       case 'bind' :  break;
       // `marvin channels chat [channelId] [groupId]` // send message to channel
@@ -45,6 +49,7 @@ export default class ChannelsCommand extends Command {
     this.logger.info('  help    ', 'show this help');
     this.logger.info('  list    ', 'list available channels, for each one, it\'s connected agents');
     this.logger.info('  add     ', 'add a channel');
+    this.logger.info('  info [channelId]', 'fetch channel info (e.g. slack groups) and cache it in marvin.json');
     this.logger.info('  bind <agentId> <channelId> <groupId>', 'bind a channel to an agent');
     this.logger.info('  chat [channelId] [groupId]', 'send a message to a channel');
     this.logger.info('  drop <channelId>', 'drop a channel');
@@ -79,7 +84,10 @@ export default class ChannelsCommand extends Command {
     this.logger.log('');
 
     // ask for channelId
-    const channelId = this.args[1] || await ask('Enter channel name (e.g. slack): ');
+    const channelId = this.args[1] || await select({
+      message: 'Select channel:',
+      choices: channels.map(id => ({ name: id, value: id })),
+    });
     
     if (!channels.includes(channelId)) {
       this.logger.error('[ChannelsCommand.execAdd]', `unknown channel "${channelId}"`);
@@ -103,7 +111,10 @@ export default class ChannelsCommand extends Command {
 
     // ask for arguments (for each arg in args, ask for value)
     for (const [arg, placeholder] of Object.entries(channel.meta.arguments)) {
-      config[arg] = await ask(`Enter ${channelId} ${arg} (e.g. ${placeholder}): `) as string;
+      const message = `Enter ${channelId} ${arg} (e.g. ${placeholder}):`;
+      config[arg] = /token|secret|key|password/i.test(arg)
+        ? await password({ message })
+        : await input({ message });
     }
 
     this.logger.log('');
@@ -128,17 +139,72 @@ export default class ChannelsCommand extends Command {
     this.logger.info('[ChannelsCommand.execAdd]', `channel "${channelId}" configured, config persisted to ${cpath}`);
   }
 
+  // `marvin channels info [channelId]` // fetch channel info (e.g. slack groups) and cache it in marvin.json
+  async execInfo() {
+    this.logger.info('[ChannelsCommand.execInfo]', 'fetching channel info...');
+
+    this.logger.log('');
+
+    // ask for channelId
+    const channelId = this.args[1] || await select({
+      message: 'Select channel:',
+      choices: listChannels(this.engine).map(id => ({ name: id, value: id })),
+    });
+
+    // the channel must be configured (tokens etc.) to connect
+    if (!this.engine.config.channels[channelId]) {
+      this.logger.error('[ChannelsCommand.execInfo]', `channel "${channelId}" not configured, run "marvin channels add ${channelId}" first`);
+      return;
+    }
+
+    const channel = await loadChannel(this.engine, channelId);
+    if (!channel) {
+      this.logger.error('[ChannelsCommand.execInfo]', `channel "${channelId}" not found`);
+      return;
+    }
+
+    await channel.load();
+    const info = await channel.info();
+    await channel.drop();
+
+    // merge the groups into the channel config (top level)
+    this.engine.config.channels[channelId] = { ...this.engine.config.channels[channelId], groups: info.groups || {} };
+
+    // persist to marvin.json
+    const cpath = join(this.engine.work, 'marvin.json');
+    if (this.engine.isDry) {
+      this.logger.info('[ChannelsCommand.execInfo]', '[dry]', `would cache channel info for ${channelId}, config persisted to ${cpath}`);
+    } else {
+      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+    }
+
+    // display the cached info from config
+    const groups = this.engine.config.channels[channelId].groups || {};
+    this.logger.info(`channel "${channelId}" info (cached in ${cpath}):`);
+    this.logger.info(' ID        ', '|', 'Name');
+    this.logger.info('-----------', '|', '----');
+    for (const [id, name] of Object.entries(groups)) {
+      this.logger.info(`${id}`, '|', `${name}`);
+    }
+  }
+
   // `marvin channels bind [agentId] [channelId] [groupId]`
   async execBind() {
     this.logger.info('[ChannelsCommand.execBind]', 'binding a channel:group to an agent...');
 
     this.logger.log('');
     // ask for agentId
-    const agentId = this.args[1] || await ask('Enter agent (e.g. my-agent): ');
+    const agentId = this.args[1] || await select({
+      message: 'Enter agent (e.g. my-agent):',
+      choices: Object.keys(this.engine.config.agents).map(id => ({ name: id, value: id })),
+    });
     // ask for channelId
-    const channelId = this.args[2] || await ask('Enter channel (e.g. slack): ');
+    const channelId = this.args[2] || await select({
+      message: 'Enter channel (e.g. slack):',
+      choices: listChannels(this.engine).map(id => ({ name: id, value: id })),
+    });
     // ask for groupId
-    const groupId = this.args[3] || await ask('Enter group (optional, e.g. general): ');
+    const groupId = this.args[3] || await input({ message: 'Enter group (optional, e.g. general):' });
 
     if (!channelId || !agentId) {
       this.logger.warn('[ChannelsCommand.execBind]', 'invalid inputs, exiting');
@@ -180,7 +246,10 @@ export default class ChannelsCommand extends Command {
     this.logger.log('');
     
     // ask for channelId
-    let channelId = this.args[1] || await ask('Enter channel (e.g. slack): ');
+    let channelId = this.args[1] || await select({
+      message: 'Enter channel (e.g. slack):',
+      choices: listChannels(this.engine).map(id => ({ name: id, value: id })),
+    });
     const channel = await loadChannel(this.engine, channelId);
     if (!channel) {
       this.logger.error('[ChannelsCommand.execChat]', `channel "${channelId}" not found`);
@@ -190,7 +259,8 @@ export default class ChannelsCommand extends Command {
     await channel.load();
 
     // list available groups as a table
-    const groups = await channel.listGroups();
+    const info = await channel.info();
+    const groups = info.groups || {};
     this.logger.info(' ID        ', '|', 'Name');
     this.logger.info('-----------', '|' ,'----');
     for (const [id, name] of Object.entries(groups)) {
@@ -199,7 +269,12 @@ export default class ChannelsCommand extends Command {
     this.logger.log('');
 
     // ask for groupId
-    let groupId = this.args[2] || await ask('Enter group (optional, e.g. general): ');
+    let groupId = this.args[2] || (Object.keys(groups).length
+      ? await select({
+          message: 'Enter group (e.g. general):',
+          choices: Object.entries(groups).map(([id, name]) => ({ name, value: id })),
+        })
+      : '');
 
     // find groupId in groups
     for (const [id, name] of Object.entries(groups)) {
@@ -215,7 +290,7 @@ export default class ChannelsCommand extends Command {
     }
 
     // ask for message
-    const message = await ask('Message: ');
+    const message = await input({ message: 'Message:' });
 
     this.logger.log('');
 
