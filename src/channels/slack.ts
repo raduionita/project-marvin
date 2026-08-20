@@ -33,12 +33,6 @@ export interface IWebClient {
   auth: {
     test: (args?: any) => Promise<any>;
   };
-  apps: {
-    connections: {
-      // validates the app token (xapp-) and returns a temporary WSS URL
-      open: (args?: any) => Promise<any>;
-    };
-  };
 }
 
 export default class SlackChannel extends Channel {
@@ -98,19 +92,10 @@ export default class SlackChannel extends Channel {
         return;
       }
     
-      // create socket mode cliet
+      // create socket mode client; start() validates the app token via
+      // apps.connections.open (Authorization header only) and rejects on
+      // unrecoverable auth errors (invalid_auth, ...)
       this.socketClient = this.newSocketClient(appToken);
-      const conn = await this.webClient.apps.connections.open({ token: appToken });
-      if (!conn.ok) {
-        // only hard-fail on unrecoverable auth errors; transient ones
-        // (internal_error, ...) are left to the socket-mode auto-reconnect
-        const hard = ['not_authed', 'invalid_auth', 'account_inactive', 'user_removed_from_team', 'team_disabled'].includes(conn.error);
-        if (hard) {
-          this.logger.error('[SlackChannel.load]', 'app token invalid:', conn.error);
-          throw conn.error;
-        }
-        this.logger.warn('[SlackChannel.load]', 'app token check transient failure:', conn.error, '(will retry via socket-mode auto-reconnect)');
-      }
 
       this.botId = auth.user_id;
 

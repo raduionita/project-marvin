@@ -15,6 +15,7 @@ import GetDateTool from '../tools/get_date.js';
 
 class MockSocketModeClient implements ISocketModeClient {
   public started = false;
+  public startError: Error | null = null;
   private handlers: Record<string, Array<(...args: any[]) => any>> = {};
 
   on(event: string, handler: (...args: any[]) => any) {
@@ -23,6 +24,9 @@ class MockSocketModeClient implements ISocketModeClient {
   }
 
   async start() {
+    if (this.startError) {
+      throw this.startError;
+    }
     this.started = true;
   }
 
@@ -51,7 +55,6 @@ class MockWebClient implements IWebClient {
   public postMessageResult: ChatPostMessageResponse | null = null;
   public conversationListResult: any = { ok: true, channels: [] };
   public authTestResult: any = { ok: true, user_id: 'U12345678' };
-  public connectionsOpenResult: any = { ok: true, url: 'wss://example.com/conn' };
 
   setPostMessageResult(result: ChatPostMessageResponse) {
     this.postMessageResult = result;
@@ -63,10 +66,6 @@ class MockWebClient implements IWebClient {
 
   setAuthTestResult(result: any) {
     this.authTestResult = result;
-  }
-
-  setConnectionsOpenResult(result: any) {
-    this.connectionsOpenResult = result;
   }
 
   public chat = {
@@ -85,14 +84,6 @@ class MockWebClient implements IWebClient {
   public auth = {
     test: async (): Promise<any> => {
       return this.authTestResult;
-    },
-  };
-
-  public apps = {
-    connections: {
-      open: async (): Promise<any> => {
-        return this.connectionsOpenResult;
-      },
     },
   };
 }
@@ -412,21 +403,12 @@ test('load() skips when the bot token is invalid (auth.test fails)', async () =>
   expect(channel.mockSok.started).toBe(false);
 });
 
-test('load() skips when the app token is invalid (connections.open fails)', async () => {
+test('load() skips when the app token is invalid (socket start fails)', async () => {
   const { channel } = buildEngine();
-  channel.mockWeb.setConnectionsOpenResult({ ok: false, error: 'invalid_auth' });
+  channel.mockSok.startError = new Error('An API error occurred: invalid_auth');
   await channel.load();
 
   expect(channel.mockSok.started).toBe(false);
-});
-
-test('load() proceeds when connections.open returns a transient error', async () => {
-  const { channel } = buildEngine();
-  channel.mockWeb.setConnectionsOpenResult({ ok: false, error: 'internal_error' });
-  await channel.load();
-
-  expect(channel.mockSok.started).toBe(true);
-  expect(channel.getBotId()).toBe('U12345678');
 });
 
 // ============================================================================
