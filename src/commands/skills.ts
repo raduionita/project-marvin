@@ -128,7 +128,7 @@ export default class SkillsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt, 'text');
+      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt);
       if (result.error || !result.content) {
         this.logger.error('[SkillsCommand.execAdd]', 'no result from the LLM');
         return;
@@ -239,7 +239,7 @@ export default class SkillsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt, 'text');
+      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt);
       if (result.error || !result.content) {
         this.logger.error('[SkillsCommand.execUse]', 'no result from the LLM');
         return;

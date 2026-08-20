@@ -11,7 +11,6 @@ import { listIntegrations, loadIntegrationTools } from "./integrations/index.js"
 import { listSkills, listCustomSkills, parseSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
-import { extractOutput } from "./helpers.js";
 
 export default class Engine {
   public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
@@ -544,8 +543,6 @@ export default class Engine {
         agent: agent,
         schedule: schedule,
         timeout: null,
-        format: task.format || 'json',
-        schema: task.schema || constants.DEFAULT_SCHEMA,
         input: input,
         integrations: task.integrations,
       } as Task;
@@ -674,7 +671,6 @@ export default class Engine {
     for (const [taskId, task] of Object.entries(this.tasks)) {
       this.logger.info('[Engine.execMonitor]', `task ${taskId}`);
       this.logger.info('[Engine.execMonitor]', `- input: ${task.input?.slice(0, 32)}`);
-      this.logger.info('[Engine.execMonitor]', `- format: ${task.format}`);
       this.logger.info('[Engine.execMonitor]', `- schedule: ${task.schedule}ms`);
     }
     
@@ -776,34 +772,28 @@ export default class Engine {
     // TODO: should tasks have cached chats? chatId = `task-${agentId}-${taskId}-${Date.now()}`;
     const chatId = undefined; // stateless, design choice, for not
 
-    const format = task.format || 'json';
-    const schema = task.schema || constants.DEFAULT_SCHEMA;
-
     // merge engine (default) tools with the task's integration tools
     const taskTools = await loadIntegrationTools(this, task.integrations || []);
     const tools = [...Object.values(this.tools).map(t => t.meta), ...taskTools];
 
     // set task input as user message to LLM
-    const result = await agent.sendChat(chatId, task.input, format, schema, tools);
+    const result = await agent.sendChat(chatId, task.input, tools);
     if (result.error) {
       this.logger.error('[Engine.execTask]', `no result from sendChat for task ${taskId}:`, result.error);
       return;
     }
 
-    // extract "output" from result json 
-    const content = extractOutput(result.content);
     // send final result through configured channels
     for (const [channelId, groupId] of Object.entries(agent.channels)) {
       try {
         const channel = this.channels[channelId];
-
         // verify channel exists, warn if not, then skip
         if (!channel) {
           this.logger.warn('[Engine.execTask]', `channel ${channelId} not found, skipping`);
           continue;
         }
 
-        const reply = await channel.sendMessage({ role: 'assistant', content, channel: groupId } as Message);
+        const reply = await channel.sendMessage({ role: 'assistant', content: result.content, group: groupId } as Message);
         if (!reply.ok) {
           this.logger.warn('[Engine.execTask]', `channel ${channelId} send failed, skipping`);
           continue;

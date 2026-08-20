@@ -157,8 +157,8 @@ test('execAdd links the integration to selected tasks', async () => {
   mockWordpressDiscovery();
   const engine = buildEngine();
   engine.config.tasks = {
-    post: { enabled: true, agent: 'journalist', schedule: 3600, maxSteps: 5, format: 'json' },
-    digest: { enabled: true, agent: 'journalist', schedule: 60, maxSteps: 5, format: 'json' },
+    post: { enabled: true, agent: 'journalist', schedule: 3600, maxSteps: 5 },
+    digest: { enabled: true, agent: 'journalist', schedule: 60, maxSteps: 5 },
   } as Config['tasks'];
   const cmd = new IntegrationsCommand(engine, new Logger(), ['add', 'gloobeam', 'wordpress']);
 

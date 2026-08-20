@@ -6,7 +6,6 @@ import type { Logger } from './logger.js';
 import type { Chat, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
-import { cleanContent } from './helpers.js';
 import { readMemorySummary } from './memory.js';
 import { splitIntegrationToolName } from './integrations/index.js';
 
@@ -35,8 +34,8 @@ export class Agent {
   }
 
   // get a chat for this id: reuse the cached/persisted one, or create a new
-  // chat seeded with the system prompt (identity + integrations + memory + format)
-  loadChat(chatId: string | undefined, format: 'text' | 'json' = 'json', schema: { [key: string]: string } = constants.DEFAULT_SCHEMA, tools?: ToolMeta[]): Chat {
+  // chat seeded with the system prompt (identity + integrations + memory)
+  loadChat(chatId: string | undefined, tools?: ToolMeta[]): Chat {
     this.logger.debug('[Agent.loadChat]');
 
     // try from cache or disk
@@ -64,11 +63,11 @@ export class Agent {
     }
 
     // or make a new chat
-    return this.makeChat(chatId, format, schema, tools);
+    return this.makeChat(chatId, tools);
   }
 
-  // make new chat seeded with the system prompt (identity + integrations + memory + format)
-  makeChat(chatId: string | undefined, format: 'text' | 'json', schema: { [key: string]: string }, tools?: ToolMeta[]): Chat {
+  // make new chat seeded with the system prompt (identity + integrations + memory)
+  makeChat(chatId: string | undefined, tools?: ToolMeta[]): Chat {
     this.logger.debug('[Agent.makeChat]');
 
     let system = this.identity;
@@ -110,16 +109,6 @@ export class Agent {
       system += 'Use the memory tool (remember/recall) to read and update these notes.';
     }
 
-    // add the JSON schema for JSON output
-    if (format === 'json') {
-      system += '\n\n';
-      system += `## Output format`;
-      system += 'Respond with exactly one JSON object, no other text::\n';
-      system += '```json\n' + JSON.stringify(schema) + '\n```\n';
-      system += '- Do not wrap the JSON in a code fence in your actual response.\n';
-      system += '- Do not include any text before or after the JSON object.';
-    }
-
     // TODO: loadIntegrationTools(integrations)
 
     return {
@@ -127,7 +116,6 @@ export class Agent {
       messages: [{ role: 'system', content: system }],
       thinking: false,
       userId: '',
-      format: format,
       tools: tools,
       updated: Date.now(),
     } as Chat;
@@ -197,12 +185,12 @@ export class Agent {
   }
 
   // exec chat // agent loop
-  async sendChat(chatId: string | undefined, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:any} = constants.DEFAULT_SCHEMA, tools?: ToolMeta[]) : Promise<Result> {
+  async sendChat(chatId: string | undefined, message: string, tools?: ToolMeta[]) : Promise<Result> {
     try {
       this.logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
 
       // get chat from cache/store, or create a new one seeded with the system prompt
-      const chat = this.loadChat(chatId, format, schema, tools);
+      const chat = this.loadChat(chatId, tools);
 
       // load task input as user message
       chat.messages.push({ role: 'user', content: message.trim() });
@@ -271,9 +259,6 @@ export class Agent {
       // save chat to cache
       this.saveChat(chatId, chat);
 
-      // TODO: more info here
-      // when format is json, make sure content is a valid JSON string (the LLM
-      // may append markup such as a <tool_calls> block after the JSON)
       return { content: reply?.message?.content || '', steps: steps };
     } catch (error) {
       this.logger.error('[Agent.sendChat]', error);

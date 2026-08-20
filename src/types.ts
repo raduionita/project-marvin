@@ -46,8 +46,6 @@ export interface Config {
     agent?: string;
     schedule: number;
     input?: string;
-    format?: 'text' | 'json';
-    schema?: {[key:string]:string};
     // integrations linked to this task: their actions become tools
     integrations?: string[];
   }>;
@@ -197,7 +195,6 @@ export abstract class Model {
   public n: number = 1;
   public userId: string = 'user-id';
   public reasoning: string = 'high';
-  public format: 'text' | 'json' = 'text';
 
   constructor(public readonly engine: Engine, public readonly logger: Logger, config: { [key: string]: any }) {
     Object.assign(this, config);
@@ -226,15 +223,11 @@ export interface Task {
   timeout: NodeJS.Timeout | null;
   // task prompt for the LLM
   input?: string;
-  // format, defaults to 'json'
-  format?: 'text' | 'json';
-  // is json, what schema
-  schema?: {[key:string]:string};
   // integrations linked to this task: their actions become tools for this task
   integrations?: string[];
 }
 
-// chat = message history + format + tools
+// chat = message history + tools
 export interface Chat {
   // used for cache retrieval, restore chat state and continue
   id: string;
@@ -244,8 +237,6 @@ export interface Chat {
   messages: Message[];
   // tools
   tools?: ToolMeta[];
-  // format
-  format?: 'text' | 'json';
   // userId is the user's id
   userId?: string;
   // last time this chat was used (for TTL eviction)
@@ -262,7 +253,7 @@ export interface Message {
   role: Role;
   content: string;
   name?: string;
-  channel?: string;
+  group?: string;
   thread?: string;
   // id of the tool that this message is responding to (role=tool)
   toolId?: string;
@@ -296,8 +287,6 @@ export interface Reply {
 
 // sendChat result
 export interface Result {
-  format: 'text' | 'json';
-  schema: {[key:string]:any};
   content: string;
   steps: number;
   error?: string;

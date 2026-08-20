@@ -1,9 +1,8 @@
-import { checkbox, expand, input, number, select } from '@inquirer/prompts';
+import { checkbox, input, number, select } from '@inquirer/prompts';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from "../types";
-import * as constants from '../constants';
 
 // `marvin tasks [command] [--dry]` add/list tasks
 export default class TasksCommand extends Command {
@@ -93,20 +92,6 @@ export default class TasksCommand extends Command {
       return;
     }
 
-    // ask for format
-    const format = await expand({
-      message: 'Select output format:',
-      choices: [
-        { key: 'j', name: 'json', value: 'json' },
-        { key: 't', name: 'text', value: 'text' },
-      ],
-      default: 'j',
-    });
-    if (format !== 'text' && format !== 'json') {
-      this.logger.error('[TasksCommand.execAdd]', 'invalid format, use "text" or "json"');
-      return;
-    }
-
     // ask which configured integrations to link (their actions become tools)
     const integrationIds = Object.keys(this.engine.config.integrations || {});
     const integrations: string[] = [];
@@ -145,8 +130,6 @@ export default class TasksCommand extends Command {
       enabled: true,
       agent: agentId,
       schedule,
-      format,
-      schema: constants.DEFAULT_SCHEMA,
       ...(integrations.length ? { integrations } : {}),
     };
 

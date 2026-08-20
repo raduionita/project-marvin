@@ -166,7 +166,7 @@ class FlowModel extends Model {
     // final answer
     return {
       id: 'r4', stop: true, finish: 'stop',
-      message: { role: 'assistant', content: '{"output": "Published to Wordpress: https://wp.example.com/?p=42"}' },
+      message: { role: 'assistant', content: 'Published to Wordpress: https://wp.example.com/?p=42' },
       usage: { completion: 5, prompt: 10 },
     } as Reply;
   }
@@ -284,7 +284,7 @@ test('full flow: the tool results are kept in the chat cache for context', async
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001', 'json', {});
+  const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001');
   expect(chat).not.toBeNull();
 
   const toolMessages = chat!.messages.filter(m => m.role === 'tool');

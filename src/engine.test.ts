@@ -57,11 +57,11 @@ test('execSweep removes chats idle longer than the TTL and reschedules', async (
   await engine.execSweep('sweep');
 
   // stale was evicted: loadChat returns a fresh chat (no 'old' message)
-  const staleChat = agent.loadChat('stale', 'text', {});
+  const staleChat = agent.loadChat('stale');
   expect(staleChat.messages.filter(m => m.content === 'old').length).toBe(0);
 
   // fresh is still cached with its 'new' message
-  const freshChat = agent.loadChat('fresh', 'text', {});
+  const freshChat = agent.loadChat('fresh');
   expect(freshChat.messages.some(m => m.content === 'new')).toBe(true);
 
   // rescheduled for the next run

@@ -43,7 +43,6 @@ class MockModel extends Model {
   n = 1;
   userId = 'test';
   reasoning = 'high';
-  format = 'text' as const;
   tools: any[] = [];
   /** Tracks how many times execChat was called. */
   callCount = 0;

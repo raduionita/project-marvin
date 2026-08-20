@@ -25,7 +25,6 @@ export class OpenaiModel extends Model {
         })),
       }))),
       stream: false,
-      ...(chat.format === 'json' ? { response_format: { type: 'json_object' } } : {}),
     };
 
     // the engine snapshots the tools for this chat (agent tools + any

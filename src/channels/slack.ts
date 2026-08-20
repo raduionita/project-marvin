@@ -3,7 +3,6 @@ import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@s
 import { Channel, Command, Message, ChannelMeta } from '../types.js';
 import { Agent } from '../agent.js';
 import type Engine from '../engine.js';
-import { extractOutput } from '../helpers.js';
 import { listCommands } from '../commands/index.js';
 import { Logger } from '../logger.js';
 
@@ -174,8 +173,8 @@ export default class SlackChannel extends Channel {
     this.logger.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
 
     if (this.engine.isDry) {
-      this.logger.info('[SlackChannel.sendMessage]', '[dry] send message to:', message.channel);
-      return { ts: '0000000000.000000', ok: true, error: '', message: '(dry)', channel: message.channel };
+      this.logger.info('[SlackChannel.sendMessage]', '[dry] send message to:', message.group);
+      return { ts: '0000000000.000000', ok: true, error: '', message: '(dry)', channel: message.group };
     }
 
     // need web client
@@ -184,7 +183,7 @@ export default class SlackChannel extends Channel {
       return { ts: '', ok: false, error: 'web client not attached', message: '(slack not attached)' };
     }
 
-    if (!message.channel) {
+    if (!message.group) {
       this.logger.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
       return { ts: '', ok: false, error: 'no channel provided', message: '(no channel)' };
     }
@@ -192,7 +191,7 @@ export default class SlackChannel extends Channel {
     // always send a markdown block: the LLM output is markdown, Slack renders
     // it (headers, bold, links, ...) via the legacy "markdown" block type
     const response = await this.webClient.chat.postMessage({
-      channel: message.channel,
+      channel: message.group,
       thread_ts: message.thread || undefined,
       blocks: [{ type: 'markdown', text: message.content }],
     });
@@ -205,8 +204,8 @@ export default class SlackChannel extends Channel {
     }
 
     // we should know if there is a mismatch between the channel in the message and the response
-    if (response.channel !== message.channel) {
-      this.logger.error('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.channel}, got ${response.channel}`);
+    if (response.channel !== message.group) {
+      this.logger.error('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.group}, got ${response.channel}`);
       return { ts: '', ok: false, error: response.error, message: '(slack channel mismatch)' };
     }
 
@@ -215,11 +214,11 @@ export default class SlackChannel extends Channel {
       ok: true,
       error: response.error || '',
       message: response.message?.text || '',
-      channel: response.channel || message.channel || '',
+      channel: response.channel || message.group || '',
     }
   }
 
-  // client factories, overridable in tests to inject mocked SDK clients
+  // socket mode client factory
   protected newSocketClient(appToken: string): ISocketModeClient {
     return new SocketModeClient({
       appToken,
@@ -229,6 +228,7 @@ export default class SlackChannel extends Channel {
     });
   }
 
+  // web client factory
   protected newWebClient(botToken: string): IWebClient {
     return new WebClient(botToken, {
       logLevel: LogLevel.ERROR,
@@ -241,7 +241,7 @@ export default class SlackChannel extends Channel {
   protected async replyTo(event: { [key: string]: any }, thread: string | undefined, content: string) {
     const text = (content || '').trim() || '(no response from the AI)';
     try {
-      const res = await this.sendMessage({ role: 'assistant', content: text, channel: event.channel, thread });
+      const res = await this.sendMessage({ role: 'assistant', content: text, group: event.channel, thread });
       if (!res.ok) {
         this.logger.warn('[SlackChannel.replyTo]', 'failed to post reply:', res.error, res.message);
       }
@@ -281,7 +281,7 @@ export default class SlackChannel extends Channel {
         return;
       }
 
-      await this.replyTo(event, thread, extractOutput(result.content));
+      await this.replyTo(event, thread, result.content);
     } catch (error) {
       this.logger.error('[SlackChannel.onMention]', error);
       await this.replyTo(event, thread, '(failed to process your message)');
@@ -319,7 +319,7 @@ export default class SlackChannel extends Channel {
         return;
       }
 
-      await this.replyTo(event, thread, extractOutput(result.content));
+      await this.replyTo(event, thread, result.content);
     } catch (error) {
       this.logger.error('[SlackChannel.onDirectMessage]', error);
       await this.replyTo(event, thread, '(failed to process your message)');
@@ -362,14 +362,14 @@ export default class SlackChannel extends Channel {
           ? `${name} cannot be run from slack`
           : `unknown command: ${name}`;
         this.logger.info('[SlackChannel.onSlashCommand]', hint, '(available:', cmds.join(', '), ')');
-        await this.sendMessage({ role: 'assistant', content: `${hint}\navailable commands: ${cmds.join(', ')}`, channel: channelId });
+        await this.sendMessage({ role: 'assistant', content: `${hint}\navailable commands: ${cmds.join(', ')}`, group: channelId });
         return;
       }
 
       const output = await this.runCommand(name, args);
 
       this.logger.info('[SlackChannel.onSlashCommand]', `command ${name} output:\n${output}`);
-      await this.sendMessage({ role: 'assistant', content: output || '(no output)', channel: channelId });
+      await this.sendMessage({ role: 'assistant', content: output || '(no output)', group: channelId });
     } catch (error) {
       this.logger.error('[SlackChannel.onSlashCommand]', error);
     }

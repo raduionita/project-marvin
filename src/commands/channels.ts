@@ -294,7 +294,7 @@ export default class ChannelsCommand extends Command {
 
     this.logger.log('');
 
-    const result = await channel.sendMessage({ role: 'assistant', content: message, channel: groupId } as Message);
+    const result = await channel.sendMessage({ role: 'assistant', content: message, group: groupId } as Message);
     if (!result.ok) {
       this.logger.error('[ChannelsCommand.execChat]', `channel "${channelId}" send failed:`, result.error);
       return;

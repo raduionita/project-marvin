@@ -27,7 +27,6 @@ export class LmstudioModel extends Model {
         n: 1,
         // user_id: "user-id",
         // tool_choice: "auto",
-        ...(chat.format === 'json' ? { response_format: { type: "json_object" } } : {}),
         tools: [
           {
             type: "function",

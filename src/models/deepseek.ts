@@ -1,4 +1,4 @@
-import { extractLeadingJsonObject, tryJsonParse } from '../helpers.js';
+import { tryJsonParse } from '../helpers.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
 
 export interface Choice {
@@ -32,7 +32,7 @@ export default class DeepseekModel extends Model {
   provider: Provider = 'deepseek';
   public baseUrl: string = 'https://api.deepseek.com';
 
-  prepChoice(choice: Choice, format = 'text'): Choice {
+  prepChoice(choice: Choice): Choice {
     // DSML tool_calls: <｜DSML｜tool_calls>...</｜DSML｜tool_calls>
     const dsml = /<tool_calls>([\s\S]*?)<\/tool_calls>/g;
     let block: RegExpExecArray | null;
@@ -66,18 +66,10 @@ export default class DeepseekModel extends Model {
       choice.message.content = choice.message.content.replace(block[0], '');
     }
 
-    switch (format) {
-      case 'json':
-        // extract JSON from the LLM response: there might be junk at the
-        // beginning/end; keep only the first JSON value (e.g. '{"output": "hi"}')
-        choice.message.content = extractLeadingJsonObject(choice.message.content) ?? choice.message.content;
-      // fall through: json output is trimmed too
-      case 'text':
-        // nothing else todo, just trim and continue
-        choice.message.content = choice.message.content.trim();
-    }
+    // trim the content, nothing else to do: the LLM returns plain text
+    choice.message.content = choice.message.content.trim();
 
-    // returned choice should be clean of DSML tags, with proper JSON, and all generated tool_calls
+    // returned choice should be clean of DSML tags, with all generated tool_calls
     return choice;
   }
 
@@ -113,14 +105,13 @@ export default class DeepseekModel extends Model {
       body.reasoning_effort = this.reasoning; // TODO: this should be configurable depending on the task
     }
 
-    body.response_format = { type: chat.format === 'json' ? 'json_object' : 'text' };
     body.tools = chat.tools;
     body.tool_choice = body.tools?.length ? 'auto' : 'none';
     body.temperature = this.temperature;
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
-    this.logger.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId, chat.format);
+    this.logger.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId);
 
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
@@ -150,7 +141,7 @@ export default class DeepseekModel extends Model {
     }
 
     // choice 0, for now only one choice is supported
-    const choice = this.prepChoice(json.choices[0] as Choice, chat.format);
+    const choice = this.prepChoice(json.choices[0] as Choice);
     // llm chat output as a reply object
     const reply = {
       id: json.id, // as string,

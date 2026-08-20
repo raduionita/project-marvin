@@ -158,7 +158,6 @@ class MockModel extends Model {
   n = 1;
   userId = 'test';
   reasoning = 'high';
-  format = 'text' as const;
   tools: any[] = [];
 
   callCount = 0;
@@ -443,7 +442,7 @@ test('sendMessage() posts to Slack and returns a SlackResponse', async () => {
     message: { text: 'reply text', ts: '1700000000.123' },
   } as ChatPostMessageResponse);
 
-  const result = await channel.sendMessage({ role: 'assistant', content: 'hello', channel: 'C123' });
+  const result = await channel.sendMessage({ role: 'assistant', content: 'hello', group: 'C123' });
 
   expect(result.ok).toBe(true);
   expect(result.ts).toBe('1700000000.123');
@@ -460,7 +459,7 @@ test('sendMessage() includes thread_ts for threaded messages', async () => {
   } as ChatPostMessageResponse);
 
   const result = await channel.sendMessage({
-    role: 'assistant', content: 'thread reply', channel: 'C123', thread: '1700000000.999',
+    role: 'assistant', content: 'thread reply', group: 'C123', thread: '1700000000.999',
   });
 
   expect(channel.mockWeb.postMessageCalls[0]!.channel).toBe('C123');
@@ -477,7 +476,7 @@ test('sendMessage() always sends the LLM markdown in a markdown block', async ()
     message: { text: 'reply', ts: '1700000000.124' },
   } as ChatPostMessageResponse);
 
-  await channel.sendMessage({ role: 'assistant', content: '## Header\n\nParagraph', channel: 'C123' });
+  await channel.sendMessage({ role: 'assistant', content: '## Header\n\nParagraph', group: 'C123' });
 
   const call = channel.mockWeb.postMessageCalls[0]!;
   expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }]);
@@ -494,7 +493,7 @@ test('sendMessage() reports failure on channel mismatch', async () => {
   } as ChatPostMessageResponse);
 
   const result = await channel.sendMessage({
-    role: 'assistant', content: 'sent elsewhere', channel: 'C123',
+    role: 'assistant', content: 'sent elsewhere', group: 'C123',
   });
 
   expect(result.ok).toBe(false);
@@ -504,7 +503,7 @@ test('sendMessage() returns ok:false when web client is not attached', async () 
   const { channel } = buildEngine();
   // do not call load() - web is undefined
 
-  const result = await channel.sendMessage({ role: 'assistant', content: 'hello', channel: 'C123' });
+  const result = await channel.sendMessage({ role: 'assistant', content: 'hello', group: 'C123' });
 
   expect(result.ok).toBe(false);
   expect(result.error).toContain('not attached');
@@ -518,7 +517,7 @@ test('sendMessage() reports actionable hints for known Slack errors', async () =
     ok: false, error: 'missing_scope', message: {},
   } as ChatPostMessageResponse);
 
-  const result = await channel.sendMessage({ role: 'assistant', content: 'hello', channel: 'C123' });
+  const result = await channel.sendMessage({ role: 'assistant', content: 'hello', group: 'C123' });
 
   expect(result.ok).toBe(false);
   expect(result.error).toBe('missing_scope');
@@ -585,7 +584,7 @@ test('E2E: app_mention runs tools then posts the final answer', async () => {
   expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('The date is 1/1/1970');
 
   // tool result was persisted to the thread's chat history
-  const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001', 'json', {});
+  const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001');
   expect(chat).not.toBeNull();
   expect(chat!.messages.filter((m: Message) => m.role === 'tool').length).toBeGreaterThan(0);
 });
@@ -727,8 +726,8 @@ test('E2E: missing agent posts an error reply instead of crashing', async () => 
   expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(failed to process your message)');
 });
 
-test('E2E: JSON LLM output is extracted to the string sent to Slack', async () => {
-  const { channel } = buildEngine({ replies: [reply('{"output": "The answer is 42"}')] });
+test('E2E: LLM output is posted to Slack unchanged', async () => {
+  const { channel } = buildEngine({ replies: [reply('The answer is 42')] });
   await channel.load();
   channel.mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.006', channel: 'C123',

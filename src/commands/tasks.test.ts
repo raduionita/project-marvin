@@ -3,7 +3,6 @@ import { mkdtempSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Config } from '../types.js';
-import * as constants from '../constants.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { buildPromptMocks } from '../tests/promptMock.js';
@@ -34,7 +33,7 @@ test('tasks add writes TASK.md and persists config', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'my-task', 'do the thing every hour', '7200', 'text'];
+  answers = ['', 'my-task', 'do the thing every hour', '7200'];
   await cmd.execAdd();
 
   // TASK.md created with the prompt
@@ -47,8 +46,6 @@ test('tasks add writes TASK.md and persists config', async () => {
     enabled: true,
     agent: 'my-agent',
     schedule: 7200,
-    format: 'text',
-    schema: constants.DEFAULT_SCHEMA,
   });
 
   // config file persisted too
@@ -72,7 +69,7 @@ test('tasks add refuses existing task', async () => {
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} } },
-    { 'my-task': { enabled: true, agent: 'my-agent', schedule: 3600, format: 'json' } },
+    { 'my-task': { enabled: true, agent: 'my-agent', schedule: 3600 } },
   );
 
   const cmd = new TasksCommand(engine, new Logger(), []);
@@ -91,7 +88,7 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'empty-task', '', '60', '', ''];
+  answers = ['', 'empty-task', '', '60', ''];
   await cmd.execAdd();
 
   expect(existsSync(join(engine.work, 'tasks', 'empty-task', 'TASK.md'))).toBe(false);
@@ -99,8 +96,6 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
     enabled: true,
     agent: 'my-agent',
     schedule: 60,
-    format: 'json',
-    schema: constants.DEFAULT_SCHEMA,
   });
 });
 
@@ -116,15 +111,13 @@ test('tasks add links configured integrations via checkbox', async () => {
   } as Config['integrations'];
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'post-task', 'write a post', '60', 'json', '1'];
+  answers = ['', 'post-task', 'write a post', '60', '1'];
   await cmd.execAdd();
 
   expect(engine.config.tasks!['post-task']).toEqual({
     enabled: true,
     agent: 'my-agent',
     schedule: 60,
-    format: 'json',
-    schema: constants.DEFAULT_SCHEMA,
     integrations: ['gloobeam'],
   });
 });
