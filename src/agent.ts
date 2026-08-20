@@ -197,7 +197,7 @@ export class Agent {
   }
 
   // exec chat // agent loop
-  async sendChat(chatId: string | undefined, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:string} = constants.DEFAULT_SCHEMA, tools?: ToolMeta[]) : Promise<Result> {
+  async sendChat(chatId: string | undefined, message: string, format: 'text' | 'json' = 'json', schema: {[key:string]:any} = constants.DEFAULT_SCHEMA, tools?: ToolMeta[]) : Promise<Result> {
     try {
       this.logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
 

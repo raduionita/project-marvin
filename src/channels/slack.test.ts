@@ -97,8 +97,9 @@ class MockWebClient implements IWebClient {
   };
 }
 
-// MockSlackChannel only replaces load() to inject the mocked SDK clients.
-// All handlers (onMention, onDirectMessage, sendMessage, ...) run the REAL code.
+// MockSlackChannel only replaces the client factories to inject the mocked SDK
+// clients. load() and all handlers (onMention, onDirectMessage, sendMessage, ...)
+// run the REAL code.
 class MockSlackChannel extends SlackChannel {
   public mockSok: MockSocketModeClient;
   public mockWeb: MockWebClient;
@@ -109,26 +110,16 @@ class MockSlackChannel extends SlackChannel {
     this.mockWeb = new MockWebClient();
   }
 
-  async load() {
-    this.sok = this.mockSok;
-    this.web = this.mockWeb;
-    this.botId = this.mockWeb.authTestResult?.user_id || '';
+  protected newSocketClient(_appToken: string): ISocketModeClient {
+    return this.mockSok;
+  }
 
-    this.sok.on('error', this.onError.bind(this) as (...args: any[]) => any);
-    this.sok.on('connecting', this.onConnecting.bind(this) as (...args: any[]) => any);
-    this.sok.on('connected', this.onConnected.bind(this) as (...args: any[]) => any);
-    this.sok.on('reconnecting', this.onReconnecting.bind(this) as (...args: any[]) => any);
-    this.sok.on('reconnected', this.onReconnected.bind(this) as (...args: any[]) => any);
-    this.sok.on('disconnected', this.onDisconnected.bind(this) as (...args: any[]) => any);
-    this.sok.on('app_mention', this.onMention.bind(this) as (...args: any[]) => any);
-    this.sok.on('message', this.onSocketMessage.bind(this) as (...args: any[]) => any);
-    this.sok.on('slash_commands', this.onSlashCommand.bind(this) as (...args: any[]) => any);
-
-    await this.sok.start();
+  protected newWebClient(_botToken: string): IWebClient {
+    return this.mockWeb;
   }
 
   // expose protected members for tests
-  findAgent(channel?: string): Agent | undefined {
+  findAgent(channel?: string): Agent {
     return super.findAgent(channel);
   }
 
@@ -140,9 +131,8 @@ class MockSlackChannel extends SlackChannel {
     this.botId = id;
   }
 
-  checkPrereqs(appToken: string | undefined, botToken: string | undefined) {
-    this.web = this.mockWeb;
-    return super.checkPrereqs(appToken, botToken);
+  getBotId(): string {
+    return this.botId;
   }
 
   async onError(err: Error) { return super.onError(err); }
@@ -231,7 +221,7 @@ function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine
   engine.tools['get_date'] = new GetDateTool(engine, new Logger());
 
   engine.config = mockConfig({
-    channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xbot-test' } },
+    channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xoxb-test' } },
     agents: { marvin: { enabled: true, channels: { slack: 'C123' } } },
   });
 
@@ -253,7 +243,11 @@ function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine
 
 // build a channel wired to the mock Slack SDK clients with an injected logger
 function buildChannel(logger: Logger = new Logger()): MockSlackChannel {
-  const channel = new MockSlackChannel(new Engine(new Logger()), logger);
+  const engine = new Engine(new Logger());
+  engine.config = mockConfig({
+    channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xoxb-test' } },
+  });
+  const channel = new MockSlackChannel(engine, logger);
   return channel;
 }
 
@@ -384,61 +378,56 @@ test('drop() before load does not throw', async () => {
 });
 
 // ============================================================================
-// checkPrereqs() tests (real implementation + mock web client)
+// load() prereq tests (real load() + mock web client via factories)
 // ============================================================================
 
-test('checkPrereqs passes with valid tokens and working scopes', async () => {
+test('load() passes prereqs with valid tokens and starts the socket', async () => {
   const { channel } = buildEngine();
-  const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-real');
-  expect(result.ok).toBe(true);
-  expect(result.botId).toBe('U12345678');
+  await channel.load();
+
+  expect(channel.mockSok.started).toBe(true);
+  expect(channel.getBotId()).toBe('U12345678');
 });
 
-test('checkPrereqs rejects a non-socket-mode appToken', async () => {
-  const { channel } = buildEngine();
-  const result = await channel.checkPrereqs('xoxb-wrong-format', 'xoxb-real');
-  expect(result.ok).toBe(false);
-  expect(result.error).toContain('xapp-');
+test('load() skips when appToken is not a socket-mode token', async () => {
+  const { channel, engine } = buildEngine();
+  engine.config.channels.slack = { enabled: true, appToken: 'xoxb-wrong-format', botToken: 'xoxb-real' };
+  await channel.load();
+
+  expect(channel.mockSok.started).toBe(false);
 });
 
-test('checkPrereqs rejects a non-bot botToken', async () => {
-  const { channel } = buildEngine();
-  const result = await channel.checkPrereqs('xapp-1-real', 'xapp-wrong-format');
-  expect(result.ok).toBe(false);
-  expect(result.error).toContain('xoxb-');
+test('load() skips when botToken is not a bot token', async () => {
+  const { channel, engine } = buildEngine();
+  engine.config.channels.slack = { enabled: true, appToken: 'xapp-1-real', botToken: 'xapp-wrong-format' };
+  await channel.load();
+
+  expect(channel.mockSok.started).toBe(false);
 });
 
-test('checkPrereqs rejects an invalid bot token (auth.test fails)', async () => {
+test('load() skips when the bot token is invalid (auth.test fails)', async () => {
   const { channel } = buildEngine();
   channel.mockWeb.setAuthTestResult({ ok: false, error: 'invalid_auth' });
-  const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-invalid');
-  expect(result.ok).toBe(false);
-  expect(result.error).toContain('invalid_auth');
+  await channel.load();
+
+  expect(channel.mockSok.started).toBe(false);
 });
 
-test('checkPrereqs rejects when conversations cannot be listed', async () => {
-  const { channel } = buildEngine();
-  channel.mockWeb.setConversationListResult({ ok: false, error: 'missing_scope' });
-  const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-real');
-  expect(result.ok).toBe(false);
-  expect(result.error).toContain('missing_scope');
-});
-
-test('checkPrereqs rejects an invalid app token (connections.open fails)', async () => {
+test('load() skips when the app token is invalid (connections.open fails)', async () => {
   const { channel } = buildEngine();
   channel.mockWeb.setConnectionsOpenResult({ ok: false, error: 'invalid_auth' });
-  const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-real');
-  expect(result.ok).toBe(false);
-  expect(result.error).toContain('app token invalid');
-  expect(result.error).toContain('invalid_auth');
+  await channel.load();
+
+  expect(channel.mockSok.started).toBe(false);
 });
 
-test('checkPrereqs passes when connections.open returns a transient error', async () => {
+test('load() proceeds when connections.open returns a transient error', async () => {
   const { channel } = buildEngine();
   channel.mockWeb.setConnectionsOpenResult({ ok: false, error: 'internal_error' });
-  const result = await channel.checkPrereqs('xapp-1-real', 'xoxb-real');
-  expect(result.ok).toBe(true);
-  expect(result.botId).toBe('U12345678');
+  await channel.load();
+
+  expect(channel.mockSok.started).toBe(true);
+  expect(channel.getBotId()).toBe('U12345678');
 });
 
 // ============================================================================
@@ -479,7 +468,7 @@ test('sendMessage() includes thread_ts for threaded messages', async () => {
   expect(result.ok).toBe(true);
 });
 
-test('sendMessage() converts markdown to Slack mrkdwn', async () => {
+test('sendMessage() always sends the LLM markdown in a markdown block', async () => {
   const { channel } = buildEngine();
   await channel.load();
 
@@ -488,103 +477,11 @@ test('sendMessage() converts markdown to Slack mrkdwn', async () => {
     message: { text: 'reply', ts: '1700000000.124' },
   } as ChatPostMessageResponse);
 
-  await channel.sendMessage({ role: 'assistant', content: '**bold** [link](https://x.com)', channel: 'C123' });
-
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('*bold* <https://x.com|link>');
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks).toBeUndefined();
-});
-
-test('sendMessage() renders rich format content into Block Kit rich_text blocks', async () => {
-  const { channel } = buildEngine();
-  await channel.load();
-
-  channel.mockWeb.setPostMessageResult({
-    ok: true, ts: '1700000000.125', channel: 'C123',
-    message: { text: 'reply', ts: '1700000000.125' },
-  } as ChatPostMessageResponse);
-
-  await channel.sendMessage({
-    role: 'assistant',
-    content: '# Title\n\n- one\n- two\n\n**bold** and `code` and [link](https://x.com)',
-    format: 'rich',
-    channel: 'C123',
-  });
+  await channel.sendMessage({ role: 'assistant', content: '## Header\n\nParagraph', channel: 'C123' });
 
   const call = channel.mockWeb.postMessageCalls[0]!;
-  expect(call.blocks).toBeDefined();
-  expect(call.blocks!.length).toBe(1);
-  const block = call.blocks![0]!;
-  expect(block.type).toBe('rich_text');
-
-  const elements = block.elements;
-  // heading -> bold section
-  expect(elements[0]).toEqual({
-    type: 'rich_text_section',
-    elements: [{ type: 'text', text: 'Title', style: { bold: true } }],
-  });
-  // list -> bullet list of sections
-  expect(elements[1]).toEqual({
-    type: 'rich_text_list',
-    style: 'bullet',
-    elements: [
-      { type: 'rich_text_section', elements: [{ type: 'text', text: 'one' }] },
-      { type: 'rich_text_section', elements: [{ type: 'text', text: 'two' }] },
-    ],
-  });
-  // paragraph with inline styles
-  expect(elements[2]).toEqual({
-    type: 'rich_text_section',
-    elements: [
-      { type: 'text', text: 'bold', style: { bold: true } },
-      { type: 'text', text: ' and ' },
-      { type: 'text', text: 'code', style: { code: true } },
-      { type: 'text', text: ' and ' },
-      { type: 'text', text: 'link', link: 'https://x.com' },
-    ],
-  });
-});
-
-test('sendMessage() keeps the mrkdwn text fallback and routing for rich format', async () => {
-  const { channel } = buildEngine();
-  await channel.load();
-
-  channel.mockWeb.setPostMessageResult({
-    ok: true, ts: '1700000000.126', channel: 'C123',
-    message: { text: 'reply', ts: '1700000000.126' },
-  } as ChatPostMessageResponse);
-
-  await channel.sendMessage({
-    role: 'assistant', content: '# Hi', format: 'rich', channel: 'C123', thread: '1700000000.999',
-  });
-
-  const call = channel.mockWeb.postMessageCalls[0]!;
-  expect(call.text).toBe('*Hi*');
-  expect(call.channel).toBe('C123');
-  expect(call.thread_ts).toBe('1700000000.999');
-  expect(call.blocks![0]!.elements[0]).toEqual({
-    type: 'rich_text_section',
-    elements: [{ type: 'text', text: 'Hi', style: { bold: true } }],
-  });
-});
-
-test('sendMessage() renders code blocks as rich_text_preformatted', async () => {
-  const { channel } = buildEngine();
-  await channel.load();
-
-  channel.mockWeb.setPostMessageResult({
-    ok: true, ts: '1700000000.127', channel: 'C123',
-    message: { text: 'reply', ts: '1700000000.127' },
-  } as ChatPostMessageResponse);
-
-  await channel.sendMessage({
-    role: 'assistant', content: '```\nconst x = 1;\n```', format: 'rich', channel: 'C123',
-  });
-
-  const block = channel.mockWeb.postMessageCalls[0]!.blocks![0]!;
-  expect(block.elements[0]).toEqual({
-    type: 'rich_text_preformatted',
-    elements: [{ type: 'text', text: 'const x = 1;' }],
-  });
+  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }]);
+  expect(call.text).toBeUndefined();
 });
 
 test('sendMessage() reports failure on channel mismatch', async () => {
@@ -666,7 +563,7 @@ test('E2E: app_mention → LLM → Slack reply', async () => {
   const posted = channel.mockWeb.postMessageCalls[0]!;
   expect(posted.channel).toBe('C123');
   expect(posted.thread_ts).toBe('1700000000.001');
-  expect(posted.text).toBe('Hello there!');
+  expect(posted.blocks![0]!.text).toBe('Hello there!');
 });
 
 test('E2E: app_mention runs tools then posts the final answer', async () => {
@@ -685,7 +582,7 @@ test('E2E: app_mention runs tools then posts the final answer', async () => {
   await channel.mockSok.emit('app_mention', mentionEvent({ text: '<@U12345678> what is today?' }));
 
   expect(model.callCount).toBe(2);
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('The date is 1/1/1970');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('The date is 1/1/1970');
 
   // tool result was persisted to the thread's chat history
   const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001', 'json', {});
@@ -709,7 +606,7 @@ test('E2E: message (im) → LLM → Slack DM reply', async () => {
 
   expect(model.callCount).toBe(1);
   expect(channel.mockWeb.postMessageCalls[0]!.channel).toBe('D123');
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('Direct message reply');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('Direct message reply');
 });
 
 test('E2E: non-im message events are acknowledged and ignored', async () => {
@@ -767,7 +664,7 @@ test('E2E: empty DM posts the placeholder reply', async () => {
   });
 
   expect(model.callCount).toBe(0);
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('(no text content)');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no text content)');
 });;
 
 test('E2E: mention with no text posts the placeholder reply', async () => {
@@ -781,7 +678,7 @@ test('E2E: mention with no text posts the placeholder reply', async () => {
   await channel.mockSok.emit('app_mention', mentionEvent({ text: '<@U12345678>' }));
 
   expect(model.callCount).toBe(0);
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('(no text content)');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no text content)');
 });
 
 test('E2E: LLM failure posts an (AI loop error) reply', async () => {
@@ -794,7 +691,7 @@ test('E2E: LLM failure posts an (AI loop error) reply', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toContain('(AI loop error: mock model failure)');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toContain('(AI loop error: mock model failure)');
 });
 
 test('E2E: empty AI content posts the (no response from the AI) placeholder', async () => {
@@ -807,7 +704,7 @@ test('E2E: empty AI content posts the (no response from the AI) placeholder', as
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('(no response from the AI)');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no response from the AI)');
 });
 
 test('E2E: missing agent posts an error reply instead of crashing', async () => {
@@ -815,19 +712,19 @@ test('E2E: missing agent posts an error reply instead of crashing', async () => 
   engine.isDry = false;
   engine.state = 'exec';
   engine.config = mockConfig({
-    channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xbot-test' } },
+    channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xoxb-test' } },
     agents: {}, // no agents configured at all
   });
   const channel = new MockSlackChannel(engine);
   await channel.load();
   channel.mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.007', channel: 'C123',
-    message: { text: '(no agent is configured for this channel)', ts: '1700000000.007' },
+    message: { text: '(failed to process your message)', ts: '1700000000.007' },
   } as ChatPostMessageResponse);
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('(no agent is configured for this channel)');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(failed to process your message)');
 });
 
 test('E2E: JSON LLM output is extracted to the string sent to Slack', async () => {
@@ -840,7 +737,7 @@ test('E2E: JSON LLM output is extracted to the string sent to Slack', async () =
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('The answer is 42');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('The answer is 42');
 });
 
 test('E2E: non-JSON LLM output is posted unchanged', async () => {
@@ -853,7 +750,7 @@ test('E2E: non-JSON LLM output is posted unchanged', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('plain text reply');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('plain text reply');
 });
 
 // ============================================================================
@@ -879,8 +776,8 @@ test('onSlashCommand acks then posts the help output to the channel', async () =
   expect(channel.mockWeb.postMessageCalls.length).toBe(1);
   const posted = channel.mockWeb.postMessageCalls[0]!;
   expect(posted.channel).toBe('C123');
-  expect(posted.text).toContain('usage: marvin [command]');
-  expect(posted.text).toContain('version');
+  expect(posted.blocks![0]!.text).toContain('usage: marvin [command]');
+  expect(posted.blocks![0]!.text).toContain('version');
 });
 
 test('onSlashCommand forwards command args and posts the result', async () => {
@@ -899,8 +796,8 @@ test('onSlashCommand forwards command args and posts the result', async () => {
 
   const posted = channel.mockWeb.postMessageCalls[0]!;
   // the "list" arg was forwarded to SkillsCommand (without it, help would run)
-  expect(posted.text).toContain('default skills:');
-  expect(posted.text).toContain('custom skills:');
+  expect(posted.blocks![0]!.text).toContain('default skills:');
+  expect(posted.blocks![0]!.text).toContain('custom skills:');
 });
 
 test('onSlashCommand replies with an error for an unknown command', async () => {
@@ -918,8 +815,8 @@ test('onSlashCommand replies with an error for an unknown command', async () => 
   });
 
   const posted = channel.mockWeb.postMessageCalls[0]!;
-  expect(posted.text).toContain('unknown command: foobar');
-  expect(posted.text).toContain('available commands');
+  expect(posted.blocks![0]!.text).toContain('unknown command: foobar');
+  expect(posted.blocks![0]!.text).toContain('available commands');
 });
 
 test('onSlashCommand does not expose blocked commands', async () => {
@@ -937,9 +834,9 @@ test('onSlashCommand does not expose blocked commands', async () => {
   });
 
   const posted = channel.mockWeb.postMessageCalls[0]!;
-  expect(posted.text).toContain('serve cannot be run from slack');
+  expect(posted.blocks![0]!.text).toContain('serve cannot be run from slack');
   // serve must not be listed among the available commands
-  const list = (posted.text || '').split('available commands: ')[1] || '';
+  const list = (posted.blocks![0]!.text || '').split('available commands: ')[1] || '';
   expect(list).not.toContain('serve');
 
   await channel.mockSok.emit('slash_commands', {
@@ -949,7 +846,7 @@ test('onSlashCommand does not expose blocked commands', async () => {
   });
 
   const second = channel.mockWeb.postMessageCalls[1]!;
-  expect(second.text).toContain('disable cannot be run from slack');
+  expect(second.blocks![0]!.text).toContain('disable cannot be run from slack');
 });
 
 test('onError logs error to its logger', async () => {

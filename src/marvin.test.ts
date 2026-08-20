@@ -50,7 +50,7 @@ class MockSocketModeClient implements ISocketModeClient {
 }
 
 class MockWebClient implements IWebClient {
-  public postMessageCalls: { channel?: string; thread_ts?: string; text?: string }[] = [];
+  public postMessageCalls: { channel?: string; thread_ts?: string; text?: string; blocks?: any[] }[] = [];
   public postMessageResult: any = { ok: true, ts: '1700000000.001', channel: 'C123', message: { text: 'ok', ts: '1700000000.001' } };
   public conversationListResult: any = { ok: true, channels: [] };
   public authTestResult: any = { ok: true, user_id: 'U12345678' };
@@ -90,11 +90,11 @@ class MockSlackChannel extends SlackChannel {
   }
 
   async load() {
-    this.sok = this.mockSok;
-    this.web = this.mockWeb;
+    this.socketClient = this.mockSok;
+    this.webClient = this.mockWeb;
     this.botId = this.mockWeb.authTestResult?.user_id || '';
-    this.sok.on('app_mention', this.onMention.bind(this) as (...args: any[]) => any);
-    await this.sok.start();
+    this.socketClient.on('app_mention', this.onMention.bind(this) as (...args: any[]) => any);
+    await this.socketClient.start();
   }
 }
 
@@ -273,7 +273,7 @@ test('full flow: slack research request reaches wordpress and replies in the thr
 
   // the final Slack reply is posted in the original thread
   expect(channel.mockWeb.postMessageCalls.length).toBe(1);
-  expect(channel.mockWeb.postMessageCalls[0]!.text).toBe('Published to Wordpress: https://wp.example.com/?p=42');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('Published to Wordpress: https://wp.example.com/?p=42');
   expect(channel.mockWeb.postMessageCalls[0]!.channel).toBe('C123');
   expect(channel.mockWeb.postMessageCalls[0]!.thread_ts).toBe('1700000000.001');
 });
