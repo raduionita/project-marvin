@@ -156,7 +156,7 @@ export default class SlackChannel extends Channel {
   // send a message to Slack, optionally as a thread reply
   public async sendMessage(message: Message) : Promise<SlackResponse> {
     try {
-      this.logger.debug('[SlackChannel.sendMessage]', JSON.stringify(message));
+      this.logger.debug('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'} agent=${message.agent?.id || '(none)'}`);
 
       if (this.engine.isDry) {
         this.logger.info('[SlackChannel.sendMessage]', '[dry] send message to:', message.group);
@@ -241,20 +241,15 @@ export default class SlackChannel extends Channel {
     const thread = event.thread_ts || event.ts || event.event_ts;
     try {
       this.logger.debug('[SlackChannel.onMention]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
-      
-      // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
-      await ack();
 
       // extract the actual message text (strip @marvin mention)
       const text = this.cleanText(event.text || '');
       if (!text) {
         this.logger.warn('[SlackChannel.onMention]', 'no text content');
-        const res = await this.sendMessage({ role: 'assistant', content: '(no text content)', group: event.channel, thread });
-        if (!res.ok) {
-          this.logger.warn('[SlackChannel.onMention]', 'failed to post reply:', res.error, res.message);
-        }
-        return;
+        return await ack({ text: '(no text content)' });
       }
+
+      await ack();
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
@@ -267,24 +262,15 @@ export default class SlackChannel extends Channel {
       const result = await agent.sendChat(chatId, text);
       if (result.error) {
         this.logger.error('[SlackChannel.onMention]', `AI loop failed for agent ${agentId}:`, result.error);
-        const res = await this.sendMessage({ role: 'assistant', content: `(AI loop error: ${result.error})`, group: event.channel, thread });
-        if (!res.ok) {
-          this.logger.warn('[SlackChannel.onMention]', 'failed to post reply:', res.error, res.message);
-        }
-        return;
+        result.content = `(AI loop error: ${result.error})`;
       }
 
-      const content = (result.content || '').trim() || '(no response from the AI)';
-      const res = await this.sendMessage({ role: 'assistant', content, group: event.channel, thread });
+      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agent });
       if (!res.ok) {
         this.logger.warn('[SlackChannel.onMention]', 'failed to post reply:', res.error, res.message);
       }
     } catch (error) {
       this.logger.error('[SlackChannel.onMention]', error);
-      const res = await this.sendMessage({ role: 'assistant', content: '(failed to process your message)', group: event.channel, thread });
-      if (!res.ok) {
-        this.logger.warn('[SlackChannel.onMention]', 'failed to post reply:', res.error, res.message);
-      }
     }
   }
 
@@ -292,20 +278,16 @@ export default class SlackChannel extends Channel {
     const thread = event.thread_ts || event.ts || event.event_ts;
     try {
       this.logger.debug('[SlackChannel.onDirectMessage]', event.channel, thread);
-      
-      // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
-      await ack();
 
       // extract the actual message text (strip @marvin mention)
       const text = this.cleanText(event.text || '');
       if (!text) {
         this.logger.warn('[SlackChannel.onDirectMessage]', 'no text content');
-        const res = await this.sendMessage({ role: 'assistant', content: '(no text content)', group: event.channel, thread });
-        if (!res.ok) {
-          this.logger.warn('[SlackChannel.onDirectMessage]', 'failed to post reply:', res.error, res.message);
-        }
-        return;
+        return await ack({ text: '(no text content)' });
       }
+
+      // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
+      await ack();
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
@@ -318,24 +300,15 @@ export default class SlackChannel extends Channel {
       const result = await agent.sendChat(chatId, text);
       if (result.error) {
         this.logger.error('[SlackChannel.onDirectMessage]', `AI loop failed for agent ${agentId}:`, result.error);
-        const res = await this.sendMessage({ role: 'assistant', content: `(AI loop error: ${result.error})`, group: event.channel, thread });
-        if (!res.ok) {
-          this.logger.warn('[SlackChannel.onDirectMessage]', 'failed to post reply:', res.error, res.message);
-        }
-        return;
+        result.content = `(AI loop error: ${result.error})`;
       }
 
-      const content = (result.content || '').trim() || '(no response from the AI)';
-      const res = await this.sendMessage({ role: 'assistant', content, group: event.channel, thread });
+      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread });
       if (!res.ok) {
         this.logger.warn('[SlackChannel.onDirectMessage]', 'failed to post reply:', res.error, res.message);
       }
     } catch (error) {
       this.logger.error('[SlackChannel.onDirectMessage]', error);
-      const res = await this.sendMessage({ role: 'assistant', content: '(failed to process your message)', group: event.channel, thread });
-      if (!res.ok) {
-        this.logger.warn('[SlackChannel.onDirectMessage]', 'failed to post reply:', res.error, res.message);
-      }
     }
   }
 
@@ -345,8 +318,7 @@ export default class SlackChannel extends Channel {
     try {
       const isBotOwn = event.subtype === 'bot_message' || !!event.bot_id;
       if (event.channel_type !== 'im' || isBotOwn) {
-        await ack();
-        return;
+        return await ack({ text: '(ignored)' });
       }
       await this.onDirectMessage({ event, body, ack });
     } catch (error) {

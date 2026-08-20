@@ -630,7 +630,7 @@ test('E2E: the bot ignores its own DMs (no infinite loop)', async () => {
   expect(channel.mockWeb.postMessageCalls.length).toBe(0);
 });
 
-test('E2E: empty DM posts the placeholder reply', async () => {
+test('E2E: empty DM acks with the placeholder reply', async () => {
   const { model, channel } = buildEngine({ replies: [reply('irrelevant')] });
   await channel.load();
   channel.mockWeb.setPostMessageResult({
@@ -638,17 +638,19 @@ test('E2E: empty DM posts the placeholder reply', async () => {
     message: { text: '(no text content)', ts: '1700000000.006' },
   } as ChatPostMessageResponse);
 
+  let ackText = '';
   await channel.mockSok.emit('message', {
     event: { text: '', channel: 'D123', channel_type: 'im', ts: '1700000000.013', event_ts: '1700000000.013' },
     body: {},
-    ack: async () => {},
+    ack: async (response: any) => { ackText = response?.text || ''; },
   });
 
   expect(model.callCount).toBe(0);
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no text content)');
-});;
+  expect(ackText).toBe('(no text content)');
+  expect(channel.mockWeb.postMessageCalls.length).toBe(0);
+});
 
-test('E2E: mention with no text posts the placeholder reply', async () => {
+test('E2E: mention with no text acks with the placeholder reply', async () => {
   const { model, channel } = buildEngine({ replies: [reply('irrelevant')] });
   await channel.load();
   channel.mockWeb.setPostMessageResult({
@@ -656,10 +658,17 @@ test('E2E: mention with no text posts the placeholder reply', async () => {
     message: { text: '(no text content)', ts: '1700000000.004' },
   } as ChatPostMessageResponse);
 
-  await channel.mockSok.emit('app_mention', mentionEvent({ text: '<@U12345678>' }));
+  let ackText = '';
+  const ev = mentionEvent({ text: '<@U12345678>' });
+  await channel.mockSok.emit('app_mention', {
+    event: ev.event,
+    body: ev.body,
+    ack: async (response: any) => { ackText = response?.text || ''; },
+  });
 
   expect(model.callCount).toBe(0);
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no text content)');
+  expect(ackText).toBe('(no text content)');
+  expect(channel.mockWeb.postMessageCalls.length).toBe(0);
 });
 
 test('E2E: LLM failure posts an (AI loop error) reply', async () => {
@@ -675,20 +684,20 @@ test('E2E: LLM failure posts an (AI loop error) reply', async () => {
   expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toContain('(AI loop error: mock model failure)');
 });
 
-test('E2E: empty AI content posts the (no response from the AI) placeholder', async () => {
+test('E2E: empty AI content posts the (no response) placeholder', async () => {
   const { channel } = buildEngine({ replies: [reply('')] });
   await channel.load();
   channel.mockWeb.setPostMessageResult({
     ok: true, ts: '1700000000.005', channel: 'C123',
-    message: { text: '(no response from the AI)', ts: '1700000000.005' },
+    message: { text: '(no response)', ts: '1700000000.005' },
   } as ChatPostMessageResponse);
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no response from the AI)');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no response)');
 });
 
-test('E2E: missing agent posts an error reply instead of crashing', async () => {
+test('E2E: missing agent does not crash', async () => {
   const engine = new Engine(new Logger());
   engine.isDry = false;
   engine.state = 'exec';
@@ -705,7 +714,8 @@ test('E2E: missing agent posts an error reply instead of crashing', async () => 
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(failed to process your message)');
+  // the error is logged, nothing is posted
+  expect(channel.mockWeb.postMessageCalls.length).toBe(0);
 });
 
 test('E2E: LLM output is posted to Slack unchanged', async () => {

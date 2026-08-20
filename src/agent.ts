@@ -259,7 +259,7 @@ export class Agent {
       // save chat to cache
       this.saveChat(chatId, chat);
 
-      return { content: reply?.message?.content || '', steps: steps };
+      return { content: (reply?.message?.content || '').trim(), steps: steps };
     } catch (error) {
       this.logger.error('[Agent.sendChat]', error);
       return { content: '', steps: 0, error: (error as Error).message };

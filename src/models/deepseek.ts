@@ -112,7 +112,7 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
-    this.logger.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId, body);
+    this.logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
 
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
@@ -166,7 +166,7 @@ export default class DeepseekModel extends Model {
       }
     } as Reply;
 
-    this.logger.debug('[DeepseekModel.sendChat]', 'response', json.id, choice.finish_reason, json.usage?.completion_tokens);
+    this.logger.debug('[DeepseekModel.sendChat]', 'response', `id=${json.id} finish=${choice.finish_reason} tokens=${json.usage?.completion_tokens}`);
 
     return reply;
   }
