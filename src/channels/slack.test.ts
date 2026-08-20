@@ -114,8 +114,8 @@ class MockSlackChannel extends SlackChannel {
     return super.findAgent(channel);
   }
 
-  extractText(event: { [key: string]: any }): string {
-    return super.extractText(event);
+  cleanText(text: string): string {
+    return super.cleanText(text);
   }
 
   setBotId(id: string) {
@@ -263,41 +263,41 @@ function mentionEvent(overrides: { [key: string]: any } = {}): { event: any; bod
 
 test('extractText returns raw text when no mention present', () => {
   const { channel } = buildEngine();
-  expect(channel.extractText({ text: 'hello world' })).toBe('hello world');
+  expect(channel.cleanText('hello world')).toBe('hello world');
 });
 
 test('extractText strips the bot\'s own mention from text', () => {
   const { channel } = buildEngine();
   channel.setBotId('U12345678');
-  expect(channel.extractText({ text: '<@U12345678> hello there' })).toBe('hello there');
+  expect(channel.cleanText('<@U12345678> hello there')).toBe('hello there');
 });
 
 test('extractText handles text with only a bot mention', () => {
   const { channel } = buildEngine();
   channel.setBotId('U12345678');
-  expect(channel.extractText({ text: '<@U12345678>' })).toBe('');
+  expect(channel.cleanText('<@U12345678>')).toBe('');
 });
 
 test('extractText strips only the bot mention, keeping other users mentions', () => {
   const { channel } = buildEngine();
   channel.setBotId('U222');
-  expect(channel.extractText({ text: '<@U111><@U222> hello friends' })).toBe('<@U111> hello friends');
+  expect(channel.cleanText('<@U111><@U222> hello friends')).toBe('<@U111> hello friends');
 });
 
 test('extractText keeps mentions when the bot id is unknown', () => {
   const { channel } = buildEngine();
-  expect(channel.extractText({ text: '<@U12345678> hello there' })).toBe('<@U12345678> hello there');
+  expect(channel.cleanText('<@U12345678> hello there')).toBe('<@U12345678> hello there');
 });
 
 test('extractText handles missing text field', () => {
   const { channel } = buildEngine();
-  expect(channel.extractText({})).toBe('');
+  expect(channel.cleanText('')).toBe('');
 });
 
 test('extractText preserves links and formatting', () => {
   const { channel } = buildEngine();
   channel.setBotId('U12345678');
-  expect(channel.extractText({ text: '<@U12345678> check <http://example.com|this link> *bold* :smile:' }))
+  expect(channel.cleanText('<@U12345678> check <http://example.com|this link> *bold* :smile:'))
     .toBe('check <http://example.com|this link> *bold* :smile:');
 });
 
@@ -461,7 +461,7 @@ test('sendMessage() always sends the LLM markdown in a markdown block', async ()
   await channel.sendMessage({ role: 'assistant', content: '## Header\n\nParagraph', group: 'C123' });
 
   const call = channel.mockWeb.postMessageCalls[0]!;
-  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }]);
+  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }, { type: 'divider' }, { type: 'markdown', text: '*Agent*: (none)\n*Model*: (none)\n*Channel*: C123\n*Thread*: (none)\n' }]);
   expect(call.text).toBeUndefined();
 });
 

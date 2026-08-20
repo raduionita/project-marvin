@@ -266,6 +266,8 @@ export interface Message {
     // arguments as a JSON, might be invalid
     arguments: {[key:string]:any};
   }[];
+  // model
+  agent?: Agent;
 }
 
 // LLM Model sendChat reply

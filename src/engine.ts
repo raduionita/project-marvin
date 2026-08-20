@@ -773,8 +773,7 @@ export default class Engine {
     const chatId = undefined; // stateless, design choice, for not
 
     // merge engine (default) tools with the task's integration tools
-    const taskTools = await loadIntegrationTools(this, task.integrations || []);
-    const tools = [...Object.values(this.tools).map(t => t.meta), ...taskTools];
+    const tools = await loadIntegrationTools(this, task.integrations || []);
 
     // set task input as user message to LLM
     const result = await agent.sendChat(chatId, task.input, tools);
@@ -793,7 +792,7 @@ export default class Engine {
           continue;
         }
 
-        const reply = await channel.sendMessage({ role: 'assistant', content: result.content, group: groupId } as Message);
+        const reply = await channel.sendMessage({ role: 'assistant', content: result.content, group: groupId, agent: agent } as Message);
         if (!reply.ok) {
           this.logger.warn('[Engine.execTask]', `channel ${channelId} send failed, skipping`);
           continue;

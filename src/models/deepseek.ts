@@ -32,6 +32,7 @@ export default class DeepseekModel extends Model {
   provider: Provider = 'deepseek';
   public baseUrl: string = 'https://api.deepseek.com';
 
+  // moves DSML tools int .tools, cleans the content
   prepChoice(choice: Choice): Choice {
     // DSML tool_calls: <｜DSML｜tool_calls>...</｜DSML｜tool_calls>
     const dsml = /<tool_calls>([\s\S]*?)<\/tool_calls>/g;
@@ -111,7 +112,7 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
-    this.logger.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId);
+    this.logger.debug('[DeepseekModel.sendChat]', 'request', chat.id, chat.userId, body);
 
     // call the model api
     const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;

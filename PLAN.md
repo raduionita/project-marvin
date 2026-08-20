@@ -78,4 +78,4 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` open
 - [ ] **Usage/cost surfaced to callers** — `Chat.usage` (`types.ts:261`) exists but `sendChat` never accumulates `Reply.usage`; nothing reports tokens/cost to the user or the logger. Aggregate into the returned result.
 - [ ] **`loadSystems`/`loadTools` use literal `.replace('.ts','')`** — `engine.ts:179` and `:231`; align with the `/\.ts$/` regex used in the fixed indexes (consistency + name-collision safety).
 - [ ] **Slack `runCommand` imports with `.ts`** — `slack.ts:407` `import(\`../commands/${name}.ts\`)` breaks in a compiled binary; use `.js` like the rest of the codebase.
-- [ ] **Unify `onMention`/`onDirectMessage`** — `slack.ts:268-352` are near-identical (extract → findAgent → sendChat → replyTo); one shared handler would avoid future drift.
+- [ ] **Unify `onMention`/`onDirectMessage`** — `slack.ts:268-352` are near-identical (extract → findAgent → sendChat); one shared handler would avoid future drift.

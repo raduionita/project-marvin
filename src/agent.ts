@@ -116,7 +116,7 @@ export class Agent {
       messages: [{ role: 'system', content: system }],
       thinking: false,
       userId: '',
-      tools: tools,
+      tools: [...Object.values(this.engine.tools).map(t => t.meta), ...(tools || [])],
       updated: Date.now(),
     } as Chat;
   }
