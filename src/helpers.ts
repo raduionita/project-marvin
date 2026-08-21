@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, realpathSync } from 'fs';
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'path';
 import { readdirSync } from 'fs';
+import TurndownService from 'turndown';
 
 import logger from './logger.js';
 
@@ -56,6 +57,12 @@ export async function withRetry<T>(fn: () => Promise<T>, opts: { retries?: numbe
 
 export function rand(min:number, max:number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// clip a string to a maximum length, appending a marker when truncated
+export function truncate(text: string, max: number): string {
+  if (max <= 0 || text.length <= max) return text;
+  return text.slice(0, max) + `...[truncated ${text.length - max} chars]`;
 }
 
 export function getRootDir() {

@@ -1,5 +1,11 @@
 
+import TurndownService from 'turndown';
+
 import { Tool, type ToolMeta } from '../types.js';
+import type Engine from '../engine.js';
+import { type Logger } from '../logger.js';
+import * as constants from '../constants.js';
+
 
 export default class WebFetchTool extends Tool {
   public meta: ToolMeta = {
@@ -20,6 +26,38 @@ export default class WebFetchTool extends Tool {
     },
   }
 
+  private turndown: TurndownService = new TurndownService({ headingStyle: 'atx', hr: '---', codeBlockStyle: 'fenced' });
+
+  constructor(engine: Engine, logger: Logger) {
+    super(engine, logger);
+    this.turndown.remove([
+      'script',
+      'style',
+      'aside',
+      'nav',
+      'footer',
+      'iframe',
+      'noscript',
+      'meta',
+      'link',
+      'button',
+      'canvas',
+      'audio',
+      'video',
+      'source',
+      'track',
+      'embed',
+      'object',
+      'picture',
+      'colgroup',
+      'form', 'input', 'select', 'textarea', 'optgroup', 'option', 'label', 'fieldset',
+      'head',
+      'map', 'area',
+      'template',
+      'dialog',
+    ]);
+  }
+
   public async call(args: { url: string }) {
     this.logger.debug('[WebFetchTool.call]', JSON.stringify(args));
 
@@ -30,13 +68,15 @@ export default class WebFetchTool extends Tool {
 
     // use fetch to fetch the page
     const response = await fetch(args.url);
-    const text = await response.text();
+    const html = await response.text();
 
+    
     // extract the relevant content
-    const start = text.indexOf('<body>');
-    const end = text.indexOf('</body>');
-    const body = text.substring(start + 6, end);
+    const body = html.substring(html.search(/\<body.+\>/) + 6, html.search(/\<\/body\>/i))
+    // const title = html.substring(html.indexOf('<title>') + 7, html.indexOf('</title>'));
 
-    return { result: body };
+    return { 
+      result: this.turndown.turndown(body).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8),
+    };
   }
 }

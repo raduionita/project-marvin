@@ -14,6 +14,8 @@ export const DEFAULT_MAX_STEPS = 20;
 
 // keep the chat history bounded (system message + last N messages)
 export const MAX_CHAT_MESSAGES = 24;
+// tool results longer than this are truncated before entering the chat history
+export const MAX_TOOL_RESULT_CHARS = 8*1024;
 // cached chats idle for longer than this are swept from memory
 export const CHAT_TTL_MS = 60 * 60 * 1000;
 // how often to sweep idle cached chats

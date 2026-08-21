@@ -353,6 +353,112 @@ test('sendChat stops the AI loop when end chat tool call is found', async () => 
   expect(result!.content).toBe(''); // The end chat content is empty in our reply
 });
 
+test('sendChat answers the end_chat tool_call_id so the history stays valid', async () => {
+  const engine = buildTestEngine();
+
+  (engine.models['mock.model'] as MockModel).setReply({
+    id: 'reply-end',
+    stop: false,
+    finish: 'tool_calls',
+    usage: { completion: 5, prompt: 10 },
+    message: {
+      role: 'assistant',
+      content: '',
+      tools: [{ id: 'final-1', name: constants.END_CHAT_NAME, arguments: {} }],
+    },
+  } as Reply);
+
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello');
+
+  // the assistant tool_calls message must be followed by a tool response,
+  // otherwise the next turn in the same thread is rejected by the provider
+  const chat = engine.agents['marvin']!.loadChat('chat-1');
+  const last = chat!.messages[chat!.messages.length - 1]!;
+  expect(last.role).toBe('tool');
+  expect(last.toolId).toBe('final-1');
+});
+
+test('sendChat answers tool calls skipped after end_chat', async () => {
+  const engine = buildTestEngine();
+
+  (engine.models['mock.model'] as MockModel).setReply({
+    id: 'reply-multi',
+    stop: false,
+    finish: 'tool_calls',
+    usage: { completion: 5, prompt: 10 },
+    message: {
+      role: 'assistant',
+      content: '',
+      tools: [
+        { id: 't-end', name: constants.END_CHAT_NAME, arguments: {} },
+        { id: 't-after', name: 'mock_tool', arguments: {} },
+      ],
+    },
+  } as Reply);
+
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello');
+
+  const chat = engine.agents['marvin']!.loadChat('chat-1');
+  const toolMsgs = chat!.messages.filter((m: Message) => m.role === 'tool');
+  expect(toolMsgs.map((m: Message) => m.toolId)).toEqual(['t-end', 't-after']);
+});
+
+test('sendChat answers pending tool calls when force stopped', async () => {
+  const engine = buildTestEngine();
+
+  (engine.models['mock.model'] as MockModel).setReply({
+    id: 'reply-stop',
+    stop: true,
+    finish: 'stop',
+    usage: { completion: 5, prompt: 10 },
+    message: {
+      role: 'assistant',
+      content: 'partial',
+      tools: [{ id: 't-1', name: 'mock_tool', arguments: {} }],
+    },
+  } as Reply);
+
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello');
+
+  const chat = engine.agents['marvin']!.loadChat('chat-1');
+  const last = chat!.messages[chat!.messages.length - 1]!;
+  expect(last.role).toBe('tool');
+  expect(last.toolId).toBe('t-1');
+});
+
+test('sendChat truncates oversized tool results', async () => {
+  const engine = buildTestEngine();
+
+  class BigTool extends MockTool {
+    async call(_args: any) {
+      return { result: 'x'.repeat(constants.MAX_TOOL_RESULT_CHARS * 3) };
+    }
+  }
+  engine.tools['mock_tool'] = new BigTool(engine, new Logger());
+
+  (engine.models['mock.model'] as MockModel).setReply({
+    id: 'reply-big',
+    stop: false,
+    finish: 'tool_calls',
+    usage: { completion: 5, prompt: 10 },
+    message: {
+      role: 'assistant',
+      content: '',
+      tools: [
+        { id: 't-big', name: 'mock_tool', arguments: {} },
+        { id: 't-end', name: constants.END_CHAT_NAME, arguments: {} },
+      ],
+    },
+  } as Reply);
+
+  await engine.agents['marvin']!.sendChat('chat-1', 'hello');
+
+  const chat = engine.agents['marvin']!.loadChat('chat-1');
+  const toolMsg = chat!.messages.find((m: Message) => m.toolId === 't-big')!;
+  expect(toolMsg.content.length < constants.MAX_TOOL_RESULT_CHARS * 2).toBe(true);
+  expect(toolMsg.content).toContain('truncated');
+});
+
 test('sendChat returns empty content when reply has no message content', async () => {
   const engine = buildTestEngine();
 
@@ -510,6 +616,32 @@ test('packChat drops oldest messages when there is no system message', () => {
 
   expect(chat.messages.length).toBe(constants.MAX_CHAT_MESSAGES);
   expect(chat.messages[0]).toEqual({ role: 'user', content: 'msg-6' });
+});
+
+test('packChat drops leading tool messages orphaned by the trim', () => {
+  const engine = mockEngine();
+  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+
+  const messages: Chat['messages'] = [
+    { role: 'system', content: 'sys' },
+    ...Array.from({ length: 5 }, (_, i) => ({ role: 'user' as const, content: `pre-${i}` })),
+    { role: 'assistant', content: '', tools: [{ id: 't1', name: 'mock_tool', arguments: {} }] },
+    { role: 'tool', content: '{"ok":true}', toolId: 't1' },
+    { role: 'tool', content: '{"ok":true}', toolId: 't1' },
+  ];
+  // pad so the trim boundary lands inside the tool batch above
+  while (messages.length < constants.MAX_CHAT_MESSAGES + 6) {
+    messages.push({ role: 'user', content: `pad-${messages.length}` });
+  }
+  const chat = chatWith(messages);
+
+  agent.packChat(chat);
+
+  expect(chat.messages.length <= constants.MAX_CHAT_MESSAGES).toBe(true);
+  expect(chat.messages[0]!.role).toBe('system');
+  // tool responses whose assistant tool_calls parent was trimmed are dropped too
+  expect(chat.messages[1]!.role).not.toBe('tool');
+  expect(chat.messages[1]!.content).toBe('pad-9');
 });
 
 // ==================== saveChat / loadChat / makeChat tests ====================

@@ -76,19 +76,24 @@ export default class WebSearchTool extends Tool {
       const json: any[] = tryJsonParse(raw) || [];
       json.length = Math.min(json.length, 10);
 
-      return { results: json.map((o: { [key: string]: any }) => ({
-        title: o.t.replace(/<\/?[^>]+(>|$)/g, ''),
-        body: o.a.replace(/<\/?[^>]+(>|$)/g, ''),
-        link: o.c
-      })) };
+      return { 
+        results: json.map((o: { [key: string]: any }) => ({
+          title: o.t.replace(/<\/?[^>]+(>|$)/g, ''),
+          body: o.a.replace(/<\/?[^>]+(>|$)/g, ''),
+          link: o.c
+        })),
+      };
     } catch (error) {
       // distinguish "search failed" from "no results", so the LLM does not
       // conclude nothing exists when the scrape/parse simply failed
       this.logger.error('[WebSearchTool.call]', 'error:', error);
-      return { results: [], warning: `web_search failed: ${(error as Error).message}` };
+      return { 
+        results: [], 
+        error: `web_search failed: ${(error as Error).message}` 
+      };
     } finally {
+      this.logger.debug('[WebSearchTool.call]', 'closing page');
       if (page && !page.isClosed()) {
-        this.logger.debug('[WebSearchTool.call]', 'closing page');
         await page.close();
       }
     }

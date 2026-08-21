@@ -1,6 +1,6 @@
 {
   "name": "marvin",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "description": "mArvIn - your AI sidekick",
   "keywords": [
     "marvin",
@@ -27,6 +27,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^25.9.1",
+    "@types/turndown": "^5.0.6",
     "typescript": "^7.0.2"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "dotenv": "^17.4.2",
     "puppeteer": "^25.3.0",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "turndown": "^7.2.4"
   }
 }

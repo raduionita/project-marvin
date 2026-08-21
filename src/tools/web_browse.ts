@@ -1,5 +1,10 @@
+import TurndownService from 'turndown';
+
 import { Tool, type ToolMeta } from '../types.js';
 import type BrowserSystem from '../systems/browser.js';
+import type Engine from '../engine.js';
+import { type Logger } from '../logger.js';
+import * as constants from '../constants.js';
 
 export default class WebBrowseTool extends Tool {
   public meta: ToolMeta = {
@@ -20,6 +25,39 @@ export default class WebBrowseTool extends Tool {
     },
   }
 
+  private turndown: TurndownService = new TurndownService({ headingStyle: 'atx', hr: '---', codeBlockStyle: 'fenced' });
+
+  constructor(engine: Engine, logger: Logger) {
+    super(engine, logger);
+    this.turndown.remove([
+      'script',
+      'style',
+      'aside',
+      'nav',
+      'footer',
+      'iframe',
+      'noscript',
+      'meta',
+      'link',
+      'button',
+      'canvas',
+      'audio',
+      'video',
+      'source',
+      'track',
+      'embed',
+      'object',
+      'picture',
+      'colgroup',
+      'form', 'input', 'select', 'textarea', 'optgroup', 'option', 'label', 'fieldset',
+      'head',
+      'map', 'area',
+      'template',
+      'dialog',
+    ]);
+  }
+
+
   public async call(args: { url: string }) {
     this.logger.debug('[WebBrowseTool.call]', args);
 
@@ -38,17 +76,28 @@ export default class WebBrowseTool extends Tool {
     const page = await system.newPage();
     page.setDefaultNavigationTimeout(15_000);
 
+    let error = '';
+    let title = '';
+    let body  = '';
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5_000 });
-      const title = await page.title();
       await page.$eval('header, footer, script, iframe', el => el.remove());
       const text = await page.$eval('body', el => el.innerText);
-      return { title, body: text.split('\n').map((line: string) => line.trim()).filter((line: string) => line.length > 0).join('\n') };
+      // output
+      title = await page.title();
+      body = this.turndown.turndown(text).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8);
     } catch (error) {
       this.logger.error('[WebBrowseTool.call]', 'error:', error);
+      title = 'error';
+      error = 'web_browse: error';
     } finally {
       await page.close();
     }
-    return { title: '', body: '', error: 'webBrowse: error' };
+
+    return { 
+      title: title,
+      body: body,
+      error: error,
+    };
   }
 }

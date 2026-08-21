@@ -11,10 +11,10 @@ export const DEFAULT_LOG_LEVEL: LogLevel = 'info';
 
 // prefix used when logger.enablePrefix(true) is set
 export const LEVEL_PREFIXES: Record<LogLevel, string> = {
-  debug: '[DEBUG]',
-  info: '[INFO]',
-  warn: '[WARN]',
-  error: '[ERROR]',
+  debug: '[DBG]',
+  info : '[INF]',
+  warn : '[WRN]',
+  error: '[ERR]',
 };
 
 // the levels a Logger can emit, including raw (unfiltered) log lines

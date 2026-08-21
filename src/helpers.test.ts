@@ -1,5 +1,20 @@
 import { test, expect } from 'bun:test';
-import { withRetry, markdownToMrkdwn, mergeConfig } from './helpers.js';
+import { withRetry, markdownToMrkdwn, mergeConfig, truncate } from './helpers.js';
+
+test('truncate leaves short strings untouched', () => {
+  expect(truncate('hello', 10)).toBe('hello');
+  expect(truncate('hello', 5)).toBe('hello');
+});
+
+test('truncate clips long strings and appends a marker', () => {
+  const out = truncate('x'.repeat(30), 10);
+  expect(out.startsWith('x'.repeat(10))).toBe(true);
+  expect(out).toContain('truncated 20 chars');
+});
+
+test('truncate returns the text for non-positive max only when short', () => {
+  expect(truncate('abc', 0)).toBe('abc');
+});
 
 test('withRetry retries until success', async () => {
   let attempts = 0;

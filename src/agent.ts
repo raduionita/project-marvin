@@ -8,6 +8,7 @@ import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
 import { splitIntegrationToolName } from './integrations/index.js';
+import { truncate } from './helpers.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI
 // loop via sendChat (model calls + tool execution) on behalf of tasks and chats,
@@ -140,7 +141,10 @@ export class Agent {
 
   // bound chat history to the system message + the last N messages
   packChat(chat: Chat): void {
-    if (!chat.messages || chat.messages.length <= constants.MAX_CHAT_MESSAGES) return;
+    if (chat.messages.length <= constants.MAX_CHAT_MESSAGES) {
+      // no trimming needed
+      return;
+    }
 
     // TODO: trim middle approach
 
@@ -151,6 +155,14 @@ export class Agent {
     } else {
       chat.messages = chat.messages.slice(drop);
     }
+
+    // drop tool messages left without their assistant tool_calls parent right
+    // after the trim point: APIs reject tool responses with no matching
+    // tool_calls message before them
+    let keep = chat.messages[0]?.role === 'system' ? 1 : 0;
+    let scan = keep; // = 1
+    while (scan < chat.messages.length && chat.messages[scan]!.role === 'tool') scan++;
+    if (scan > keep) chat.messages = [...chat.messages.slice(0, keep), ...chat.messages.slice(scan)];
   }
 
   // tool call
@@ -219,37 +231,32 @@ export class Agent {
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
         // trim result, this can be really big
-        this.logger.debug('[Agent.sendChat]', `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
+        this.logger.debug('[Agent.sendChat]', `ended=${ended}`, `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
 
-        // force stop
-        if (reply.stop) {
-          this.logger.debug('[Agent.sendChat]', `force stop at step=#${steps}`);
-          break;
-        }
-
+        ended = reply.stop || ended;
         // execute any tool calls
         for (const tool of reply.message.tools || []) {
           this.logger.debug('[Agent.sendChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
-
           // if end_chat tool call is found, we're done
           if (tool.name === constants.END_CHAT_NAME) {
             ended = true;
-            break;
+            chat.messages.push({ role: 'tool', content: JSON.stringify({ ended: true }), toolId: tool.id });
+          } else if (ended) {
+            // tools after end_chat are skipped, but their ids still need an answer
+            chat.messages.push({ role: 'tool', content: JSON.stringify({ skipped: true }), toolId: tool.id });
+          } else {
+            // ! tool call
+            let result = await this.execTool(tool.name, tool.arguments);  
+            // add tool call to chat history, truncating huge results (e.g. full
+            // web pages) so they cannot blow past the model context window
+            chat.messages.push({
+              role: 'tool',
+              content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS),
+              toolId: tool.id,
+            });
           }
-
-          // ! tool call
-          let result = await this.execTool(tool.name, tool.arguments);
-
-          // add tool call to chat history
-          chat.messages.push({ role: 'tool', content: JSON.stringify(result), toolId: tool.id });
         }
-
-        // if end_chat tool call is found, we're done
-        if (ended) {
-          this.logger.info('[Agent.sendChat]', `tool stop (${constants.END_CHAT_NAME}) at step=#${steps}`);
-          break;
-        }
-      } while (steps < constants.DEFAULT_MAX_STEPS - 1);
+      } while ((!ended) && (steps < constants.DEFAULT_MAX_STEPS - 1));
 
       // warn if max steps reached
       if (steps >= constants.DEFAULT_MAX_STEPS) {

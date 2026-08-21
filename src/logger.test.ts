@@ -30,7 +30,7 @@ test('shouldLog respects the level threshold', () => {
 });
 
 test('LEVEL_PREFIXES matches the [LEVEL] format', () => {
-  expect(LEVEL_PREFIXES).toEqual({ debug: '[DEBUG]', info: '[INFO]', warn: '[WARN]', error: '[ERROR]' });
+  expect(LEVEL_PREFIXES).toEqual({ debug: '[DBG]', info: '[INF]', warn: '[WRN]', error: '[ERR]' });
 });
 
 test('Logger default level follows the env and filters debug', () => {
@@ -96,9 +96,9 @@ test('Logger.enablePrefix prefixes emitted lines with [LEVEL]', () => {
   lg.info('i');
   lg.warn('w');
 
-  expect(lines[0]!.args[0]).toBe('[DEBUG]');
-  expect(lines[1]!.args[0]).toBe('[INFO]');
-  expect(lines[2]!.args[0]).toBe('[WARN]');
+  expect(lines[0]!.args[0]).toBe('[DBG]');
+  expect(lines[1]!.args[0]).toBe('[INF]');
+  expect(lines[2]!.args[0]).toBe('[WRN]');
   expect(lines[0]!.args[1]).toBe('d');
 
   lg.enablePrefix(false);
@@ -155,7 +155,7 @@ test('setLoggerMode flips every Logger instance (daemon mode)', () => {
 
     lg.info('[SlackChannel.onConnected]', 'connected!');
 
-    expect(lines[0]!.args).toEqual(['[INFO]', '[SlackChannel.onConnected]', 'connected!']);
+    expect(lines[0]!.args).toEqual(['[INF]', '[SlackChannel.onConnected]', 'connected!']);
   } finally {
     setLoggerMode({ prefix: false, stripTags: true });
   }
