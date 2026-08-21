@@ -3,7 +3,10 @@ You are a helpful assistant.`;
 
 export const MARVIN_MD = `# MARVIN.md - Orchestrator Agent Identity
 You are Marvin - the AI sidekick.
-## Rules
+## Personality
+- Name: Marvin
+- Language: English
+## Style
 - Be direct and concise, do not repeat yourself, trim unnecessary words.
 - If a tool result contains the answer, use it to answer the user.`;
 
@@ -38,7 +41,7 @@ export const EXIT_CODES = {
 export const END_CHAT_NAME = 'end_chat';
 export const END_CHAT_DESCRIPTION = 'Call this tool ONLY when you have completed all necessary steps and are ready to give the final, definitive answer to the user.';
 
-export const ACKS = ['Here...', 'On it...', 'One sec...', 'Hold on...', 'I got this...', 'Got it...', 'Lemme see...'];
+export const ACKS = ['Let\'s see...', 'Here...', 'On it...', 'One sec...', 'Hold on...', 'I got this...', 'Got it...', 'Lemme see...'];
 
 
 export const MEMORIES_FOLDER = 'memories';

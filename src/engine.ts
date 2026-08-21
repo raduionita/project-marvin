@@ -191,6 +191,8 @@ export default class Engine {
         this.logger.error('[Engine.loadSystems]', `failed to load "${name}":`, err);
       }
     }
+
+    this.logger.debug('[Engine.loadSystems]', 'systems:', Object.keys(this.systems));
   }
 
   async loadTools() {
@@ -243,6 +245,8 @@ export default class Engine {
         this.logger.error('[Engine.loadTools]', `failed to load custom tool "${file}":`, err);
       }
     }
+
+    this.logger.debug('[Engine.loadTools]', 'tools:', Object.keys(this.tools));
   }
 
   async loadChannels() {
@@ -277,6 +281,8 @@ export default class Engine {
         this.logger.error('[Engine.loadChannels]', `failed to load "${id}":`, err);
       }
     }
+
+    this.logger.debug('[Engine.loadChannels]', 'channels:', Object.keys(this.channels));
   }
 
   async loadIntegrations() {
@@ -311,6 +317,8 @@ export default class Engine {
         this.logger.error('[Engine.loadIntegrations]', `failed to load "${id}":`, err);
       }
     }
+
+    this.logger.debug('[Engine.loadIntegrations]', 'integrations:', Object.keys(this.integrations));
   }
 
   async loadSkills() {
@@ -467,6 +475,8 @@ export default class Engine {
 
       this.logger.info('[Engine.loadAgents]',`agent [${agentId}] loaded`);
     }
+
+    this.logger.debug('[Engine.loadAgents]', 'agents:', Object.keys(this.agents));
   }
 
   // loads tasks: the internal monitor/sweep tasks run on the orchestrator
@@ -549,6 +559,8 @@ export default class Engine {
 
       this.logger.info('[Engine.loadTasks]', `task "${taskId}" created (agent ${agent.id})`);
     }
+
+    this.logger.debug('[Engine.loadTasks]', 'tasks:', Object.keys(this.tasks));
   }
 
   async dropAgents() {
@@ -792,7 +804,7 @@ export default class Engine {
           continue;
         }
 
-        const reply = await channel.sendMessage({ role: 'assistant', content: result.content, group: groupId, agent: agent } as Message);
+        const reply = await channel.sendMessage({ role: 'assistant', content: result.content, group: groupId, agent: agent.id, model: agent.model?.model } as Message);
         if (!reply.ok) {
           this.logger.warn('[Engine.execTask]', `channel ${channelId} send failed, skipping`);
           continue;
