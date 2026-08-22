@@ -187,10 +187,10 @@ export default class SlackChannel extends Channel {
           type: "divider"
         },{
           type: "markdown",
-          text: '*Agent*: `'   + (message.agent  || '(none)') + '`\n' +
-                '*Model*: `'   + (message.model  || '(none)') + '`\n' +
-                '*Channel*: `' + (message.group  || '(none)') + '`\n' +
-                '*Thread*: `'  + (message.thread || '(none)') + '`\n'
+          text: '**Agent**: `'   + (message.agent  || '(none)') + '`\n' +
+                '**Model**: `'   + (message.model  || '(none)') + '`\n' +
+                '**Channel**: `' + (message.group  || '(none)') + '`\n' +
+                '**Thread**: `'  + (message.thread || '(none)') + '`\n'
         },
       ]});
 

@@ -1,7 +1,7 @@
-export const IDENTITY_MD = `# IDENTITY.md - Agent Identity
+export const IDENTITY_MD = `# Identity
 You are a helpful assistant.`;
 
-export const MARVIN_MD = `# MARVIN.md - Orchestrator Agent Identity
+export const MARVIN_MD = `# Identity
 You are Marvin - the AI sidekick.
 ## Personality
 - Name: Marvin
