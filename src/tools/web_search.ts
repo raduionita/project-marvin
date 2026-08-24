@@ -26,7 +26,7 @@ export default class WebSearchTool extends Tool {
   }
 
   public async call(args: { query: string }) {
-    this.logger.debug('[WebSearchTool.call]', JSON.stringify(args));
+    this.logger.debug('[WebSearchTool.call]', Object.keys(args));
 
     if (this.engine.isDry) {
       this.logger.info('[WebSearchTool.call]', '[dry] search:', args.query);

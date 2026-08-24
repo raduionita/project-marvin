@@ -59,7 +59,7 @@ export default class WebFetchTool extends Tool {
   }
 
   public async call(args: { url: string }) {
-    this.logger.debug('[WebFetchTool.call]', JSON.stringify(args));
+    this.logger.debug('[WebFetchTool.call]', Object.keys(args));
 
     if (this.engine.isDry) {
       this.logger.info('[WebFetchTool.call]', '[dry] fetch:', args.url);
