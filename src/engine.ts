@@ -171,7 +171,7 @@ export default class Engine {
   async loadSystems() {
     this.logger.debug('[Engine.loadSystems]');
 
-    const files = listSystems(this).map(f => f.replace('.ts', ''));
+    const files = listSystems(this);
     for (const name of files) {
       try {
         if (this.systems[name]) continue;

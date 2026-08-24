@@ -5,8 +5,6 @@ import { existsSync, readdirSync } from 'fs';
 import type Engine from '../engine.js';
 import { Tool } from '../types.js';
 
-
-
 let tools: string[] = [];
 
 export function listInternalTools(engine: Engine): string[] {

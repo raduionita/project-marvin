@@ -266,7 +266,7 @@ export default class ToolsCommand extends Command {
   async loadSystems() {
     this.logger.debug('[ToolCommand.loadSystems]');
 
-    const files = listSystems(this.engine).map(f => f.replace('.ts', ''));
+    const files = listSystems(this.engine);
     for (const name of files) {
       try {
         const Module = await import(`../systems/${name}.js`);
