@@ -59,7 +59,7 @@ export default class WebBrowseTool extends Tool {
 
 
   public async call(args: { url: string }) {
-    this.logger.debug('[WebBrowseTool.call]', args);
+    this.logger.debug('[WebBrowseTool.call]', Object.keys(args));
 
     if (this.engine.isDry) {
       this.logger.info('[WebBrowseTool.call]', '[dry] browse:', args.url);

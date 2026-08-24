@@ -39,7 +39,7 @@ export default class GrepTool extends Tool {
   }
 
   public async call(args: { pattern: string; path?: string; caseSensitive?: boolean }) {
-    this.logger.debug('[GrepTool.call]', args);
+    this.logger.debug('[GrepTool.call]', Object.keys(args));
 
     if (!args?.pattern) {
       return { error: 'grep: no pattern provided' };

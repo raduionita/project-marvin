@@ -20,7 +20,7 @@ export default class GetDateTool extends Tool {
   }
 
   public async call(args: {timestamp?:number}) {
-    this.logger.debug('[GetDateTool.call]', args);
+    this.logger.debug('[GetDateTool.call]', Object.keys(args));
     
     return {date: new Date(args.timestamp || Date.now()).toDateString()};
   }

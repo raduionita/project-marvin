@@ -74,7 +74,6 @@ export default class WebSearchTool extends Tool {
       const end = text.indexOf(SEARCH_END_TAG, start);
       const raw = text.substring(start + SEARCH_START_TAG.length, end);
       const json: any[] = tryJsonParse(raw) || [];
-      json.length = Math.min(json.length, 10);
 
       return { 
         results: json.map((o: { [key: string]: any }) => ({

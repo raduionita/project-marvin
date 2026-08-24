@@ -4,7 +4,7 @@ import { join } from 'path';
 
 import { tryJsonParse } from "../helpers";
 import { listSystems } from "../systems";
-import { listTools, listCustomTools } from "../tools";
+import { listInternalTools, listCustomTools } from "../tools";
 import { readSkill } from "../skills";
 import { Command, System, Tool, ToolMeta } from "../types";
 
@@ -34,7 +34,7 @@ export default class ToolsCommand extends Command {
         // call a tool by name
         await this.loadSystems();
         const params = tryJsonParse(this.args.slice(1).join(' ')) as { [key: string]: any };
-        await this.callTool(cmd, params);
+        await this.execTool(cmd, params);
       break;
     }
   }
@@ -51,7 +51,7 @@ export default class ToolsCommand extends Command {
 
   async listTools() {
     this.logger.debug('[ToolCommand.listTools]', 'tools:');
-    const files = listTools(this.engine);
+    const files = listInternalTools(this.engine);
     for (const file of files) {
       const name = file;
       try {
@@ -91,9 +91,10 @@ export default class ToolsCommand extends Command {
     }
   }
 
-  async callTool(name: string, params: { [key: string]: any } = {}) {
-    this.logger.debug('[ToolCommand.callTool]', name, JSON.stringify(params));
+  async execTool(name: string, params: { [key: string]: any } = {}) {
+    this.logger.debug('[ToolCommand.execTool]', name, JSON.stringify(params));
     try {
+      const params = tryJsonParse(this.args.slice(1).join(' ')) as { [key: string]: any };
       // load tool (repo tools first, then custom workspace tools)
       let Module: any;
       try {
@@ -103,22 +104,22 @@ export default class ToolsCommand extends Command {
       }
       const Class = Module.default;
       if (!Class || !(Class.prototype instanceof Tool)) {
-        this.logger.error('[ToolCommand.callTool]', `${name} does not export a Tool class, skipping`);
-        throw new Error(`[ToolCommand.callTool] ERROR - ${name} does not export a Tool class`);
+        this.logger.error('[ToolCommand.execTool]', `${name} does not export a Tool class, skipping`);
+        throw new Error(`[ToolCommand.execTool] ERROR - ${name} does not export a Tool class`);
       }
       // register instance of Tool
       const instance = new Class(this.engine, this.logger);
       // dry guard
       if (this.engine.isDry) {
-        this.logger.info('[ToolCommand.callTool]', '[dry] tool:', name, JSON.stringify(params));
+        this.logger.info('[ToolCommand.execTool]', '[dry] tool:', name, JSON.stringify(params));
         return;
       }
       // call the tool          
       const output = await instance.call(params);
       // output
-      this.logger.info('[ToolCommand.callTool]', JSON.stringify(output, null, 2));
+      this.logger.info('[ToolCommand.execTool]', JSON.stringify(output, null, 2));
     } catch (err) {
-      this.logger.error('[ToolCommand.callTool]', `failed to load ${name}:`, err);
+      this.logger.error('[ToolCommand.execTool]', `failed to load ${name}:`, err);
     }
   }
 

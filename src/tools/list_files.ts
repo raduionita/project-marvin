@@ -27,7 +27,7 @@ export default class ListFilesTool extends Tool {
   }
 
   public async call(args: { path?: string; pattern?: string }) {
-    this.logger.debug('[ListFilesTool.call]', args);
+    this.logger.debug('[ListFilesTool.call]', Object.keys(args));
 
     if (!isSafePath(args?.path || '.')) {
       return { error: `list_files: path "${args?.path || '.'}" is outside the workspace (~/.marvin)` };

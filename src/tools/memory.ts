@@ -30,7 +30,7 @@ export default class MemoryTool extends Tool {
   }
 
   public async call(args: { operation: string; key?: string; content?: string }): Promise<{ [key: string]: any }> {
-    this.logger.debug('[MemoryTool.call]', args);
+    this.logger.debug('[MemoryTool.call]', Object.keys(args));
 
     const operation = args?.operation;
     if (!operation) {

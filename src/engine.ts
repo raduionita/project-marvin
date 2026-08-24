@@ -5,7 +5,7 @@ import { listSystems } from "./systems";
 import { Command, Config, Channel, Tool, Model, System, Task, Message, Integration, Skill, ToolMeta } from "./types";
 import { Agent } from './agent.js';
 import * as constants from './constants.js';
-import { listTools, listCustomTools } from "./tools/index.js";
+import { listInternalTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
 import { listIntegrations, loadIntegrationTools } from "./integrations/index.js";
 import { listSkills, listCustomSkills, parseSkill } from "./skills/index.js";
@@ -198,7 +198,7 @@ export default class Engine {
   async loadTools() {
     this.logger.debug('[Engine.loadTools]');
 
-    const files = listTools(this);
+    const files = listInternalTools(this);
     for (const file of files) {
       const name = file;
       try {

@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { listTools, listCustomTools } from './index.js';
+import { listInternalTools, listCustomTools } from './index.js';
 import { Config } from '../types.js';
 
 function mockEngine(config: Config = {} as Config): Engine {
@@ -28,26 +28,26 @@ function mockEngine(config: Config = {} as Config): Engine {
 
 test('listTools returns tool files', () => {
   const engine = mockEngine();
-  const tools = listTools(engine);
+  const tools = listInternalTools(engine);
   expect(Array.isArray(tools)).toBe(true);
   expect(tools.length).toBeGreaterThan(0);
 });
 
 test('listTools excludes index.ts', () => {
   const engine = mockEngine();
-  const tools = listTools(engine);
+  const tools = listInternalTools(engine);
   expect(tools).not.toContain('index.ts');
 });
 
 test('listTools excludes test files', () => {
   const engine = mockEngine();
-  const tools = listTools(engine);
+  const tools = listInternalTools(engine);
   expect(tools).not.toContain('get_date.test.ts');
 });
 
 test('listTools includes known tools', () => {
   const engine = mockEngine();
-  const tools = listTools(engine);
+  const tools = listInternalTools(engine);
   expect(tools).toContain('get_date');
   expect(tools).toContain('web_search');
   expect(tools).toContain('web_browse');

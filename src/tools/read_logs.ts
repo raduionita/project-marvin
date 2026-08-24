@@ -24,7 +24,7 @@ export default class ReadLogsTool extends Tool {
   }
 
   public async call(args: { lines?: number }) {
-    this.logger.debug('[ReadLogsTool.call]', args);
+    this.logger.debug('[ReadLogsTool.call]', Object.keys(args));
 
     const lines = Math.min(Math.max(args?.lines || DEFAULT_LINES, 1), 200);
     const logPath = join(this.engine.work, 'logs', 'marvin.log');

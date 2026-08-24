@@ -22,7 +22,7 @@ export default class DeleteFileTool extends Tool {
   }
 
   public async call(args: { path: string }) {
-    this.logger.debug('[DeleteFileTool.call]', args);
+    this.logger.debug('[DeleteFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'delete_file: no path provided' };

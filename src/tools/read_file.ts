@@ -22,7 +22,7 @@ export default class ReadFileTool extends Tool {
   }
 
   public async call(args: { path: string }) {
-    this.logger.debug('[ReadFileTool.call]', args);
+    this.logger.debug('[ReadFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'read_file: no path provided' };

@@ -27,7 +27,7 @@ export default class MoveFileTool extends Tool {
   }
 
   public async call(args: { path: string; newPath: string }) {
-    this.logger.debug('[MoveFileTool.call]', args);
+    this.logger.debug('[MoveFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'move_file: no path provided' };

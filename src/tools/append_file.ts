@@ -27,7 +27,7 @@ export default class AppendFileTool extends Tool {
   }
 
   public async call(args: { path: string; content: string }) {
-    this.logger.debug('[AppendFileTool.call]', args);
+    this.logger.debug('[AppendFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'append_file: no path provided' };

@@ -24,7 +24,7 @@ export default class FindIntegrationTool extends Tool {
   }
 
   public async call(args: { integration: string, action: string }): Promise<{ [key: string]: any }> {
-    this.logger.debug('[FindIntegrationTool.call]', args);
+    this.logger.debug('[FindIntegrationTool.call]', Object.keys(args));
 
     const integration = this.engine.integrations[args.integration];
     if (!integration) {

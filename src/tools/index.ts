@@ -4,12 +4,12 @@ import { existsSync, readdirSync } from 'fs';
 
 import type Engine from '../engine.js';
 
-const tdir = join(dirname(fileURLToPath(import.meta.url)));
+
 
 let tools: string[] = [];
 
-export function listTools(engine: Engine): string[] {
-  if (tools.length) return tools;
+export function listInternalTools(engine: Engine): string[] {
+  const tdir = join(dirname(fileURLToPath(import.meta.url)));
   return tools = readdirSync(tdir).filter(f =>
     f !== 'index.ts' &&
     !f.includes('.test.ts') &&
@@ -29,4 +29,10 @@ export function listCustomTools(engine: Engine): string[] {
     !f.includes('.d.ts') &&
     f.endsWith('.ts')
   ).map(f => f.replace('.ts', ''));
+}
+
+// listTools combines internal and custom tools
+export function listTools(engine: Engine): string[] {
+  if (tools.length) return tools;
+  return [...listInternalTools(engine), ...listCustomTools(engine)];
 }
