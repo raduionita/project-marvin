@@ -22,19 +22,15 @@ export default class AgentsCommand extends Command {
         this.logger.info('  chat    ', 'send a chat message to the specified agent');
       break;
       case 'add': // `marvin agents add [agentId]` // add an agent interactively
+        await this.execAdd();
+      break;
+      case 'chat': // `marvin agents chat [agentId]` // send message to agent
 
+        // TODO: this is NOT ok. needs serve command to be started, it needs all the internarls of serve
+        // TODO: update this to send to api/http server at `/chat`
 
         // TODO: issue here: if marvin.service is already started, systems.api will error (port already in use)
         // TODO: this may not need all the dependencies (like the api, any other?!)
-        await this.engine.load();
-        
-        
-        await this.execAdd();
-
-
-        await this.engine.drop();
-      break;
-      case 'chat': // `marvin agents chat [agentId]` // send message to agent
         await this.engine.load();
         await this.execChat();
         await this.engine.drop();

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, unlinkSync } from "fs";
 
 import type { Logger } from './logger.js';
-import { listSystems } from "./systems";
+import { listSystems, loadSystem } from "./systems";
 import { Command, Config, Channel, Tool, Model, System, Task, Message, Integration, Skill, ToolMeta } from "./types";
 import { Agent } from './agent.js';
 import * as constants from './constants.js';
@@ -175,15 +175,8 @@ export default class Engine {
     for (const name of files) {
       try {
         if (this.systems[name]) continue;
-
-        const Module = await import(`./systems/${name}.js`);
-        const Class = Module.default;
-        if (!Class || !(Class.prototype instanceof System)) {
-          this.logger.error('[Engine.loadSystems]', `"${name}" does not export a System class, skipping`);
-          continue;
-        }
         // register instance of System
-        const instance = new Class(this, this.logger);
+        const instance = await loadSystem(this, name);
         await instance.load();
         this.systems[name] = instance;
         this.logger.info('[Engine.loadSystems]', `system "${name}" loaded`);
@@ -439,6 +432,7 @@ export default class Engine {
       this.agents[marvinId] = new Agent(this, this.logger, {
         id: marvinId,
         enabled: true,
+        memory: this.config.settings.memory,
         identity: identity,
         channels: {},
         model: model,
@@ -468,6 +462,7 @@ export default class Engine {
       this.agents[agentId] = new Agent(this, this.logger, {
         id: agentId,
         enabled: agent.enabled,
+        memory: this.config.settings.memory,
         identity: identity,
         channels: agent.channels,
         model: model,

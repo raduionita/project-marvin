@@ -27,7 +27,7 @@ export const DEFAULT_CONFIG = {
     host: '127.0.0.1',
     port: 7331,
     apiToken: 'changeme',
-    memory: false,
+    memory: true,
   },
   channels: {},
   integrations: {},
@@ -42,9 +42,6 @@ export const EXIT_CODES = {
 
 export const END_CHAT_NAME = 'end_chat';
 export const END_CHAT_DESCRIPTION = 'Call this tool ONLY when you have completed all necessary steps and are ready to give the final, definitive answer to the user.';
-
-export const ACKS = ['Let\'s see...', 'Here...', 'On it...', 'One sec...', 'Hold on...', 'I got this...', 'Got it...', 'Lemme see...'];
-
 
 export const MEMORIES_FOLDER = 'memories';
 export const AGENTS_FOLDER = 'agents';

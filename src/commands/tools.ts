@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { tryJsonParse } from "../helpers";
-import { listSystems } from "../systems";
+import { listSystems, loadSystem } from "../systems";
 import { listTools as listToolFiles, listCustomTools, loadTool } from "../tools";
 import { readSkill } from "../skills";
 import { Command, System, ToolMeta } from "../types";
@@ -67,21 +67,19 @@ export default class ToolsCommand extends Command {
   async execTool(name: string) {
     this.logger.debug('[ToolCommand.execTool]', name);
     try {
-      
-      
-      await this.loadSystems();
-
-
+      const system = await loadSystem(this.engine, 'browser');
+      this.engine.systems['browser'] = system;
+      // call tool
       const params = tryJsonParse(this.args.slice(1).join(' ')) as { [key: string]: any };
       // load tool (repo tools first, then custom workspace tools)
-      const instance = await loadTool(this.engine, name);
+      const tool = await loadTool(this.engine, name);
       // dry guard
       if (this.engine.isDry) {
         this.logger.info('[ToolCommand.execTool]', '[dry] tool:', name, JSON.stringify(params));
         return;
       }
       // call the tool
-      const output = await instance.call(params);
+      const output = await tool.call(params);
       // output
       this.logger.info('[ToolCommand.execTool]', JSON.stringify(output, null, 2));
     } catch (err) {

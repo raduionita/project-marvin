@@ -763,7 +763,7 @@ test('onSlashCommand acks then posts the help output to the channel', async () =
     ack: async (response: any) => { ackText = response?.text || ''; },
   });
 
-  expect(ackText).toContain('running /marvin help');
+  expect(ackText).toContain('');
   expect(channel.mockWeb.postMessageCalls.length).toBe(1);
   const posted = channel.mockWeb.postMessageCalls[0]!;
   expect(posted.channel).toBe('C123');

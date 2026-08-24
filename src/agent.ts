@@ -104,13 +104,15 @@ export class Agent {
     // inject a compact summary of the most recently updated memory notes, so
     // the agent keeps cross-run context (facts, preferences, progress)
     if (this.engine.config.settings.memory || this.memory) {
-      system += '\n\n';
-      system += '## Memory\n';
-      system += readMemorySummary(this.engine.work) + '\n';
-      system += 'Use the memory tool (remember/recall) to read and update these notes.';
+      const memory = readMemorySummary(this.engine.work);
+      if (memory) {
+        system += '\n\n';
+        system += '## Memory\n';
+        system += memory + '\n';
+        system += 'Use the memory tool (remember/recall) to read and update these notes.';
+        this.logger.debug('[Agent.makeChat]', 'memory:', memory);
+      }
     }
-
-    // TODO: loadIntegrationTools(integrations)
 
     return {
       id: chatId,

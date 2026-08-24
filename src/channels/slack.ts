@@ -250,7 +250,7 @@ export default class SlackChannel extends Channel {
         return await ack({ text: '(no text content)' });
       }
 
-      await ack({ text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)] });
+      await ack();
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
@@ -289,8 +289,8 @@ export default class SlackChannel extends Channel {
         return await ack({ text: '(no text content)' });
       }
 
-      // acknowledge the event // {text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)]}
-      await ack({ text: constants.ACKS[Math.floor(Math.random() * constants.ACKS.length)] });
+      // acknowledge the event
+      await ack();
 
       // find an agent that has slack configured
       const agent = this.findAgent(event.channel);
@@ -330,7 +330,7 @@ export default class SlackChannel extends Channel {
       const cmds = listCommands(this.engine).filter(c => !SLASH_BLOCKED_COMMANDS.includes(c));
 
       // acknowledge immediately (Slack requires ack within ~3s), the result is posted afterwards
-      await ack({ text: `running /marvin ${name}${args.length ? ' ' + args.join(' ') : ''}...` });
+      await ack();
 
       let output = '';
       if (!cmds.includes(name)) {
