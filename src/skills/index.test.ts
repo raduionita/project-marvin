@@ -21,7 +21,7 @@ function buildEngine(customSkills?: Record<string, string>): Engine {
 test('listSkills combines internal and custom skills', () => {
   const engine = buildEngine({ 'my-skill': '# My Skill\n\nDoes something.' });
   const skills = listSkills(engine);
-  expect(skills).toContain('SKILLS-CREATE.md');
+  expect(skills).toContain('skills-create.md');
   expect(skills).toContain('my-skill.md');
 });
 

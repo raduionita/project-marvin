@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { captureLogger } from '../tests/helpers.js';
+import { captureLogger } from '../tests.js';
 import { Config, Message, Model, Chat, Reply } from '../types.js';
 import { Agent } from '../agent.js';
 import SlackChannel from './slack.js';

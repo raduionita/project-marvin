@@ -44,17 +44,13 @@ export function listSkills(engine: Engine): string[] {
  * @throws Error if the skill is not found
  */
 export function loadSkill(engine: Engine, id: string): Skill {
-  const key = id.toLowerCase();
-
-  // custom workspace skills override defaults with the same id
-  const cpath = join(engine.work, 'skills', `${key}.md`);
+  // custom workspace skills override internal ones with the same id
+  const cpath = join(engine.work, 'skills', `${id}.md`);
   if (existsSync(cpath)) return parseSkill(cpath, 'custom');
-
-  // internal file names may be uppercase on disk (e.g. TOOLS-CREATE.md),
-  // match them case-insensitively against the listed files
-  const file = listInternalSkills(engine).find(f => f.replace(/\.md$/i, '').toLowerCase() === key);
-  if (!file) throw new Error(`skill "${key}" not found`);
-  return parseSkill(join(dirname(fileURLToPath(import.meta.url)), file), 'default');
+  const ipath = join(dirname(fileURLToPath(import.meta.url)), `${id}.md`);
+  if (existsSync(ipath)) return parseSkill(ipath, 'default');
+  // else throw
+  throw new Error(`skill "${id}" not found`);
 }
 
 // parse the .md header into skill meta data: id = file name (lowercased),

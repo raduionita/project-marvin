@@ -6,8 +6,7 @@ import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { Skill, Config } from '../types.js';
 import { Agent } from '../agent.js';
-import { captureLogger } from '../tests/helpers.js';
-import { buildPromptMocks } from '../tests/promptMock.js';
+import { buildPromptMocks, captureLogger } from '../tests.js';
 
 // scripted answers consumed by the mocked @inquirer/prompts prompts
 let answers: string[] = [];

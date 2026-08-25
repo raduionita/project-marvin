@@ -6,7 +6,7 @@ import { Config } from '../types.js';
 import * as constants from '../constants.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { buildPromptMocks } from '../tests/promptMock.js';
+import { buildPromptMocks } from '../tests.js';
 
 // scripted answers consumed by the mocked @inquirer/prompts prompts
 let answers: string[] = [];

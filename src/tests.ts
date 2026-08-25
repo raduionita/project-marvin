@@ -1,5 +1,18 @@
 import { mock } from 'bun:test';
 
+import { Logger } from './logger.js';
+
+// shared test helpers: a capturing logger and @inquirer/prompts mocks used
+// across *.test.ts files.
+
+// a logger that captures every emitted line (info-level and up), so tests can
+// assert on command output without patching console.*
+export function captureLogger(): { logger: Logger; lines: string[] } {
+  const lines: string[] = [];
+  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
+  return { logger, lines };
+}
+
 // A set of mock prompt functions that consume a shared queue of scripted
 // answers, mirroring @inquirer/prompts' return types so command tests can run
 // without a TTY:

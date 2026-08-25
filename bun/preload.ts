@@ -1,4 +1,4 @@
-import { setDefaultOutput } from '../logger.js';
+import { setDefaultOutput } from './logger.js';
 
 // silence Logger output during tests (debug logging would pollute the test
 // runner). tests that need to assert on output use the shared captureLogger()

@@ -117,7 +117,7 @@ export default class ToolsCommand extends Command {
       return;
     }
 
-    // load the TOOLS-CREATE skill that teaches how to create tools
+    // load the tools-create skill that teaches how to create tools
     let instructions: string;
     try {
       instructions = readSkill(loadSkill(this.engine, 'tools-create'));
@@ -203,7 +203,7 @@ export default class ToolsCommand extends Command {
       return;
     }
 
-    // load the TOOLS-EDIT skill that teaches how to edit tools
+    // load the tools-edit skill that teaches how to edit tools
     let instructions: string;
     try {
       instructions = readSkill(loadSkill(this.engine, 'tools-edit'));

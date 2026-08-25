@@ -93,7 +93,7 @@ export default class SkillsCommand extends Command {
       return;
     }
 
-    // load the SKILLS-CREATE skill that teaches how to create skills
+    // load the skills-create skill that teaches how to create skills
     let instructions: string;
     try {
       instructions = readSkill(loadSkill(this.engine, 'skills-create'));

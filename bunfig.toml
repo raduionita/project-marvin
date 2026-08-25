@@ -1,2 +1,3 @@
+telemetry = false
 [test]
-preload = ["./src/tests/preload.ts"]
+preload = ["./bun/preload.ts"]

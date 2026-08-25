@@ -6,8 +6,7 @@ import { join } from 'path';
 import { Config } from '../types.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { captureLogger } from '../tests/helpers.js';
-import { buildPromptMocks } from '../tests/promptMock.js';
+import { buildPromptMocks, captureLogger } from '../tests.js';
 
 // scripted answers consumed by the mocked @inquirer/prompts prompts. selects
 // interpret the answer as a 1-based option index (the old numbered fallback).
