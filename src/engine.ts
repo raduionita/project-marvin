@@ -8,7 +8,7 @@ import * as constants from './constants.js';
 import { listInternalTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
 import { listIntegrations, loadIntegrationTools } from "./integrations/index.js";
-import { listSkills, listCustomSkills, parseSkill } from "./skills/index.js";
+import { listSkills, loadSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
 
@@ -185,7 +185,7 @@ export default class Engine {
       }
     }
 
-    this.logger.debug('[Engine.loadSystems]', 'systems:', Object.keys(this.systems));
+    this.logger.debug('[Engine.loadSystems]', Object.keys(this.systems));
   }
 
   async loadTools() {
@@ -239,7 +239,7 @@ export default class Engine {
       }
     }
 
-    this.logger.debug('[Engine.loadTools]', 'tools:', Object.keys(this.tools));
+    this.logger.debug('[Engine.loadTools]', '[', Object.keys(this.tools).join(','), ']');
   }
 
   async loadChannels() {
@@ -275,7 +275,7 @@ export default class Engine {
       }
     }
 
-    this.logger.debug('[Engine.loadChannels]', 'channels:', Object.keys(this.channels));
+    this.logger.debug('[Engine.loadChannels]', Object.keys(this.channels));
   }
 
   async loadIntegrations() {
@@ -311,35 +311,29 @@ export default class Engine {
       }
     }
 
-    this.logger.debug('[Engine.loadIntegrations]', 'integrations:', Object.keys(this.integrations));
+    // tools may derive meta from loaded integrations (e.g. call_integration
+    // lists the actual sites and actions), so refresh them after loading
+    for (const tool of Object.values(this.tools)) {
+      const refresh = (tool as { refresh?: () => void }).refresh;
+      if (typeof refresh === 'function') refresh.call(tool);
+    }
+
+    this.logger.debug('[Engine.loadIntegrations]', Object.keys(this.integrations));
   }
 
   async loadSkills() {
     this.logger.debug('[Engine.loadSkills]');
 
-    // default skills shipped with marvin (src/skills)
-    const files = listSkills(this);
-    for (const file of files) {
+    // default skills shipped with marvin (src/skills), overridden by
+    // custom workspace skills (~/.marvin/skills)
+    const ids = [...new Set(listSkills(this).map(f => f.replace(/\.md$/i, '').toLowerCase()))];
+    for (const id of ids) {
       try {
-        const skill = parseSkill(join(import.meta.dirname, 'skills', file), 'default');
-        if (this.skills[skill.id]) continue;
+        const skill = loadSkill(this, id);
         this.skills[skill.id] = skill;
-        this.logger.info('[Engine.loadSkills]', `skill "${skill.id}" loaded (default)`);
+        this.logger.info('[Engine.loadSkills]', `skill "${skill.id}" loaded (${skill.source})`);
       } catch (err) {
-        this.logger.error('[Engine.loadSkills]', `failed to load "${file}":`, err);
-      }
-    }
-
-    // custom skills in the workspace (~/.marvin/skills), override defaults
-    const cdir = join(this.work, 'skills');
-    const cfiles = listCustomSkills(this);
-    for (const file of cfiles) {
-      try {
-        const skill = parseSkill(join(cdir, file), 'custom');
-        this.skills[skill.id] = skill;
-        this.logger.info('[Engine.loadSkills]', `skill "${skill.id}" loaded (custom)`);
-      } catch (err) {
-        this.logger.error('[Engine.loadSkills]', `failed to load custom skill "${file}":`, err);
+        this.logger.error('[Engine.loadSkills]', `failed to load "${id}":`, err);
       }
     }
   }
@@ -782,7 +776,7 @@ export default class Engine {
     // merge engine (default) tools with the task's integration tools
     const tools = await loadIntegrationTools(this, task.integrations || []);
 
-    // set task input as user message to LLM
+    // ! set task input as user message to LLM
     const result = await agent.sendChat(chatId, task.input, tools);
     if (result.error) {
       this.logger.error('[Engine.execTask]', `no result from sendChat for task ${taskId}:`, result.error);
@@ -799,6 +793,7 @@ export default class Engine {
           continue;
         }
 
+        // ! send message to the channel
         const reply = await channel.sendMessage({ role: 'assistant', content: result.content, group: groupId, agent: agent.id, model: agent.model?.model } as Message);
         if (!reply.ok) {
           this.logger.warn('[Engine.execTask]', `channel ${channelId} send failed, skipping`);
@@ -818,7 +813,7 @@ export default class Engine {
       return;
     }
 
-    // re-schedule next execution
+    // ! re-schedule next execution
     task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
   }
 }

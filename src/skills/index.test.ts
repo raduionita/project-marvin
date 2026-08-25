@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { basename, join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { listSkills, listCustomSkills, parseSkill, readSkill } from './index.js';
+import { listSkills, loadSkill, parseSkill, readSkill } from './index.js';
 
 function buildEngine(customSkills?: Record<string, string>): Engine {
   const engine = new Engine(new Logger());
@@ -18,22 +18,39 @@ function buildEngine(customSkills?: Record<string, string>): Engine {
   return engine;
 }
 
-test('listSkills returns the default .md skill files', () => {
-  const engine = buildEngine();
+test('listSkills combines internal and custom skills', () => {
+  const engine = buildEngine({ 'my-skill': '# My Skill\n\nDoes something.' });
   const skills = listSkills(engine);
-  expect(skills).toContain('META.md');
-  expect(skills).toContain('TOOLS-CREATE.md');
-  expect(skills).toContain('TOOLS-EDIT.md');
-  expect(skills).not.toContain('index.ts');
+  expect(skills).toContain('SKILLS-CREATE.md');
+  expect(skills).toContain('my-skill.md');
 });
 
-test('listCustomSkills returns workspace skills only when present', () => {
-  const engine = buildEngine({ 'my-skill': '# My Skill\n\nDoes something.' });
-  const skills = listCustomSkills(engine);
-  expect(skills).toEqual(['my-skill.md']);
+test('loadSkill loads an internal skill by lowercase id', () => {
+  const engine = buildEngine();
+  const skill = loadSkill(engine, 'tools-create');
+  expect(skill.id).toBe('tools-create');
+  expect(skill.source).toBe('default');
+  expect(skill.title.toLowerCase()).toContain('tool');
+});
 
-  const empty = buildEngine();
-  expect(listCustomSkills(empty)).toEqual([]);
+test('loadSkill prefers the custom skill over the default', () => {
+  const engine = buildEngine({ 'tools-create': '# Custom Tools Create\n\nOverrides the default.' });
+  const skill = loadSkill(engine, 'tools-create');
+  expect(skill.id).toBe('tools-create');
+  expect(skill.source).toBe('custom');
+  expect(skill.title).toBe('Custom Tools Create');
+});
+
+test('loadSkill loads a custom-only skill', () => {
+  const engine = buildEngine({ 'my-skill': '# My Skill\n\nDoes something.' });
+  const skill = loadSkill(engine, 'my-skill');
+  expect(skill.id).toBe('my-skill');
+  expect(skill.source).toBe('custom');
+});
+
+test('loadSkill throws for an unknown skill', () => {
+  const engine = buildEngine();
+  expect(() => loadSkill(engine, 'nope')).toThrow('not found');
 });
 
 test('parseSkill extracts id, title, description and source', () => {

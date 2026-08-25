@@ -1,10 +1,24 @@
+import type Engine from '../engine.js';
+import type { Logger } from '../logger.js';
 import { Tool, ToolMeta } from '../types.js';
 
 export default class CallIntegrationTool extends Tool {
   // the meta is dynamic: rebuilt from the configured integrations so the LLM
-  // sees the actual sites and their actions. loadIntegrations() runs before
-  // loadModels(), and models snapshot tool metas in their constructor.
-  public get meta(): ToolMeta {
+  // sees the actual sites and their actions. loadIntegrations() refreshes it
+  // once the integration instances are loaded (see Engine.loadIntegrations).
+  public meta: ToolMeta;
+
+  constructor(engine: Engine, logger: Logger) {
+    super(engine, logger);
+    this.meta = this.buildMeta();
+  }
+
+  // rebuild meta from the current config + loaded integrations
+  public refresh(): void {
+    this.meta = this.buildMeta();
+  }
+
+  private buildMeta(): ToolMeta {
     const integrations = Object.keys(this.engine.config.integrations || {});
 
     // collect the union of actions across the configured integration types,

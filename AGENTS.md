@@ -12,13 +12,13 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 - `src/engine.ts` - the core `Engine` class: config + workspace (`~/.marvin`), the AI loop (`sendChat`), agent/task scheduling (`execMonitor`/`execSweep`/`execInput`), tool dispatch (`execTool`), chat cache (chatId -> Chat), and system prompt assembly.
 - `src/types.ts` - all core interfaces: `Command`, `Config`, `Channel`, `Tool`, `Model`, `Agent`, `System`, `Task`, `Message`, `Reply`, `Chat`, `Integration`, `Skill`, `ToolMeta`, `Schema`. Almost every class is an `abstract class` with a `meta` (name/description) and `load()`/`drop()` lifecycle.
 - `src/commands/` - one file per CLI command (`add`, `enable`, `reload`, `serve`, ...), each exporting a `default` class extending `Command` with `exec()`.
-- `src/tools/` - built-in executable actions (`web_search`, `get_date`, `read_file`, `memory`, `call_integration`, ...). `end_chat` (`constants.END_CHAT_NAME`) is special: calling it stops the AI loop.
+- `src/tools/` - built-in executable actions (`web_search`, `get_date`, `read_file`, `memory`, `call_integration`, ...). `end_chat` is special: calling it stops the AI loop.
 - `src/models/` - one file per provider (`openai`, `anthropic`, `deepseek`, `lmstudio`, `fallback`), each exporting a `default` class extending `Model` implementing `sendChat(chat): Promise<Reply>`. Tools are passed as `chat.tools`. **`sendChat` MUST return valid `reply.message.content`**: if `chat.format === 'json'` a JSON string (e.g. `'{"output":"an article"}'`); if `'text'` clean trimmed text. No model junk (e.g. leaked DSML tags) in the content.
 - `src/channels/` - user-facing output channels (`slack`, `telegram`, `whatsapp`): `sendMessage(message)`, plus `load()`/`drop()`.
 - `src/integrations/` - external service integrations (`wordpress`) with named actions. Integrations can be linked to tasks (`task.integrations` in marvin.json): each linked action becomes a per-action tool named `<integrationId>__<action>` (built by `loadIntegrationTools` in `src/integrations/index.ts`, merged into `chat.tools` by `execTask`, routed by `execTool`). Standalone calls go through `call_integration`/`find_integration`.
 - `src/systems/` - internal infrastructure (`api` HTTP server, `browser`, `watch` file watcher) with `load()`/`drop()`.
 - `src/skills/` - markdown skill docs (header + body, e.g. `META.md`, `TOOLS-CREATE.md`, `WORDPRESS.md`); parsed and injected into the system prompt. User skills in `~/.marvin/skills/` override.
-- `src/constants.ts` - project-wide constants (`END_CHAT_NAME`, `DEFAULT_MAX_STEPS`, `DEFAULT_CONFIG`).
+- `src/constants.ts` - project-wide constants (`DEFAULT_MAX_STEPS`, `DEFAULT_CONFIG`).
 - `src/helpers.ts` - pure helpers: `tryJsonParse`, `extractOutput`, `cleanContent`, `markdownToHtml`, `safeJoin`, ...
 - `src/logger.ts`, `src/memory.ts` - logging and memory storage (see below). Interactive prompts use `@inquirer/prompts` directly in commands (mock it in tests via `src/tests/promptMock.ts`).
 
@@ -28,7 +28,7 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 - `marvin.service` - systemd unit file.
 - `agents/<agent>/IDENTITY.md` - agent identities.
 - `tasks/<task>/TASK.md` - task prompts (TASK.md seeds the AI loop).
-- `memories/<key>.md` - persistent memory, written/read by the `memory` tool and summarized into the system prompt.
+- `memories/<agent-id>/<key>.md` - persistent memory scoped per agent, written/read by the `memory` tool and summarized into the system prompt.
 - `skills/*.md`, `tools/*.ts` - user-defined skills and tools (snake_case) that mirror the built-in folders.
 
 ## Core concepts and flows

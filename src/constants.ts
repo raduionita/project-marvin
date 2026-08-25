@@ -40,9 +40,6 @@ export const EXIT_CODES = {
   ERROR: 1,
 };
 
-export const END_CHAT_NAME = 'end_chat';
-export const END_CHAT_DESCRIPTION = 'Call this tool ONLY when you have completed all necessary steps and are ready to give the final, definitive answer to the user.';
-
 export const MEMORIES_FOLDER = 'memories';
 export const AGENTS_FOLDER = 'agents';
 export const SKILLS_FOLDER = 'skills';

@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta } from './types.js';
 import { Agent } from './agent.js';
+import EndChatTool from './tools/end_chat.js';
 import * as constants from './constants.js';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
@@ -159,6 +160,8 @@ function buildTestEngine(opts?: {
 
   // Install a mock tool (needed if tool calls are sent)
   engine.tools['mock_tool'] = new MockTool(engine, new Logger());
+  // end_chat stops the AI loop via its Tool.stop flag
+  engine.tools['end_chat'] = new EndChatTool(engine, new Logger());
 
   return engine;
 }
@@ -338,7 +341,7 @@ test('sendChat stops the AI loop when end chat tool call is found', async () => 
     message: {
       role: 'assistant',
       content: '',
-      tools: [{ id: 'final-1', name: constants.END_CHAT_NAME, arguments: {"answer": "done"} }],
+      tools: [{ id: 'final-1', name: 'end_chat', arguments: {"answer": "done"} }],
     },
   } as Reply;
 
@@ -364,7 +367,7 @@ test('sendChat answers the end_chat tool_call_id so the history stays valid', as
     message: {
       role: 'assistant',
       content: '',
-      tools: [{ id: 'final-1', name: constants.END_CHAT_NAME, arguments: {} }],
+      tools: [{ id: 'final-1', name: 'end_chat', arguments: {"answer": "done"} }],
     },
   } as Reply);
 
@@ -390,7 +393,7 @@ test('sendChat answers tool calls skipped after end_chat', async () => {
       role: 'assistant',
       content: '',
       tools: [
-        { id: 't-end', name: constants.END_CHAT_NAME, arguments: {} },
+        { id: 't-end', name: 'end_chat', arguments: {} },
         { id: 't-after', name: 'mock_tool', arguments: {} },
       ],
     },
@@ -446,7 +449,7 @@ test('sendChat truncates oversized tool results', async () => {
       content: '',
       tools: [
         { id: 't-big', name: 'mock_tool', arguments: {} },
-        { id: 't-end', name: constants.END_CHAT_NAME, arguments: {} },
+        { id: 't-end', name: 'end_chat', arguments: {} },
       ],
     },
   } as Reply);
@@ -748,12 +751,12 @@ test('makeChat seeds only the identity when there are no integrations', () => {
 
 test('makeChat renders a memory block when memory notes exist', () => {
   const engine = mockEngine();
-  const mem = join(engine.work, 'memories');
+  const mem = join(engine.work, 'memories', 'marvin');
   mkdirSync(mem, { recursive: true });
   writeFileSync(join(mem, 'prefs.md'), 'Prefers concise answers');
   writeFileSync(join(mem, 'goals.md'), 'Ship marvin 1.0');
 
-  const agent = new Agent(engine, new Logger(), { memory: true, identity: '' });
+  const agent = new Agent(engine, new Logger(), { id: 'marvin', memory: true, identity: '' });
 
   const chat = agent.loadChat('chat-1');
   const prompt = chat.messages[0]!.content as string;

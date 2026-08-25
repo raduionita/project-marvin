@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from "../types";
-import { listSkills, listCustomSkills, readSkill, parseSkill } from '../skills';
+import { listSkills, loadSkill, readSkill, parseSkill } from '../skills';
 import * as constants from '../constants';
 
 // `marvin skills [command] [--dry]` list and add (create) skills
@@ -47,25 +47,15 @@ export default class SkillsCommand extends Command {
   async execList() {
     this.logger.debug('[SkillsCommand.execList]');
 
-    // default skills shipped with marvin
-    const defaults = listSkills(this.engine);
-    const custom = listCustomSkills(this.engine);
+    // all skills: defaults shipped with marvin + custom workspace skills
+    const files = listSkills(this.engine);
 
-    this.logger.info('default skills:');
-    if (defaults.length === 0) this.logger.info('  (none)');
-    for (const file of defaults) {
+    this.logger.info('skills:');
+    if (files.length === 0) this.logger.info('  (none)');
+    for (const file of files) {
       const id = file.replace(/\.md$/i, '').toLowerCase();
       const skill = this.engine.skills[id];
-      this.logger.info(`  ${id}`);
-      if (skill?.description) this.logger.info('  -', skill.description);
-    }
-
-    this.logger.info('custom skills:');
-    if (custom.length === 0) this.logger.info('  (none)');
-    for (const file of custom) {
-      const id = file.replace(/\.md$/i, '').toLowerCase();
-      const skill = this.engine.skills[id];
-      this.logger.info(`  ${id}`);
+      this.logger.info(`  ${id}${skill ? ` (${skill.source})` : ''}`);
       if (skill?.description) this.logger.info('  -', skill.description);
     }
   }
@@ -103,13 +93,14 @@ export default class SkillsCommand extends Command {
       return;
     }
 
-    // load the META skill that teaches how to create skills
-    const meta = this.engine.skills['meta'];
-    if (!meta) {
-      this.logger.error('[SkillsCommand.execAdd]', 'the "meta" skill is not loaded, cannot create skills');
+    // load the SKILLS-CREATE skill that teaches how to create skills
+    let instructions: string;
+    try {
+      instructions = readSkill(loadSkill(this.engine, 'skills-create'));
+    } catch {
+      this.logger.error('[SkillsCommand.execAdd]', 'the "skills-create" skill was not found, cannot create skills');
       return;
     }
-    const instructions = readSkill(meta);
 
     // load the engine (models + agents) so we can prompt the LLM
     await this.engine.load();
@@ -156,8 +147,7 @@ export default class SkillsCommand extends Command {
     // ensure skills are loaded (defaults + custom) so we can pick from them
     await this.engine.load();
 
-    const ids = [...new Set([...listSkills(this.engine), ...listCustomSkills(this.engine)])]
-      .map(f => f.replace('.md', '').toLowerCase());
+    const ids = [...new Set(listSkills(this.engine).map(f => f.replace(/\.md$/i, '').toLowerCase()))];
 
     // pick a skill (positional arg or prompt)
     let id = (this.args[1] || '').toLowerCase();
@@ -176,12 +166,13 @@ export default class SkillsCommand extends Command {
       }
     }
 
-    const skill = this.engine.skills[id];
-    if (!skill) {
+    let instructions: string;
+    try {
+      instructions = readSkill(loadSkill(this.engine, id));
+    } catch {
       this.logger.error('[SkillsCommand.execUse]', 'unknown skill:', id);
       return;
     }
-    const instructions = readSkill(skill);
 
     // ask the necessary info for the skill (tool skills get a name + purpose/change, others a task)
     let toolName = '';

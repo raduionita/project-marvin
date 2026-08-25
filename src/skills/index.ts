@@ -5,22 +5,56 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import type Engine from '../engine.js';
 import { Skill } from '../types.js';
 
-const tdir = join(dirname(fileURLToPath(import.meta.url)));
-
 let skills: string[] = [];
 
 // default skill files shipped with marvin (src/skills/*.md), returned as
 // full file names (parseSkill expects the path, .md included)
-export function listSkills(engine: Engine): string[] {
-  if (skills.length) return skills;
-  return skills = readdirSync(tdir).filter(f => f.endsWith('.md'));
+function listInternalSkills(engine: Engine): string[] {
+  const spath = join(dirname(fileURLToPath(import.meta.url)));
+  return readdirSync(spath).filter(f =>
+    f !== 'index.ts' &&
+    !f.includes('.test.ts') &&
+    !f.includes('.d.ts') &&
+    (engine.isTest || !f.includes('.mock.ts')) &&
+    f.endsWith('.md')
+  ).map(f => f.replace('.ts', ''));
 }
 
 // custom skill files in the user workspace (~/.marvin/skills/*.md)
-export function listCustomSkills(engine: Engine): string[] {
-  const cdir = join(engine.work, 'skills');
-  if (!existsSync(cdir)) return [];
-  return readdirSync(cdir).filter(f => f.endsWith('.md'));
+function listCustomSkills(engine: Engine): string[] {
+  const wpath = join(engine.work, 'skills');
+  if (!existsSync(wpath)) return [];
+  return readdirSync(wpath).filter(f =>
+    f !== 'index.ts' &&
+    !f.includes('.test.ts') &&
+    !f.includes('.d.ts') &&
+    (engine.isTest || !f.includes('.mock.ts')) &&
+    f.endsWith('.md')
+  ).map(f => f.replace('.ts', ''));
+}
+
+// listSkills combines internal and custom skills
+export function listSkills(engine: Engine): string[] {
+  if (!skills.length) skills;
+  return skills =[...listInternalSkills(engine), ...listCustomSkills(engine)];
+}
+
+/**
+ * loadSkill loads a Skill by id (custom workspace skills override defaults)
+ * @throws Error if the skill is not found
+ */
+export function loadSkill(engine: Engine, id: string): Skill {
+  const key = id.toLowerCase();
+
+  // custom workspace skills override defaults with the same id
+  const cpath = join(engine.work, 'skills', `${key}.md`);
+  if (existsSync(cpath)) return parseSkill(cpath, 'custom');
+
+  // internal file names may be uppercase on disk (e.g. TOOLS-CREATE.md),
+  // match them case-insensitively against the listed files
+  const file = listInternalSkills(engine).find(f => f.replace(/\.md$/i, '').toLowerCase() === key);
+  if (!file) throw new Error(`skill "${key}" not found`);
+  return parseSkill(join(dirname(fileURLToPath(import.meta.url)), file), 'default');
 }
 
 // parse the .md header into skill meta data: id = file name (lowercased),

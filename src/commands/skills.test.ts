@@ -119,11 +119,10 @@ test('skills list prints default and custom skills', async () => {
   await cmd.exec();
 
   const out = lines.join('\n');
-  expect(out).toContain('default skills');
-  expect(out).toContain('meta');
-  expect(out).toContain('tools-create');
-  expect(out).toContain('tools-edit');
-  expect(out).toContain('my-skill');
+  expect(out).toContain('skills:');
+  expect(out).toContain('tools-create (default)');
+  expect(out).toContain('tools-edit (default)');
+  expect(out).toContain('my-skill (custom)');
 });
 
 // register the "tools-create" skill (the one used by `skills use`) like the meta skill

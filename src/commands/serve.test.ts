@@ -263,10 +263,10 @@ test('execSkills loads default skills shipped with marvin', async () => {
 
   await engine.loadSkills();
 
-  expect(engine.skills['meta']).toBeDefined();
+  expect(engine.skills['skills-create']).toBeDefined();
   expect(engine.skills['tools-create']).toBeDefined();
   expect(engine.skills['tools-edit']).toBeDefined();
-  expect(engine.skills['meta']!.source).toBe('default');
+  expect(engine.skills['skills-create']!.source).toBe('default');
 });
 
 test('execSkills loads custom skills from the workspace', async () => {
@@ -280,7 +280,7 @@ test('execSkills loads custom skills from the workspace', async () => {
 
   expect(engine.skills['my-skill']).toBeDefined();
   expect(engine.skills['my-skill']!.source).toBe('custom');
-  expect(engine.skills['meta']).toBeDefined();
+  expect(engine.skills['skills-create']).toBeDefined();
 });
 
 test('custom skills override default skills with the same id', async () => {

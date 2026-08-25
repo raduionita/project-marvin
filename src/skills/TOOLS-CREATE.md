@@ -14,6 +14,9 @@ extends `Tool` (imported from `{MARVIN_ROOT}/src/types.js`):
 import { Tool, ToolMeta } from '{MARVIN_ROOT}/src/types.js';
 
 export default class MyTool extends Tool {
+  // should this tool stop the chat
+  public stop: boolean = false;
+  // tool descriptor
   public meta: ToolMeta = {
     type: 'function',
     function: {

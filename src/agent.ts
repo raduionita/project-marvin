@@ -104,7 +104,7 @@ export class Agent {
     // inject a compact summary of the most recently updated memory notes, so
     // the agent keeps cross-run context (facts, preferences, progress)
     if (this.engine.config.settings.memory || this.memory) {
-      const memory = readMemorySummary(this.engine.work);
+      const memory = readMemorySummary(this.engine, this.id);
       if (memory) {
         system += '\n\n';
         system += '## Memory\n';
@@ -175,7 +175,7 @@ export class Agent {
     if (instance) {
       try {
         // ! tool call
-        return await instance.call(args);
+        return await instance.call(args, { agent: this });
       } catch (err) {
         this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
         return {tool: tool, error: (err as Error).message};
@@ -237,25 +237,25 @@ export class Agent {
 
         ended = reply.stop || ended;
         // execute any tool calls
-        for (const tool of reply.message.tools || []) {
-          this.logger.debug('[Agent.sendChat]', `executing tool: ${tool.name}`, JSON.stringify(tool.arguments));
-          // if end_chat tool call is found, we're done
-          if (tool.name === constants.END_CHAT_NAME) {
+        for (const call of reply.message.tools || []) {
+          this.logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, Object.keys(call.arguments));
+          // tool MUST exist
+          const tool = this.engine.tools[call.name] 
+          if (!tool) {
+            this.logger.error('[Agent.sendChat]', `tool ${call.name} not found`);
+            continue;
+          } else if (tool.stop) {
             ended = true;
-            chat.messages.push({ role: 'tool', content: JSON.stringify({ ended: true }), toolId: tool.id });
+            chat.messages.push({role: 'tool', content: JSON.stringify({ ended: true }), toolId: call.id});
           } else if (ended) {
             // tools after end_chat are skipped, but their ids still need an answer
-            chat.messages.push({ role: 'tool', content: JSON.stringify({ skipped: true }), toolId: tool.id });
+            chat.messages.push({role: 'tool', content: JSON.stringify({ skipped: true }), toolId: call.id});
           } else {
             // ! tool call
-            let result = await this.execTool(tool.name, tool.arguments);  
+            let result = await this.execTool(call.name, call.arguments);  
             // add tool call to chat history, truncating huge results (e.g. full
             // web pages) so they cannot blow past the model context window
-            chat.messages.push({
-              role: 'tool',
-              content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS),
-              toolId: tool.id,
-            });
+            chat.messages.push({role: 'tool', content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS), toolId: call.id});
           }
         }
       } while ((!ended) && (steps < constants.DEFAULT_MAX_STEPS - 1));

@@ -2,11 +2,13 @@ import { Tool, ToolMeta } from "../types";
 import * as constants from '../constants';
 
 export default class EndChatTool extends Tool {
+  public stop: boolean = true;
+
   public meta: ToolMeta = {
     type: 'function',
     function: {
-      name: constants.END_CHAT_NAME,
-      description: constants.END_CHAT_DESCRIPTION,
+      name: 'end_chat',
+      description: 'Call this tool ONLY when you have completed all necessary steps and are ready to give the final, definitive answer to the user.',
       parameters: {
         type: 'object',
         properties: {},
@@ -16,7 +18,7 @@ export default class EndChatTool extends Tool {
   }
 
   async call(args?: any) {
-    this.logger.debug('[FinalAnswerTool.call]', Object.keys(args));
+    throw new Error('end_chat tool should never be called');
     return {};
   }
 }

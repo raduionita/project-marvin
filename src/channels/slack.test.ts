@@ -787,8 +787,7 @@ test('onSlashCommand forwards command args and posts the result', async () => {
 
   const posted = channel.mockWeb.postMessageCalls[0]!;
   // the "list" arg was forwarded to SkillsCommand (without it, help would run)
-  expect(posted.blocks![0]!.text).toContain('default skills:');
-  expect(posted.blocks![0]!.text).toContain('custom skills:');
+  expect(posted.blocks![0]!.text).toContain('skills:');
 });
 
 test('onSlashCommand replies with an error for an unknown command', async () => {

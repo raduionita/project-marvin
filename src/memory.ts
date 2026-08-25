@@ -1,28 +1,39 @@
 import { mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
+
+import type Engine from './engine.js';
+import * as constants from './constants.js';
 import { safeJoin } from './helpers.js';
 
-// memory storage helpers: ~/.marvin/memory/<key>.md files. Used by the
-// memory tool and by the engine to build the system-prompt summary.
+// memory storage helpers: per-agent notes in ~/.marvin/memories/<agent-id>/<key>.md.
+// Used by the memory tool and by the agent to build the system-prompt summary.
 
 // sanitize a memory key into a safe file name (no path separators, no dots)
 function sanitizeKey(key: string): string {
   return key.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-]+|[-]+$/g, '').toLowerCase();
 }
 
-export function saveMemory(work: string, key: string, content: string): { path: string } | { error: string } {
-  const file = safeJoin(work, 'memories', `${sanitizeKey(key)}.md`);
+// resolve the file for a memory note: <work>/memories/<agent-id>/<key>.md
+function memoryFile(engine: Engine, agentId: string, key: string): string | undefined {
+  const agent = sanitizeKey(agentId);
+  if (!agent) {
+    return undefined;
+  }
+  return safeJoin(engine.work, constants.MEMORIES_FOLDER, agent, `${sanitizeKey(key)}.md`);
+}
+
+export function saveMemory(engine: Engine, agentId: string, key: string, content: string): { path: string } | { error: string } {
+  const file = memoryFile(engine, agentId, key);
   if (!file) {
     return { error: `memory: key "${key}" is not a valid memory key` };
   }
-  const mpath = join(work, 'memories');
-  mkdirSync(mpath, { recursive: true });
+  mkdirSync(join(engine.work, constants.MEMORIES_FOLDER, sanitizeKey(agentId)), { recursive: true });
   writeFileSync(file, content.trim() + '\n', 'utf-8');
   return { path: file };
 }
 
-export function readMemory(work: string, key: string): { content: string } | { error: string } {
-  const file = safeJoin(work, 'memories', `${sanitizeKey(key)}.md`);
+export function readMemory(engine: Engine, agentId: string, key: string): { content: string } | { error: string } {
+  const file = memoryFile(engine, agentId, key);
   if (!file) {
     return { error: `memory: key "${key}" is not a valid memory key` };
   }
@@ -33,8 +44,8 @@ export function readMemory(work: string, key: string): { content: string } | { e
   }
 }
 
-export function dropMemory(work: string, key: string): { ok: boolean } | { error: string } {
-  const file = safeJoin(work, 'memories', `${sanitizeKey(key)}.md`);
+export function dropMemory(engine: Engine, agentId: string, key: string): { ok: boolean } | { error: string } {
+  const file = memoryFile(engine, agentId, key);
   if (!file) {
     return { error: `memory: key "${key}" is not a valid memory key` };
   }
@@ -46,8 +57,12 @@ export function dropMemory(work: string, key: string): { ok: boolean } | { error
   }
 }
 
-export function listMemories(work: string): { key: string; preview: string }[] {
-  const mpath = join(work, 'memories');
+export function listMemories(engine: Engine, agentId: string): { key: string; preview: string }[] {
+  const agent = sanitizeKey(agentId);
+  const mpath = join(engine.work, constants.MEMORIES_FOLDER, agent);
+  if (!agent) {
+    return [];
+  }
   try {
     return readdirSync(mpath)
       .filter(f => f.endsWith('.md'))
@@ -72,10 +87,10 @@ export function listMemories(work: string): { key: string; preview: string }[] {
   }
 }
 
-// build a compact summary of the most recently updated memory notes, used in
-// the system prompt. bounded: at most MAX_NOTES notes and MAX_CHARS total.
-export function readMemorySummary(work: string, maxNotes = 10, maxChars = 2048): string {
-  const notes = listMemories(work).slice(0, maxNotes);
+// build a compact summary of the most recently updated memory notes for this
+// agent, used in the system prompt. bounded: at most MAX_NOTES and MAX_CHARS.
+export function readMemorySummary(engine: Engine, agentId: string, maxNotes = 10, maxChars = 2048): string {
+  const notes = listMemories(engine, agentId).slice(0, maxNotes);
   if (notes.length === 0) return '';
 
   const lines: string[] = [];

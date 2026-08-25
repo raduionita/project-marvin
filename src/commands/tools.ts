@@ -5,7 +5,7 @@ import { join } from 'path';
 import { tryJsonParse } from "../helpers";
 import { listSystems, loadSystem } from "../systems";
 import { listTools as listToolFiles, listCustomTools, loadTool } from "../tools";
-import { readSkill } from "../skills";
+import { readSkill, loadSkill } from "../skills";
 import { Command, System, ToolMeta } from "../types";
 
 export default class ToolsCommand extends Command {
@@ -118,12 +118,13 @@ export default class ToolsCommand extends Command {
     }
 
     // load the TOOLS-CREATE skill that teaches how to create tools
-    const skill = this.engine.skills['tools-create'];
-    if (!skill) {
-      this.logger.error('[ToolCommand.execAdd]', 'the "tools-create" skill is not loaded, cannot create tools');
+    let instructions: string;
+    try {
+      instructions = readSkill(loadSkill(this.engine, 'tools-create'));
+    } catch {
+      this.logger.error('[ToolCommand.execAdd]', 'the "tools-create" skill was not found, cannot create tools');
       return;
     }
-    const instructions = readSkill(skill);
 
     // load the engine (models + agents) so we can prompt the LLM
     await this.engine.load();
@@ -203,12 +204,13 @@ export default class ToolsCommand extends Command {
     }
 
     // load the TOOLS-EDIT skill that teaches how to edit tools
-    const skill = this.engine.skills['tools-edit'];
-    if (!skill) {
-      this.logger.error('[ToolCommand.execEdit]', 'the "tools-edit" skill is not loaded, cannot edit tools');
+    let instructions: string;
+    try {
+      instructions = readSkill(loadSkill(this.engine, 'tools-edit'));
+    } catch {
+      this.logger.error('[ToolCommand.execEdit]', 'the "tools-edit" skill was not found, cannot edit tools');
       return;
     }
-    const instructions = readSkill(skill);
 
     // load the engine (models + agents) so we can prompt the LLM
     await this.engine.load();
