@@ -26,6 +26,13 @@ export interface Config {
     type: string;
     [key: string]: any;
   }>;
+  // mcp connectors (client): spawn command + args + env per server
+  mcps?: Record<string, {
+    enabled?: boolean;
+    command: string;
+    args: string[];
+    env?: Record<string, string>;
+  }>;
   models: Record<string, {
     enabled: boolean;
     provider: Provider;
@@ -48,6 +55,8 @@ export interface Config {
     input?: string;
     // integrations linked to this task: their actions become tools
     integrations?: string[];
+    // mcps linked to this task: their tools become tools
+    mcps?: string[];
   }>;
 }
 
@@ -234,6 +243,8 @@ export interface Task {
   input?: string;
   // integrations linked to this task: their actions become tools for this task
   integrations?: string[];
+  // mcps linked to this task: their tools become tools for this task
+  mcps?: string[];
 }
 
 // chat = message history + tools

@@ -21,6 +21,7 @@ export default class HelpCommand extends Command {
     this.logger.info('  agents  ', 'list, add, bind, chat, drop agents');
     this.logger.info('  channels', 'list, add, bind, chat, drop channels');
     this.logger.info('  integrations', 'list, add, drop integrations');
+    this.logger.info('  mcps    ', 'list, add, edit, info, drop mcp connectors');
     this.logger.info('  skills  ', 'list, add skills');
     this.logger.info('  models  ', 'list, add, bind, drop models');
     this.logger.info('  tasks   ', 'list, add tasks');

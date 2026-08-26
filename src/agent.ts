@@ -8,6 +8,7 @@ import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
 import { splitIntegrationToolName } from './integrations/index.js';
+import { splitMcpToolName } from './mcp.js';
 import { truncate } from './helpers.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI
@@ -101,6 +102,24 @@ export class Agent {
       system += blocks.join('\n');
     }
 
+    // inject the mcps block: loaded servers list their tools, config-only
+    // entries just their spawn spec
+    const mcpBlocks = Object.entries(this.engine.mcps).map(([id, client]) => {
+      const tools = client.tools.length
+        ? `\nTools: ${client.tools.map(t => t.name).join('; ')}`
+        : '';
+      return `### ${id}${tools}`;
+    });
+    const mcpConfigBlocks = Object.keys(this.engine.config.mcps || {})
+      .filter(id => !this.engine.mcps[id])
+      .map(id => `### ${id} (not connected)`);
+    const allMcpBlocks = [...mcpBlocks, ...mcpConfigBlocks];
+    if (allMcpBlocks.length) {
+      system += '\n\n';
+      system += '## Mcps\n';
+      system += allMcpBlocks.join('\n');
+    }
+
     // inject a compact summary of the most recently updated memory notes, so
     // the agent keeps cross-run context (facts, preferences, progress)
     if (this.engine.config.settings.memory || this.memory) {
@@ -188,6 +207,18 @@ export class Agent {
     if (integration) {
       try {
         return await integration.call({ action: split!.action, ...args });
+      } catch (err) {
+        this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
+        return {tool: tool, error: (err as Error).message};
+      }
+    }
+
+    // dynamic mcp tools (<mcpId>__<toolName>) loaded per-task
+    const mcpSplit = splitMcpToolName(tool);
+    const mcp = mcpSplit ? this.engine.mcps[mcpSplit.mcpId] : undefined;
+    if (mcp) {
+      try {
+        return await mcp.execTool(mcpSplit!.toolName, args);
       } catch (err) {
         this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
         return {tool: tool, error: (err as Error).message};

@@ -8,6 +8,7 @@ import * as constants from './constants.js';
 import { listInternalTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
 import { listIntegrations, loadIntegrationTools } from "./integrations/index.js";
+import { Mcp, loadMcpTools } from "./mcp.js";
 import { listSkills, loadSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
@@ -23,6 +24,7 @@ export default class Engine {
   // channels, models, agents
   public channels: Record<string, Channel> = {};
   public integrations: Record<string, Integration> = {};
+  public mcps: Record<string, Mcp> = {};
   public skills: Record<string, Skill> = {};
   public tools   : Record<string, Tool> = {};
   public models  : Record<string, Model> = {};
@@ -56,6 +58,7 @@ export default class Engine {
     await this.loadTools();
     await this.loadChannels();
     await this.loadIntegrations();
+    await this.loadMcps();
     await this.loadSkills();
     await this.loadModels();
     await this.loadAgents();
@@ -79,6 +82,7 @@ export default class Engine {
     await this.dropModels();
     await this.dropChannels();
     await this.dropIntegrations();
+    await this.dropMcps();
     await this.dropSkills();
     await this.dropSystems();
 
@@ -319,6 +323,27 @@ export default class Engine {
     }
 
     this.logger.debug('[Engine.loadIntegrations]', Object.keys(this.integrations));
+  }
+
+  // connects the configured mcp servers (spawn + initialize). failures are
+  // logged and skipped, so a broken server never blocks the engine.
+  async loadMcps() {
+    this.logger.debug('[Engine.loadMcps]');
+
+    for (const [id, config] of Object.entries(this.config.mcps || {})) {
+      if (!config.enabled) continue;
+
+      try {
+        if (this.mcps[id]) continue;
+        const client = new Mcp(this, this.logger, id, config);
+        await client.load();
+        this.mcps[id] = client;
+      } catch (err) {
+        this.logger.error('[Engine.loadMcps]', `failed to connect mcp "${id}":`, err);
+      }
+    }
+
+    this.logger.debug('[Engine.loadMcps]', 'mcps:', Object.keys(this.mcps));
   }
 
   async loadSkills() {
@@ -617,6 +642,34 @@ export default class Engine {
     delete this.integrations[id];
   }
 
+  // disconnects all mcp servers (kills their processes)
+  async dropMcps() {
+    this.logger.debug('[Engine.dropMcps]');
+    for (const [id, client] of Object.entries(this.mcps)) {
+      try {
+        this.logger.debug('[Engine.dropMcps]', `disconnecting mcp ${id}`);
+        await client.drop();
+      } catch (err) {
+        this.logger.error('[Engine.dropMcps]', `error disconnecting mcp ${id}:`, err);
+      }
+    }
+    this.mcps = {};
+  }
+
+  // disconnect and remove a single mcp server from the engine
+  async dropMcp(id: string) {
+    this.logger.debug('[Engine.dropMcp]', id);
+    const client = this.mcps[id];
+    if (client) {
+      try {
+        await client.drop();
+      } catch (err) {
+        this.logger.error('[Engine.dropMcp]', `error disconnecting mcp ${id}:`, err);
+      }
+      delete this.mcps[id];
+    }
+  }
+
   async dropSystems() {
     this.logger.debug('[Engine.dropSystems]');
     for (const [name, system] of Object.entries(this.systems)) {
@@ -770,11 +823,14 @@ export default class Engine {
       return;
     }
 
-    // TODO: should tasks have cached chats? chatId = `task-${agentId}-${taskId}-${Date.now()}`;
+    // TODO: `task-${agentId}-${taskId}` - need a way to decide if chatId should be reused OR new (stateless) chat (current)
     const chatId = undefined; // stateless, design choice, for not
 
-    // merge engine (default) tools with the task's integration tools
-    const tools = await loadIntegrationTools(this, task.integrations || []);
+    // merge engine (default) tools with the task's integration + mcp tools
+    const tools = [
+      ...await loadIntegrationTools(this, task.integrations || []),
+      ...await loadMcpTools(this, task.mcps || []),
+    ];
 
     // ! set task input as user message to LLM
     const result = await agent.sendChat(chatId, task.input, tools);

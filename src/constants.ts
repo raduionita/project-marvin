@@ -21,6 +21,11 @@ export const CHAT_TTL_MS = 60 * 60 * 1000;
 // how often to sweep idle cached chats
 export const CHAT_SWEEP_MS = 10 * 60 * 1000;
 
+// mcp client: timeout for the initialize handshake (npx cold start can be slow)
+export const MCP_INIT_TIMEOUT_MS = 30 * 1000;
+// mcp client: timeout for a single tools/call request
+export const MCP_CALL_TIMEOUT_MS = 60 * 1000;
+
 export const DEFAULT_CONFIG = {
   settings: {
     name: 'marvin',
@@ -31,6 +36,7 @@ export const DEFAULT_CONFIG = {
   },
   channels: {},
   integrations: {},
+  mcps: {},
   models: {},
   agents: {},
 };
