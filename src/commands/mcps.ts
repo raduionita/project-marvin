@@ -1,10 +1,9 @@
 import { checkbox, confirm, input } from '@inquirer/prompts';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { createInterface } from 'readline';
 import { join } from 'path';
 
-import { Command } from "../types";
-import { Mcp, McpConfig } from '../mcp.js';
+import { Command, Config } from "../types";
+import { Mcp } from '../mcp.js';
 import { tryJsonParse } from '../helpers.js';
 import { multiline } from '../termina.js';
 
@@ -38,7 +37,7 @@ export function unwrapMcpSnippet(json: {[key:string]:any}): { name?: string, spe
 }
 
 // validate an mcp server spec: command required, args string[], env string map
-export function validateMcpSpec(spec: {[key:string]:any}): { ok: boolean, error?: string, config?: McpConfig } {
+export function validateMcpSpec(spec: {[key:string]:any}): { ok: boolean, error?: string, config?: Config['mcps'][string] } {
   if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
     return { ok: false, error: 'snippet must be a json object' };
   }
@@ -51,7 +50,7 @@ export function validateMcpSpec(spec: {[key:string]:any}): { ok: boolean, error?
   if (spec.env !== undefined && (!spec.env || typeof spec.env !== 'object' || Array.isArray(spec.env) || Object.values(spec.env).some((v: any) => typeof v !== 'string'))) {
     return { ok: false, error: '"env" must be an object of string values' };
   }
-  const config: McpConfig = {
+  const config: Config['mcps'][string] = {
     enabled: spec.enabled === undefined ? true : !!spec.enabled,
     command: spec.command.trim(),
     args: spec.args || [],
@@ -149,7 +148,7 @@ export default class McpsCommand extends Command {
     }
 
     // ask for the multi-line json snippet
-    const text = await multiline('Paste the mcp json snippet (end with an empty line):');
+    const text = await this.pasteSnippet();
     const json = tryJsonParse(text);
     if (!json || typeof json !== 'object' || !Object.keys(json).length) {
       this.logger.error('[McpsCommand.execAdd]', 'invalid json snippet');
@@ -171,6 +170,7 @@ export default class McpsCommand extends Command {
     const ok = await this.verify(name, config);
     if (!ok) {
       const saveAnyway = await confirm({ message: 'Connection failed. Save anyway?', default: false });
+      // stop early
       if (!saveAnyway) {
         this.logger.info('[McpsCommand.execAdd]', 'aborted, nothing saved');
         return;
@@ -195,8 +195,9 @@ export default class McpsCommand extends Command {
     }
 
     // register the mcp in config
-    this.engine.config.mcps = this.engine.config.mcps || {};
-    this.engine.config.mcps[name] = config;
+    const mcps = this.engine.config.mcps || {};
+    mcps[name] = config;
+    this.engine.config.mcps = mcps;
 
     this.persist(`mcp "${name}" configured`);
   }
@@ -274,10 +275,10 @@ export default class McpsCommand extends Command {
       await client.load();
 
       this.logger.log(`mcp "${pname}" (${[config.command, ...(config.args || [])].join(' ')}):`);
-      if (!client.tools.length) {
+      if (!Object.keys(client.tools).length) {
         this.logger.log('  (no tools)');
       }
-      for (const tool of client.tools) {
+      for (const tool of Object.values(client.tools)) {
         this.logger.log(`  ${tool.name}`);
         if (tool.description) this.logger.log('  - description:', tool.description);
         this.logger.log('  - parameters:', JSON.stringify(tool.inputSchema));
@@ -322,23 +323,12 @@ export default class McpsCommand extends Command {
   // read a multi-line json snippet from stdin: collects pasted lines until a
   // blank line (interactive) or EOF (piped)
   protected async pasteSnippet(): Promise<string> {
-    const rl = createInterface({ input: process.stdin });
-    const lines: string[] = [];
-    return await new Promise<string>(resolve => {
-      process.stdout.write('Paste the mcp json snippet (end with an empty line):\n');
-      rl.on('line', line => {
-        if (!line.trim()) {
-          rl.close();
-          return;
-        }
-        lines.push(line);
-      });
-      rl.on('close', () => resolve(lines.join('\n')));
-    });
+    return await multiline('Paste the mcp json snippet (end with an empty line):');
   }
 
   // read the snippet from a file arg, piped stdin, or an interactive prompt
-  private async readSnippet(arg: string | undefined): Promise<string | null> {    if (arg) {
+  private async readSnippet(arg: string | undefined): Promise<string | null> {
+    if (arg) {
       if (!existsSync(arg)) {
         this.logger.error('[McpsCommand.readSnippet]', `file not found: ${arg}`);
         return null;
@@ -352,7 +342,7 @@ export default class McpsCommand extends Command {
   }
 
   // spawn + initialize + listTools, printing what the server exposes
-  private async verify(name: string, config: McpConfig): Promise<boolean> {
+  private async verify(name: string, config: Config['mcps'][string]): Promise<boolean> {
     this.logger.info(`verifying mcp "${name}" (spawning ${config.command})...`);
 
     const client = new Mcp(this.engine, this.logger, name, config);
@@ -369,12 +359,12 @@ export default class McpsCommand extends Command {
   }
 
   // static risk notes shown before saving
-  private warnRisks(config: McpConfig) {
-    if (/^npx(\.cmd)?$/i.test(config.command) && config.args.some(a => a === '-y')) {
-      this.logger.warn('[McpsCommand.warnRisks]', '"npx -y" downloads and runs a package from npm on every start (supply-chain risk)');
+  private warnRisks(config: Config['mcps'][string]) {
+    if (/^npx(\.cmd)?$/i.test(config.command) && config.args.some((a: string) => a === '-y')) {
+      this.logger.warn('"npx -y" downloads and runs a package from npm on every start (supply-chain risk)');
     }
     if (config.env && Object.keys(config.env).length) {
-      this.logger.warn('[McpsCommand.warnRisks]', 'env values (credentials) are stored as plain text in marvin.json');
+      this.logger.warn('env values (credentials) are stored as plain text in marvin.json');
     }
   }
 

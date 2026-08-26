@@ -325,8 +325,7 @@ export default class Engine {
     this.logger.debug('[Engine.loadIntegrations]', Object.keys(this.integrations));
   }
 
-  // connects the configured mcp servers (spawn + initialize). failures are
-  // logged and skipped, so a broken server never blocks the engine.
+  // connects the configured mcp servers (spawn + initialize)
   async loadMcps() {
     this.logger.debug('[Engine.loadMcps]');
 
@@ -335,9 +334,9 @@ export default class Engine {
 
       try {
         if (this.mcps[id]) continue;
-        const client = new Mcp(this, this.logger, id, config);
-        await client.load();
-        this.mcps[id] = client;
+        const mcp = new Mcp(this, this.logger, id, config);
+        await mcp.load();
+        this.mcps[id] = mcp;
       } catch (err) {
         this.logger.error('[Engine.loadMcps]', `failed to connect mcp "${id}":`, err);
       }

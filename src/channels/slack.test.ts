@@ -201,6 +201,8 @@ function mockConfig(options: {
     integrations: {},
     models: {},
     agents: options.agents || {},
+    tasks: {},
+    mcps: {},
   };
 }
 

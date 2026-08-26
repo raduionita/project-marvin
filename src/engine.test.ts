@@ -18,6 +18,8 @@ function buildEngine(): Engine {
     integrations: {},
     models: {},
     agents: {},
+    tasks: {},
+    mcps: {},
   } as Config;
   return engine;
 }

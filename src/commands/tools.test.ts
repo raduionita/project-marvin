@@ -27,6 +27,8 @@ function mockEngine(isDry = false): Engine {
     integrations: {},
     models: { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     agents: {},
+    tasks: {},
+    mcps: {},
   } as Config;
 
   // the skills used by `tools add` / `tools edit`

@@ -22,6 +22,8 @@ function mockEngine(): Engine {
     integrations: { gloobeam: { enabled: true, type: 'wordpress' } },
     models: { llm: { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     agents: {},
+    tasks: {},
+    mcps: {},
   } as Config;
 
   engine.models['llm'] = new FakeModel(engine, { enabled: true, provider: 'deepseek', model: 'deepseek-chat' });

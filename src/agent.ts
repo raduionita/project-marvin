@@ -7,9 +7,7 @@ import type { Chat, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
-import { splitIntegrationToolName } from './integrations/index.js';
-import { splitMcpToolName } from './mcp.js';
-import { truncate } from './helpers.js';
+import { truncate, splitMcpToolName, splitIntegrationToolName } from './helpers.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI
 // loop via sendChat (model calls + tool execution) on behalf of tasks and chats,
@@ -105,8 +103,8 @@ export class Agent {
     // inject the mcps block: loaded servers list their tools, config-only
     // entries just their spawn spec
     const mcpBlocks = Object.entries(this.engine.mcps).map(([id, client]) => {
-      const tools = client.tools.length
-        ? `\nTools: ${client.tools.map(t => t.name).join('; ')}`
+      const tools = Object.keys(client.tools).length
+        ? `\nTools: ${Object.keys(client.tools).join('; ')}`
         : '';
       return `### ${id}${tools}`;
     });
@@ -189,42 +187,32 @@ export class Agent {
   // tool call
   async execTool(tool: string, args: {[key:string]:any}) : Promise<{[key:string]:any}> {
     this.logger.debug('[Agent.execTool]', tool);
-
-    const instance = this.engine.tools[tool];
-    if (instance) {
-      try {
+    try {
+      // internal tools
+      const instance = this.engine.tools[tool];
+      if (instance) {
         // ! tool call
         return await instance.call(args, { agent: this });
-      } catch (err) {
-        this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
-        return {tool: tool, error: (err as Error).message};
       }
-    }
 
-    // dynamic integration tools (<integrationId>__<action>) loaded per-task
-    const split = splitIntegrationToolName(tool);
-    const integration = split ? this.engine.integrations[split.integrationId] : undefined;
-    if (integration) {
-      try {
-        return await integration.call({ action: split!.action, ...args });
-      } catch (err) {
-        this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
-        return {tool: tool, error: (err as Error).message};
+      // integration tools (<integrationId>__<action>) loaded per-task
+      const intSplit = splitIntegrationToolName(tool);
+      const integration = intSplit ? this.engine.integrations[intSplit.id] : undefined;
+      if (integration) {
+        return await integration.call({ action: intSplit!.action, ...args });
       }
-    }
 
-    // dynamic mcp tools (<mcpId>__<toolName>) loaded per-task
-    const mcpSplit = splitMcpToolName(tool);
-    const mcp = mcpSplit ? this.engine.mcps[mcpSplit.mcpId] : undefined;
-    if (mcp) {
-      try {
-        return await mcp.execTool(mcpSplit!.toolName, args);
-      } catch (err) {
-        this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
-        return {tool: tool, error: (err as Error).message};
+      // mcp tools (<mcpId>__<toolName>) loaded per-task
+      const mcpSplit = splitMcpToolName(tool);
+      const mcp = mcpSplit ? this.engine.mcps[mcpSplit.id] : undefined;
+      if (mcp) {
+        return await mcp.call(mcpSplit!.name, args);
       }
+    } catch (err) {
+      this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
+      return {tool: tool, error: (err as Error).message};
     }
-
+    // not found
     this.logger.error('[Agent.execTool]', `tool ${tool} not found`);
     return {tool: tool, error: `tool ${tool} does NOT exist`};
   }

@@ -27,7 +27,7 @@ export interface Config {
     [key: string]: any;
   }>;
   // mcp connectors (client): spawn command + args + env per server
-  mcps?: Record<string, {
+  mcps: Record<string, {
     enabled?: boolean;
     command: string;
     args: string[];
@@ -47,7 +47,7 @@ export interface Config {
     channels: Record<string, string>;
     tools?: string[];
   }>;
-  tasks?: Record<string, {
+  tasks: Record<string, {
     enabled: boolean;
     type?: TaskType;
     agent?: string;

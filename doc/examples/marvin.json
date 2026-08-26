@@ -32,7 +32,7 @@
   },
   "integrations": {
     "gloobeam": {
-      "enabled": true,
+      "enabled": false,
       "type": "wordpress",
       "endpoint": "https://gloobeam.com",
       "user": "admin",

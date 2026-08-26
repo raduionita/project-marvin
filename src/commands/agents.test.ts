@@ -22,6 +22,8 @@ function mockConfig(models: Config['models'], channels: Config['channels']): Con
     integrations: {},
     models,
     agents: {},
+    tasks: {},
+    mcps: {},
   } as Config;
 }
 

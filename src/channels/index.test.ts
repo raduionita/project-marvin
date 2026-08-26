@@ -13,6 +13,8 @@ function mockEngine(config: Config = {} as Config): Engine {
     integrations: {},
     models: {},
     agents: {},
+    tasks: {},
+    mcps: {},
   } as Config;
   engine.channels = {};
   engine.models = {};

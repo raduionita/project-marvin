@@ -25,6 +25,8 @@ function buildEngine(...integrations: [string, { [key: string]: any }][]): Engin
     integrations: Object.fromEntries(integrations) as Config['integrations'],
     models: {},
     agents: {},
+    tasks: {},
+    mcps: {},
   } as Config;
   writeFileSync(join(engine.work, 'marvin.json'), JSON.stringify(config, null, 2));
   engine.config = config;

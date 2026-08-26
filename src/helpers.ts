@@ -65,6 +65,27 @@ export function truncate(text: string, max: number): string {
   return text.slice(0, max) + `...[truncated ${text.length - max} chars]`;
 }
 
+// llm function names must match ^[a-zA-Z0-9_-]+$: map anything else to _
+export function sanitizeToolName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+// flatten mcp result content blocks into a plain object: text blocks join into
+// .text, other block types (image, audio, resource) are kept under their type
+export function flattenContent(content: unknown): { [key: string]: any } {
+  const out: { [key: string]: any } = {};
+  const texts: string[] = [];
+  for (const block of (Array.isArray(content) ? content : []) as { type: string, text?: string }[]) {
+    if (block.type === 'text' && typeof block.text === 'string') {
+      texts.push(block.text);
+    } else {
+      (out[block.type] ||= []).push(block);
+    }
+  }
+  if (texts.length) out.text = texts.join('\n');
+  return out;
+}
+
 export function getRootDir() {
   return import.meta.dirname.replace(/\/src.*/, '')
 }
@@ -152,4 +173,20 @@ function formatInline(text: string): string {
   text = text.replace(/\u0000(\d+)\u0000/g, (_, i: string) => codeSpans[Number(i)]!);
 
   return text;
+}
+
+// split a tool name back into { mcpId, toolName }, or null when the name is
+// not an mcp tool
+export function splitMcpToolName(name: string): { id: string, name: string } | null {
+  const idx = name.lastIndexOf('__');
+  if (idx <= 0 || idx === name.length - 2) return null;
+  return { id: name.slice(0, idx), name: name.slice(idx + 2) };
+}
+
+// split a tool name back into { integrationId, action }, or null when the name
+// is not an integration tool
+export function splitIntegrationToolName(name: string): { id: string, action: string } | null {
+  const idx = name.lastIndexOf('__');
+  if (idx <= 0 || idx === name.length - 2) return null;
+  return { id: name.slice(0, idx), action: name.slice(idx + 2) };
 }

@@ -6,36 +6,24 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 import type Engine from './engine.js';
 import type { Logger } from './logger.js';
-import type { ToolMeta } from './types.js';
+import type { ToolMeta, Config } from './types.js';
 import * as constants from './constants.js';
-
-// mcp connector config (marvin.json mcps[id]): a stdio server spawn spec
-export interface McpConfig {
-  enabled?: boolean;
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-}
-
-// mcp tool as exposed by a server (subset used by marvin)
-export interface McpTool {
-  name: string;
-  description?: string;
-  inputSchema: { [key: string]: any };
-}
+import { sanitizeToolName, flattenContent } from './helpers.js';
 
 // client for one mcp server over stdio: spawns the process on load, lists its
 // tools and forwards tool calls. reconnects lazily if the process died.
 export class Mcp {
   public client: Client | null = null;
   public transport: StdioClientTransport | null = null;
-  // tools as listed on load (used for prompt blocks and tool metas)
-  public tools: McpTool[] = [];
-  // sanitized -> raw tool names (llm function names must be [a-zA-Z0-9_-])
-  public toolNames: Record<string, string> = {};
+  // tools as listed on load, keyed by sanitized name
+  public tools: Record<string, {
+    name: string;
+    description?: string;
+    inputSchema: { [key: string]: any };
+  }> = {};
 
-  constructor(public engine: Engine, public logger: Logger, public id: string, public config: McpConfig) {
-    this.logger.debug(`[Mcp.${this.id}.constructor]`);
+  constructor(public engine: Engine, public logger: Logger, public id: string, public config: Config['mcps'][string]) {
+    this.logger.debug(`[Mcp.constructor]`, this.id);
   }
 
   get isLoaded(): boolean {
@@ -64,22 +52,23 @@ export class Mcp {
 
     await this.client.connect(this.transport, { timeout: constants.MCP_INIT_TIMEOUT_MS });
 
-    // cache the tool list + sanitized name mapping
-    const listed = await this.client.listTools({}, { timeout: constants.MCP_CALL_TIMEOUT_MS });
-    this.tools = (listed.tools || []).map(t => ({
-      name: t.name,
-      ...(t.description ? { description: t.description } : {}),
-      inputSchema: (t.inputSchema || { type: 'object', properties: {} }) as { [key: string]: any },
-    }));
+    // cache the tool list, keyed by sanitized name
+    const result = await this.client.listTools({}, { timeout: constants.MCP_CALL_TIMEOUT_MS });
+    this.tools = Object.fromEntries((result.tools || []).map(t => [
+      sanitizeToolName(t.name),
+      {
+        name: t.name,
+        ...(t.description ? { description: t.description } : {}),
+        inputSchema: (t.inputSchema || { type: 'object', properties: {} }) as { [key: string]: any },
+      },
+    ]));
 
-    this.toolNames = Object.fromEntries(this.tools.map(t => [sanitizeToolName(t.name), t.name]));
-
-    this.logger.info(`[Mcp.${this.id}]`, `connected, ${this.tools.length} tool(s)`);
+    this.logger.info(`[Mcp.call]`, this.id, `connected, ${Object.keys(this.tools).length} tool(s)`);
   }
 
   // close the connection and kill the server process
   async drop(): Promise<void> {
-    this.logger.debug(`[Mcp.${this.id}.drop]`);
+    this.logger.debug(`[Mcp.drop]`, this.id);
 
     const client = this.client;
     this.client = null;
@@ -87,47 +76,32 @@ export class Mcp {
       try {
         await client.close();
       } catch (err) {
-        this.logger.error(`[Mcp.${this.id}.drop]`, err);
+        this.logger.error(`[Mcp.drop]`, this.id, err);
       }
     }
 
     const transport = this.transport;
     this.transport = null;
-    this.tools = [];
-    this.toolNames = {};
+    this.tools = {};
     if (transport) {
       try {
         await transport.close();
       } catch (err) {
-        this.logger.error(`[Mcp.${this.id}.drop]`, err);
+        this.logger.error(`[Mcp.drop]`, this.id, err);
       }
     }
   }
 
-  private onStderr(chunk: Buffer) {
-    this.logger.debug(`[Mcp.onStderr]`, this.id, chunk.toString().trim());
-  }
-
-  private onClose() {
-    this.logger.debug(`[Mcp.onClose]`, this.id);
-    this.client = null;
-  }
-
-  private onError(err: Error) {
-    this.logger.error(`[Mcp.onError]`, this.id, err);
-  }
-
   // call a tool by its sanitized name, returning the flattened result content.
-  // reconnects once when the server process is gone.
-  async execTool(name: string, args: { [key: string]: any } = {}): Promise<{ [key: string]: any }> {
-    this.logger.debug(`[Mcp.${this.id}.callTool]`, name);
+  async call(name: string, args: { [key: string]: any } = {}): Promise<{ [key: string]: any }> {
+    this.logger.debug(`[Mcp.call]`, this.id, name);
 
     if (!this.client) {
-      this.logger.warn(`[Mcp.${this.id}]`, 'not connected, reconnecting');
+      this.logger.warn(`[Mcp.call]`, this.id, 'not connected, reconnecting');
       await this.load();
     }
 
-    const raw = this.toolNames[name] || name;
+    const raw = this.tools[name]?.name || name;
 
     const result = await this.client!.callTool(
       { name: raw, arguments: args },
@@ -145,6 +119,19 @@ export class Mcp {
     return flat;
   }
 
+  private onStderr(chunk: Buffer) {
+    this.logger.debug(`[Mcp.onStderr]`, this.id, chunk.toString().trim());
+  }
+
+  private onClose() {
+    this.logger.debug(`[Mcp.onClose]`, this.id);
+    this.client = null;
+  }
+
+  private onError(err: Error) {
+    this.logger.error(`[Mcp.onError]`, this.id, err);
+  }
+
   // marvin version from the app package.json (fallback "0.0.0")
   private version(): string {
     try {
@@ -159,42 +146,9 @@ export class Mcp {
   }
 }
 
-// llm function names must match ^[a-zA-Z0-9_-]+$: map anything else to _
-export function sanitizeToolName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-// flatten mcp result content blocks into a plain object: text blocks join into
-// .text, other block types (image, audio, resource) are kept under their type
-function flattenContent(content: unknown): { [key: string]: any } {
-  const out: { [key: string]: any } = {};
-  const texts: string[] = [];
-  for (const block of (Array.isArray(content) ? content : []) as { type: string, text?: string }[]) {
-    if (block.type === 'text' && typeof block.text === 'string') {
-      texts.push(block.text);
-    } else {
-      (out[block.type] ||= []).push(block);
-    }
-  }
-  if (texts.length) out.text = texts.join('\n');
-  return out;
-}
-
-// --- per-task mcp tools (linked to tasks via task.mcps) ---
-
-// mcp tool names follow `<mcpId>__<toolName>` (double underscore, same
-// convention as integration tools, since both ids and tool names may contain
-// single underscores)
-export function mcpToolName(mcpId: string, toolName: string): string {
-  return `${mcpId}__${sanitizeToolName(toolName)}`;
-}
-
-// split a tool name back into { mcpId, toolName }, or null when the name is
-// not an mcp tool
-export function splitMcpToolName(name: string): { mcpId: string, toolName: string } | null {
-  const idx = name.lastIndexOf('__');
-  if (idx <= 0 || idx === name.length - 2) return null;
-  return { mcpId: name.slice(0, idx), toolName: name.slice(idx + 2) };
+// mcp tool names follow `<mcpId>__<toolName>`
+export function mcpToolName(mcp: string, tool: string): string {
+  return `${mcp}__${sanitizeToolName(tool)}`;
 }
 
 // build the tool metas for a task's linked mcps. loaded dynamically at
@@ -216,7 +170,7 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
       continue;
     }
 
-    for (const tool of client.tools) {
+    for (const tool of Object.values(client.tools)) {
       const schema = tool.inputSchema || {};
       tools.push({
         type: 'function',

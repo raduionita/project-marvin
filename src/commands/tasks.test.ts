@@ -22,6 +22,7 @@ function mockConfig(agents: Config['agents'], tasks: Config['tasks'] = {}): Conf
     models: {},
     agents,
     tasks,
+    mcps: {},
   } as Config;
 }
 

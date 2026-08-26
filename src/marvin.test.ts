@@ -181,6 +181,8 @@ function mockConfig(): Config {
     integrations: { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://wp.example.com' } },
     models: {},
     agents: { marvin: { enabled: true, channels: { slack: 'C123' } } },
+    tasks: {},
+    mcps: {},
   };
 }
 

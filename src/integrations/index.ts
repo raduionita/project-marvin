@@ -33,20 +33,50 @@ export async function loadIntegration(engine: Engine, type: string, config: { [k
   }
 }
 
+// build the tool metas for a task's linked integrations. loaded dynamically at
+// execTask time and merged with the engine (default) tools.
+export async function loadIntegrationTools(engine: Engine, integrations: string[]): Promise<ToolMeta[]> {
+  const tools: ToolMeta[] = [];
+  for (const id of integrations || []) {
+    const integration = engine.integrations[id];
+    if (!integration) {
+      engine.logger.warn('[buildIntegrationTools]', `integration "${id}" not loaded, skipping`);
+      continue;
+    }
+
+    const config = integration.config || {};
+    const actionsCfg = config.actions || {};
+    const hasConfigured = Object.keys(actionsCfg).length > 0;
+
+    for (const [action, description] of Object.entries(integration.meta.actions)) {
+      const cfg = actionsCfg[action];
+      // when any action is configured, expose only the configured (enabled) ones
+      if (hasConfigured && (!cfg || cfg.enabled === false)) continue;
+
+      // configured fields (OPTIONS snapshot) drive the tool schema; fall back to
+      // live discovery (best effort, never blocks the task loop)
+      let fields = actionParameters(config, action).properties;
+      if (!Object.keys(fields).length) {
+        try {
+          const discovered = await integration.discover(action);
+          fields = Object.fromEntries(discovered.map(f => [f.name, f]));
+        } catch (err) {
+          engine.logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${action}":`, (err as Error).message);
+        }
+      }
+
+      tools.push(makeActionTool(id, integration, action, description, Object.values(fields)));
+    }
+  }
+  return tools;
+}
+
 // --- per-action integration tools (linked to tasks via task.integrations) ---
 
 // tool names for per-action integration tools follow `<integrationId>__<action>`
 // (double underscore, since both ids and actions may contain single underscores)
-export function integrationToolName(integrationId: string, action: string): string {
-  return `${integrationId}__${action}`;
-}
-
-// split a tool name back into { integrationId, action }, or null when the name
-// is not an integration tool
-export function splitIntegrationToolName(name: string): { integrationId: string, action: string } | null {
-  const idx = name.lastIndexOf('__');
-  if (idx <= 0 || idx === name.length - 2) return null;
-  return { integrationId: name.slice(0, idx), action: name.slice(idx + 2) };
+export function integrationToolName(id: string, action: string): string {
+  return `${id}__${action}`;
 }
 
 // map a Field into a JSON-schema property for the tool parameters
@@ -132,42 +162,4 @@ function makeActionTool(integrationId: string, integration: Integration, action:
       },
     },
   };
-}
-
-// build the tool metas for a task's linked integrations. loaded dynamically at
-// execTask time and merged with the engine (default) tools.
-export async function loadIntegrationTools(engine: Engine, integrations: string[]): Promise<ToolMeta[]> {
-  const tools: ToolMeta[] = [];
-  for (const id of integrations || []) {
-    const integration = engine.integrations[id];
-    if (!integration) {
-      engine.logger.warn('[buildIntegrationTools]', `integration "${id}" not loaded, skipping`);
-      continue;
-    }
-
-    const config = integration.config || {};
-    const actionsCfg = config.actions || {};
-    const hasConfigured = Object.keys(actionsCfg).length > 0;
-
-    for (const [action, description] of Object.entries(integration.meta.actions)) {
-      const cfg = actionsCfg[action];
-      // when any action is configured, expose only the configured (enabled) ones
-      if (hasConfigured && (!cfg || cfg.enabled === false)) continue;
-
-      // configured fields (OPTIONS snapshot) drive the tool schema; fall back to
-      // live discovery (best effort, never blocks the task loop)
-      let fields = actionParameters(config, action).properties;
-      if (!Object.keys(fields).length) {
-        try {
-          const discovered = await integration.discover(action);
-          fields = Object.fromEntries(discovered.map(f => [f.name, f]));
-        } catch (err) {
-          engine.logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${action}":`, (err as Error).message);
-        }
-      }
-
-      tools.push(makeActionTool(id, integration, action, description, Object.values(fields)));
-    }
-  }
-  return tools;
 }

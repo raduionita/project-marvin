@@ -26,6 +26,8 @@ function mockEngine(isDry = false): Engine {
     integrations: {},
     models: { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     agents: {},
+    tasks: {},
+    mcps: {},
   } as Config;
 
   // a loaded "meta" skill (the one used by `skills add`)

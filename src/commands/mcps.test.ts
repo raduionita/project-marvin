@@ -28,6 +28,7 @@ function buildEngine(...mcps: [string, { [key: string]: any }][]): Engine {
     mcps: Object.fromEntries(mcps) as Config['mcps'],
     models: {},
     agents: {},
+    tasks: {},
   } as Config;
   writeFileSync(join(engine.work, 'marvin.json'), JSON.stringify(config, null, 2));
   engine.config = config;
