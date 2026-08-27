@@ -31,6 +31,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@inquirer/editor": "^5.3.1",
     "@inquirer/prompts": "^8.5.2",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@slack/socket-mode": "^2.0.7",

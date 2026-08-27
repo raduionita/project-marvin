@@ -200,3 +200,35 @@ export async function testMcp(engine: Engine, name: string, config: Config['mcps
     await mcp.drop();
   }
 }
+
+// unwrap common paste formats down to the server spec, then validate it:
+// - claude-style wrapper: { "mcpServers": { "<name>": {...} } }
+// - bare named server:    { "<name>": { "command": ... } }
+// - direct spec:          { "command": ..., "args": [...], "env": {...} }
+// returns the spawn config, or null when the snippet is invalid
+export function specMcp(json: {[key:string]:any}): Config['mcps'][string] | null {
+  let spec: { [key: string]: any } = json;
+  if (json && typeof json === 'object' && !Array.isArray(json) && json.mcpServers && typeof json.mcpServers === 'object') {
+    const entries = Object.entries(json.mcpServers);
+    if (entries.length) spec = entries[0]![1] as { [key: string]: any };
+  } else if (json && typeof json === 'object' && !Array.isArray(json)) {
+    const keys = Object.keys(json);
+    if (keys.length === 1) {
+      const value = (json as { [key: string]: any })[keys[0]!];
+      if (value && typeof value === 'object' && !Array.isArray(value) && value.command) spec = value;
+    }
+  }
+
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return null;
+  if (typeof spec.command !== 'string' || !spec.command.trim()) return null;
+  if (spec.args !== undefined && (!Array.isArray(spec.args) || spec.args.some((a: any) => typeof a !== 'string'))) return null;
+  if (spec.env !== undefined && (!spec.env || typeof spec.env !== 'object' || Array.isArray(spec.env) || Object.values(spec.env).some((v: any) => typeof v !== 'string'))) return null;
+
+  const config: Config['mcps'][string] = {
+    ...(spec.enabled === undefined ? {} : { enabled: !!spec.enabled }),
+    command: spec.command.trim(),
+    args: spec.args || [],
+    ...(spec.env ? { env: spec.env } : {}),
+  };
+  return config;
+}

@@ -1,4 +1,4 @@
-import { input } from '@inquirer/prompts';
+import { input } from '../terminal.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 

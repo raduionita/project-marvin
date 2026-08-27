@@ -1,4 +1,4 @@
-import { checkbox, input, password, rawlist, select } from '@inquirer/prompts';
+import { checkbox, input, password, rawlist, select } from '../terminal.js';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
 

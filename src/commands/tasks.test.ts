@@ -12,6 +12,10 @@ let answers: string[] = [];
 const promptMocks = buildPromptMocks(() => answers);
 mock.module('@inquirer/prompts', () => promptMocks);
 
+// injectable editor prompt (no $EDITOR in tests)
+let taskPromptSnippet = '';
+mock.module('../terminal.js', () => ({ ...promptMocks, editor: async () => taskPromptSnippet }));
+
 import TasksCommand from './tasks.js';
 
 function mockConfig(agents: Config['agents'], tasks: Config['tasks'] = {}): Config {
@@ -34,7 +38,8 @@ test('tasks add writes TASK.md and persists config', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'my-task', 'do the thing every hour', '7200'];
+  answers = ['', 'my-task', '7200'];
+  taskPromptSnippet = 'do the thing every hour';
   await cmd.execAdd();
 
   // TASK.md created with the prompt
@@ -89,7 +94,8 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
   });
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'empty-task', '', '60', ''];
+  answers = ['', 'empty-task', '60'];
+  taskPromptSnippet = '';
   await cmd.execAdd();
 
   expect(existsSync(join(engine.work, 'tasks', 'empty-task', 'TASK.md'))).toBe(false);
@@ -112,7 +118,8 @@ test('tasks add links configured integrations via checkbox', async () => {
   } as Config['integrations'];
 
   const cmd = new TasksCommand(engine, new Logger(), []);
-  answers = ['', 'post-task', 'write a post', '60', '1'];
+  answers = ['', 'post-task', '60', '1'];
+  taskPromptSnippet = 'write a post';
   await cmd.execAdd();
 
   expect(engine.config.tasks!['post-task']).toEqual({

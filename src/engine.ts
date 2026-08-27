@@ -23,13 +23,14 @@ export default class Engine {
 
   // channels, models, agents
   public channels: Record<string, Channel> = {};
-  public integrations: Record<string, Integration> = {};
-  public mcps: Record<string, Mcp> = {};
-  public skills: Record<string, Skill> = {};
-  public tools   : Record<string, Tool> = {};
+  public skills  : Record<string, Skill> = {};
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
   public tasks   : Record<string, Task> = {};
+  
+  public tools       : Record<string, Tool> = {};
+  public mcps        : Record<string, Mcp> = {};
+  public integrations: Record<string, Integration> = {};
 
   // workspace (~/.marvin) data folder
   public work: string = process.env.HOME + '/.marvin';

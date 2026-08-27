@@ -1,42 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-import { Command, Config } from "../types";
-import { Mcp, testMcp } from '../mcp.js';
+import { Command } from "../types";
+import { Mcp, testMcp, specMcp } from '../mcp.js';
 import { tryJsonParse } from '../helpers.js';
-import { multiline, checkbox, confirm, input } from '../terminal.js';
-
-// unwrap common paste formats down to the server spec, then validate it:
-// - claude-style wrapper: { "mcpServers": { "<name>": {...} } }
-// - bare named server:    { "<name>": { "command": ... } }
-// - direct spec:          { "command": ..., "args": [...], "env": {...} }
-// returns the spawn config, or null when the snippet is invalid
-export function specMcp(json: {[key:string]:any}): Config['mcps'][string] | null {
-  let spec: { [key: string]: any } = json;
-  if (json && typeof json === 'object' && !Array.isArray(json) && json.mcpServers && typeof json.mcpServers === 'object') {
-    const entries = Object.entries(json.mcpServers);
-    if (entries.length) spec = entries[0]![1] as { [key: string]: any };
-  } else if (json && typeof json === 'object' && !Array.isArray(json)) {
-    const keys = Object.keys(json);
-    if (keys.length === 1) {
-      const value = (json as { [key: string]: any })[keys[0]!];
-      if (value && typeof value === 'object' && !Array.isArray(value) && value.command) spec = value;
-    }
-  }
-
-  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return null;
-  if (typeof spec.command !== 'string' || !spec.command.trim()) return null;
-  if (spec.args !== undefined && (!Array.isArray(spec.args) || spec.args.some((a: any) => typeof a !== 'string'))) return null;
-  if (spec.env !== undefined && (!spec.env || typeof spec.env !== 'object' || Array.isArray(spec.env) || Object.values(spec.env).some((v: any) => typeof v !== 'string'))) return null;
-
-  const config: Config['mcps'][string] = {
-    ...(spec.enabled === undefined ? {} : { enabled: !!spec.enabled }),
-    command: spec.command.trim(),
-    args: spec.args || [],
-    ...(spec.env ? { env: spec.env } : {}),
-  };
-  return config;
-}
+import { editor, checkbox, confirm, input } from '../terminal.js';
 
 // `marvin mcps [command] [--dry]` list, add, edit, info, drop mcp connectors
 export default class McpsCommand extends Command {
@@ -109,7 +77,7 @@ export default class McpsCommand extends Command {
     this.logger.debug('[McpsCommand.execAdd]', 'adding an mcp...');
 
     // ask for the mcp name
-    const name = await input({
+    const name = this.args[1] || await input({
       message: 'Enter mcp name (e.g. gloobeam):',
       required: true,
       pattern: /^[a-zA-Z0-9_-]+$/,
@@ -126,22 +94,25 @@ export default class McpsCommand extends Command {
       return;
     }
 
-    // ask for the multi-line json snippet
-    const text = await multiline('Paste the mcp json snippet (end with an empty line):');
-    const json = tryJsonParse(text);
+    // ask for the multi-line json snippet (edited in $EDITOR)
+    const text = await editor({ message: 'Paste the mcp json snippet:', default: '', postfix: '.json' });
+    const json = tryJsonParse(text.trim());
     if (!json || typeof json !== 'object' || !Object.keys(json).length) {
       this.logger.error('[McpsCommand.execAdd]', 'invalid json snippet');
       return;
     }
 
-    const config = specMcp(json);
-    if (!config) {
+    const conf = specMcp(json);
+    if (!conf) {
       this.logger.error('[McpsCommand.execAdd]', 'invalid mcp snippet (missing "command" or bad shape)');
       return;
     }
 
+    // show the specs
+    this.logger.log(conf);
+
     // verify connectivity before saving (spawn + initialize + listTools)
-    const ok = await testMcp(this.engine, name, config);
+    const ok = await testMcp(this.engine, name, conf);
     if (!ok) {
       const saveAnyway = await confirm({ message: 'Connection failed. Save anyway?', default: false });
       // stop early
@@ -170,7 +141,8 @@ export default class McpsCommand extends Command {
 
     // register the mcp in config
     const mcps = this.engine.config.mcps || {};
-    mcps[name] = config;
+    conf.enabled = true;
+    mcps[name] = conf;
     this.engine.config.mcps = mcps;
 
     // save config
@@ -201,9 +173,7 @@ export default class McpsCommand extends Command {
       return;
     }
 
-    const text = await multiline('Paste the mcp json snippet (end with an empty line):');
-    if (text === null) return;
-
+    const text = await editor({ message: 'Paste the mcp json snippet:', default: '', postfix: '.json' });
     const json = tryJsonParse<any>(text);
     if (!json || typeof json !== 'object' || !Object.keys(json).length) {
       this.logger.error('[McpsCommand.execEdit]', 'invalid json snippet');

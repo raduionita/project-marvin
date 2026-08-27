@@ -1,4 +1,4 @@
-import { input, password, select } from '@inquirer/prompts';
+import { input, password, select } from '../terminal.js';
 import { listModels } from "../models";
 import { Command, Config, Provider } from "../types";
 import { writeFileSync } from 'fs';

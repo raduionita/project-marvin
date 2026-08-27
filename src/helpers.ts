@@ -9,7 +9,7 @@ export function tryJsonParse<T>(str: string): T {
   try {
     return JSON.parse(str) as T;
   } catch (error) {
-    logger.warn('[tryJsonParse]', `"${str}"`, error);
+    logger.warn('[tryJsonParse]', `"${str}"`, (error as Error).message);
     return {} as T;
   }
 }

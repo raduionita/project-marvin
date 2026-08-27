@@ -1,5 +1,5 @@
 
-import { input, password, select } from '@inquirer/prompts';
+import { input, password, select } from '../terminal.js';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
 

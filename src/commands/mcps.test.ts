@@ -13,9 +13,9 @@ let answers: string[] = [];
 const promptMocks = buildPromptMocks(() => answers);
 mock.module('@inquirer/prompts', () => promptMocks);
 
-// injectable snippet for the multiline() prompt (stdin is not readable in tests)
+// injectable snippet for the editor() prompt (no $EDITOR in tests)
 let injectedSnippet = '';
-mock.module('../termina.js', () => ({ multiline: async () => injectedSnippet }));
+mock.module('../terminal.js', () => ({ ...promptMocks, editor: async () => injectedSnippet }));
 
 import McpsCommand from './mcps.js';
 

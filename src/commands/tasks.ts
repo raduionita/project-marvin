@@ -1,4 +1,4 @@
-import { checkbox, input, number, select } from '@inquirer/prompts';
+import { checkbox, editor, input, number, select, textbox } from '../terminal.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -56,13 +56,13 @@ export default class TasksCommand extends Command {
 
     const marvin = this.engine.config.settings.name;
     const defaultAgent = agentIds.includes(marvin) ? marvin : agentIds[0]!;
-    const agentId = this.args[1] || await select({
+    const taskAgent = this.args[1] || await select({
       message: `Select agent (default "${defaultAgent}"):`,
       choices: agentIds.map(id => ({ name: id, value: id })),
       default: defaultAgent,
     });
-    if (!this.engine.config.agents[agentId!] && agentId !== marvin) {
-      this.logger.error('[TasksCommand.execAdd]', `agent "${agentId}" not found`, 'available agents:', agentIds.join(', '));
+    if (!this.engine.config.agents[taskAgent!] && taskAgent !== marvin) {
+      this.logger.error('[TasksCommand.execAdd]', `agent "${taskAgent}" not found`, 'available agents:', agentIds.join(', '));
       return;
     }
 
@@ -82,19 +82,19 @@ export default class TasksCommand extends Command {
       return;
     }
 
-    // ask for the task prompt, saved to tasks/<taskId>/TASK.md
-    const taskPrompt = await input({ message: 'Enter task prompt (or press enter to skip):' });
+    // ask for the task prompt (multi-line markdown), saved to tasks/<taskId>/TASK.md
+    const taskInput = await editor({ message: 'Write the task prompt input inside the editor:', default: '', postfix: '.md' });
 
     // ask for schedule (in seconds)
-    const schedule = (await number({ message: 'Enter schedule in seconds (default 3600):', default: 3600, min: 0 })) ?? 3600;
-    if (schedule < 0) {
+    const taskSchedule = (await number({ message: 'Enter schedule in seconds (default 3600):', default: 3600, min: 0 })) ?? 3600;
+    if (taskSchedule < 0) {
       this.logger.error('[TasksCommand.execAdd]', 'invalid schedule, must be a positive number of seconds');
       return;
     }
 
     // ask which configured integrations to link (their actions become tools)
     const integrationIds = Object.keys(this.engine.config.integrations || {});
-    const integrations: string[] = [];
+    const taskIntegrations: string[] = [];
     if (integrationIds.length) {
       const picked = await checkbox({
         message: 'Select integrations to link (space to toggle, enter to confirm):',
@@ -105,43 +105,41 @@ export default class TasksCommand extends Command {
           this.logger.warn('[TasksCommand.execAdd]', `unknown integration "${id}", skipping`);
           continue;
         }
-        if (!integrations.includes(id)) integrations.push(id);
+        if (!taskIntegrations.includes(id)) taskIntegrations.push(id);
       }
     }
 
     this.logger.log('');
 
     // persist the task prompt to tasks/<taskId>/TASK.md
-    let pinn: string | null = null;
-    if (taskPrompt) {
-      const ppath = join(this.engine.work, 'tasks', taskId, 'TASK.md');
+    let ppath: string = '';
+    if (taskInput) {
+      ppath = join(this.engine.work, 'tasks', taskId, 'TASK.md');
       if (this.engine.isDry) {
-        this.logger.info('[TasksCommand.execAdd]', '[dry]', 'task prompt file:', ppath);
+        this.logger.info('[dry]', 'task prompt file:', ppath);
       } else {
         mkdirSync(join(this.engine.work, 'tasks', taskId), { recursive: true });
-        writeFileSync(ppath, taskPrompt + '\n');
+        writeFileSync(ppath, taskInput + '\n');
       }
-      pinn = ppath;
     }
 
     // register the task in config
     this.engine.config.tasks = this.engine.config.tasks || {};
     this.engine.config.tasks[taskId] = {
       enabled: true,
-      agent: agentId,
-      schedule,
-      ...(integrations.length ? { integrations } : {}),
+      agent: taskAgent,
+      schedule: taskSchedule,
+      ...(taskIntegrations.length ? { integrations: taskIntegrations } : {}),
     };
 
     // persist to marvin.json
     const cpath = join(this.engine.work, 'marvin.json');
     if (this.engine.isDry) {
-      this.logger.info('[TasksCommand.execAdd]', '[dry]', `would configure task "${taskId}" for agent "${agentId}", config persisted to ${cpath}`);
+      this.logger.info('[dry]', `would configure task "${taskId}" for agent "${taskAgent}", config persisted to ${cpath}`);
     } else {
       writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
     }
 
-    this.logger.info(`[TasksCommand.execAdd]`, `task "${taskId}" configured for agent "${agentId}" (schedule: ${schedule}s ${pinn ? `, prompt saved to ${pinn}` : ''}`);
-    this.logger.warn('[TasksCommand.execAdd]', 'note: run "marvin reload" to apply the new task to the running daemon');
+    this.logger.info(`task "${taskId}" configured for agent "${taskAgent}" (schedule: ${taskSchedule}s ${ppath ? `, prompt saved to ${ppath}` : ''}`);
   }
 }
