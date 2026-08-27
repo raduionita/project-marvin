@@ -350,7 +350,7 @@ export default class Engine {
 
     // default skills shipped with marvin (src/skills), overridden by
     // custom workspace skills (~/.marvin/skills)
-    const ids = [...new Set(listSkills(this).map(f => f.replace(/\.md$/i, '').toLowerCase()))];
+    const ids = [...new Set(listSkills(this).map(f => f.replace(/\.md$/i, '').toUpperCase()))];
     for (const id of ids) {
       try {
         const skill = loadSkill(this, id);

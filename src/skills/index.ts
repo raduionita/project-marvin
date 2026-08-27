@@ -53,10 +53,10 @@ export function loadSkill(engine: Engine, id: string): Skill {
   throw new Error(`skill "${id}" not found`);
 }
 
-// parse the .md header into skill meta data: id = file name (lowercased),
+// parse the .md header into skill meta data: id = file name (uppercased),
 // title = first # heading, description = first paragraph after the heading
 export function parseSkill(file: string, source: 'default' | 'custom'): Skill {
-  const id = basename(file, '.md').toLowerCase();
+  const id = basename(file, '.md').toUpperCase();
   const content = readFileSync(file, 'utf8');
 
   let title = id;

@@ -101,7 +101,6 @@ export default class InstallCommand extends Command {
       this.logger.info('directory', fpath, 'exists');
     }
 
-
     //  ~/.marvin/MARVIN.md
     const mpath = join(hpath, 'MARVIN.md');
     if (this.engine.isDry) {
