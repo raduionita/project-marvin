@@ -190,3 +190,14 @@ export function splitIntegrationToolName(name: string): { id: string, action: st
   if (idx <= 0 || idx === name.length - 2) return null;
   return { id: name.slice(0, idx), action: name.slice(idx + 2) };
 }
+
+export function readError(error: unknown): string {
+  if (error instanceof Error) {
+    const lines = error.stack?.split('\n');
+    if (lines && lines.length > 0) {
+      return error.message + ' ' + (lines[0] || 'N/A');
+    }
+    return error.message;
+  }
+  return error?.toString() || 'N/A';
+}

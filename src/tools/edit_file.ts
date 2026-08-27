@@ -7,13 +7,13 @@ export default class EditFileTool extends Tool {
     type: 'function',
     function: {
       name: 'edit_file',
-      description: 'Edit a file inside the ~/.marvin workspace: pass oldString + newString to replace a snippet, or just newString to create/overwrite the file',
+      description: 'Edit a file inside the `~/.marvin/files` folder: pass oldString + newString to replace a snippet, or just newString to create/overwrite the file',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Path to the file to edit (must be inside ~/.marvin)',
+            description: 'Path to the file to edit (must be inside ~/.marvin/files)',
           },
           newString: {
             type: 'string',
@@ -41,7 +41,7 @@ export default class EditFileTool extends Tool {
     }
 
     if (!isSafePath(args.path)) {
-      return { error: `edit_file: path "${args.path}" is outside the workspace (~/.marvin)` };
+      return { error: `edit_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
     const path = safeJoin(this.engine.work, args.path);

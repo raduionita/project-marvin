@@ -8,13 +8,13 @@ export default class AppendFileTool extends Tool {
     type: 'function',
     function: {
       name: 'append_file',
-      description: 'Append text to the end of a file inside the ~/.marvin workspace. Creates the file (and parent folders) when it does not exist yet. Use for journaling, logs, or growing notes',
+      description: 'Append text to the end of a file inside the `~/.marvin/files` filder. Creates the file (and parent folders) when it does not exist yet. Use for journaling, logs, or growing notes',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Path to the file to append to (must be inside ~/.marvin)',
+            description: 'Path to the file to append to (must be inside `~/.marvin/files`)',
           },
           content: {
             type: 'string',
@@ -38,7 +38,7 @@ export default class AppendFileTool extends Tool {
     }
 
     if (!isSafePath(args.path)) {
-      return { error: `append_file: path "${args.path}" is outside the workspace (~/.marvin)` };
+      return { error: `append_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
     const path = safeJoin(this.engine.work, args.path);

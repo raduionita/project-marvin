@@ -1,4 +1,4 @@
-import { writeFileSync } from 'fs';
+import { appendFileSync, writeFileSync } from 'fs';
 import { tryJsonParse } from '../helpers.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
 import { join } from 'path';
@@ -115,7 +115,7 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
-    writeFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
+    appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
 
     // TODO: remove this
     this.logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
@@ -142,7 +142,7 @@ export default class DeepseekModel extends Model {
     const json = await response.json();
 
     // TODO: remove this
-    writeFileSync(join(this.engine.work,'logs', `${chatId}.log`), '--- LLM response ---\n' + JSON.stringify(json, null, 2));
+    appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '--- LLM response ---\n' + JSON.stringify(json, null, 2));
 
     // no choices, no reply
     if (!json.choices || json.choices.length === 0) {

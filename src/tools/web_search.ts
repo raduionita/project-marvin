@@ -1,6 +1,6 @@
 import { Tool } from '../types.js';
 import type { ToolMeta } from '../types.js';
-import { delay, rand, tryJsonParse } from '../helpers.js';
+import { delay, rand, readError, tryJsonParse } from '../helpers.js';
 import type BrowserSystem from '../systems/browser.js';
 
 const SEARCH_START_TAG = "DDG.pageLayout.load('d',";
@@ -42,6 +42,7 @@ export default class WebSearchTool extends Tool {
     const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
 
     let page: Awaited<ReturnType<BrowserSystem['newPage']>> | undefined;
+    let raw: string | undefined;
     try {
       page = await system.newPage((request) => {
         // exlude everything except links.duckduckgo.com/d.js and document
@@ -72,7 +73,7 @@ export default class WebSearchTool extends Tool {
       // the results need to be extracted/parsed
       const start = text.indexOf(SEARCH_START_TAG);
       const end = text.indexOf(SEARCH_END_TAG, start);
-      const raw = text.substring(start + SEARCH_START_TAG.length, end);
+            raw = text.substring(start + SEARCH_START_TAG.length, end);
       const json: any[] = tryJsonParse(raw) || [];
 
       return { 
@@ -85,7 +86,7 @@ export default class WebSearchTool extends Tool {
     } catch (error) {
       // distinguish "search failed" from "no results", so the LLM does not
       // conclude nothing exists when the scrape/parse simply failed
-      this.logger.error('[WebSearchTool.call]', 'error:', error);
+      this.logger.error('[WebSearchTool.call]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw);
       return { 
         results: [], 
         error: `web_search failed: ${(error as Error).message}` 

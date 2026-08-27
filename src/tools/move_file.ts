@@ -8,17 +8,17 @@ export default class MoveFileTool extends Tool {
     type: 'function',
     function: {
       name: 'move_file',
-      description: 'Move or rename a file or folder inside the ~/.marvin workspace. Both the source and the destination must be inside ~/.marvin',
+      description: 'Move or rename a file or folder inside the `~/.marvin/files` folder. Both the source and the destination must be inside ~/.marvin',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Path of the file or folder to move (must be inside ~/.marvin)',
+            description: 'Path of the file or folder to move (must be inside ~/.marvin/files)',
           },
           newPath: {
             type: 'string',
-            description: 'Destination path (must be inside ~/.marvin)',
+            description: 'Destination path (must be inside ~/.marvin/files)',
           },
         },
         required: ['path', 'newPath'],
@@ -38,11 +38,11 @@ export default class MoveFileTool extends Tool {
     }
 
     if (!isSafePath(args.path)) {
-      return { error: `move_file: path "${args.path}" is outside the workspace (~/.marvin)` };
+      return { error: `move_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
     if (!isSafePath(args.newPath)) {
-      return { error: `move_file: newPath "${args.newPath}" is outside the workspace (~/.marvin)` };
+      return { error: `move_file: newPath "${args.newPath}" is outside the workspace (~/.marvin/files)` };
     }
 
     const path = safeJoin(this.engine.work, args.path);

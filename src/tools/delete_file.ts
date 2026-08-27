@@ -7,13 +7,13 @@ export default class DeleteFileTool extends Tool {
     type: 'function',
     function: {
       name: 'delete_file',
-      description: 'Delete a file inside the ~/.marvin workspace. Only files can be deleted, not folders',
+      description: 'Delete a file inside the `~/.marvin/files` folder. Only files can be deleted, not folders',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Path to the file to delete (must be inside ~/.marvin)',
+            description: 'Path to the file to delete (must be inside `~/.marvin/files`)',
           },
         },
         required: ['path'],
@@ -29,7 +29,7 @@ export default class DeleteFileTool extends Tool {
     }
 
     if (!isSafePath(args.path)) {
-      return { error: `delete_file: path "${args.path}" is outside the workspace (~/.marvin)` };
+      return { error: `delete_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
     const path = safeJoin(this.engine.work, args.path);

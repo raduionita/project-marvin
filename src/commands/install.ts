@@ -90,6 +90,18 @@ export default class InstallCommand extends Command {
       this.logger.info('directory', chatsPath, 'exists');
     }
 
+    // ~/.marvin/files
+    const fpath = join(hpath, 'files');
+    if (this.engine.isDry) {
+      this.logger.info('[InstallCommand.makeProject]', '[dry]', fpath);
+    } else if (!existsSync(fpath)) {
+      mkdirSync(fpath, { recursive: true });
+      this.logger.info('created agents directory:', fpath);
+    } else {
+      this.logger.info('directory', fpath, 'exists');
+    }
+
+
     //  ~/.marvin/MARVIN.md
     const mpath = join(hpath, 'MARVIN.md');
     if (this.engine.isDry) {

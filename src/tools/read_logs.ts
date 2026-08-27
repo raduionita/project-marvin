@@ -9,10 +9,14 @@ export default class ReadLogsTool extends Tool {
     type: 'function',
     function: {
       name: 'read_logs',
-      description: 'Read the last N lines (default 20) of the marvin daemon log file (~/.marvin/logs/marvin.log). Use it to inspect recent activity, errors, or what the assistant did',
+      description: 'Read the last N lines (default 20) of the a marvin log file (~/.marvin/logs/marvin.log). Use it to inspect recent activity, errors, or what the assistant did',
       parameters: {
         type: 'object',
         properties: {
+          file: {
+            type: 'string',
+            description: 'Name of log file to read (default marvin.log)',
+          },
           lines: {
             type: 'number',
             description: 'How many lines to read from the end of the log (default 20, max 200)',
@@ -23,11 +27,12 @@ export default class ReadLogsTool extends Tool {
     },
   }
 
-  public async call(args: { lines?: number }) {
+  public async call(args: { file?: string; lines?: number }) {
     this.logger.debug('[ReadLogsTool.call]', Object.keys(args));
 
+    const file = args?.file || 'marvin.log';
     const lines = Math.min(Math.max(args?.lines || DEFAULT_LINES, 1), 200);
-    const logPath = join(this.engine.work, 'logs', 'marvin.log');
+    const logPath = join(this.engine.work, 'logs', file);
 
     try {
       const content = readFileSync(logPath, 'utf-8');
