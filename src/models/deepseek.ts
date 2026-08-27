@@ -1,5 +1,7 @@
+import { writeFileSync } from 'fs';
 import { tryJsonParse } from '../helpers.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
+import { join } from 'path';
 
 export interface Choice {
   // [stop, length, content_filter, tool_calls, insufficient_system_resources]
@@ -75,6 +77,7 @@ export default class DeepseekModel extends Model {
   }
 
   async execChat(chat: Chat) : Promise<Reply> {
+    const chatId = chat.id || 'deepseek-' + Date.now();
     const body: { [key: string]: any } = {};
 
     body.model = this.model;
@@ -112,6 +115,8 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
+    writeFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
+
     this.logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
 
     // call the model api
@@ -134,6 +139,9 @@ export default class DeepseekModel extends Model {
 
     // extract json from response
     const json = await response.json();
+
+    // TODO: remove this
+    writeFileSync(join(this.engine.work,'logs', `${chatId}.log`), '--- LLM response ---\n' + JSON.stringify(json, null, 2));
 
     // no choices, no reply
     if (!json.choices || json.choices.length === 0) {

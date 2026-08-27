@@ -39,8 +39,7 @@ export default class Engine {
 
   public isDry: boolean = process.argv.includes('--dry') || process.argv.includes('-dry');
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
-
-  public get isDebug() { return process.env.MARVIN_LOG_LEVEL === 'debug'; }
+  public isDebug: boolean =  process.env.MARVIN_LOG_LEVEL === 'debug';
 
   constructor(public logger: Logger) {
     this.logger.debug('[Engine.constructor]');
