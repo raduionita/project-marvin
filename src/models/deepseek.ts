@@ -117,6 +117,7 @@ export default class DeepseekModel extends Model {
 
     writeFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
 
+    // TODO: remove this
     this.logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
 
     // call the model api
