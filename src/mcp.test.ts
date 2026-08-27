@@ -5,7 +5,7 @@ import { join } from 'path';
 
 import Engine from './engine.js';
 import { Logger } from './logger.js';
-import { Mcp, mcpToolName, loadMcpTools } from './mcp.js';
+import { Mcp, makeMcpToolName, loadMcpTools } from './mcp.js';
 import { splitMcpToolName } from './helpers.js';
 import { sanitizeToolName } from './helpers.js';
 
@@ -34,7 +34,7 @@ test('sanitizeToolName maps invalid characters to underscores', () => {
 });
 
 test('mcpToolName and splitMcpToolName round-trip', () => {
-  expect(mcpToolName('gloobeam', 'create_post')).toBe('gloobeam__create_post');
+  expect(makeMcpToolName('gloobeam', 'create_post')).toBe('gloobeam__create_post');
   expect(splitMcpToolName('gloobeam__create_post')).toEqual({ id: 'gloobeam', name: 'create_post' });
   // double underscore keeps single underscores intact on both sides
   expect(splitMcpToolName('my_mcp__weird_name')).toEqual({ id: 'my_mcp', name: 'weird_name' });

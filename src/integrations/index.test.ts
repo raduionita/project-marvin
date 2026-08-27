@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { listIntegrations, loadIntegration, integrationToolName, loadIntegrationTools } from './index.js';
+import { listIntegrations, loadIntegration, makeIntegrationToolName, loadIntegrationTools } from './index.js';
 import { splitIntegrationToolName } from '../helpers.js';
 import { Config, Integration, IntegrationMeta, Field } from '../types.js';
 
@@ -75,7 +75,7 @@ class MockIntegration extends Integration {
 }
 
 test('integrationToolName round-trips through splitIntegrationToolName', () => {
-  expect(integrationToolName('gloobeam', 'create_post')).toBe('gloobeam__create_post');
+  expect(makeIntegrationToolName('gloobeam', 'create_post')).toBe('gloobeam__create_post');
   expect(splitIntegrationToolName('gloobeam__create_post')).toEqual({ id: 'gloobeam', action: 'create_post' });
   expect(splitIntegrationToolName('web_search')).toBeNull();
   expect(splitIntegrationToolName('__create_post')).toBeNull();

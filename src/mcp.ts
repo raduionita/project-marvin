@@ -147,7 +147,7 @@ export class Mcp {
 }
 
 // mcp tool names follow `<mcpId>__<toolName>`
-export function mcpToolName(mcp: string, tool: string): string {
+export function makeMcpToolName(mcp: string, tool: string): string {
   return `${mcp}__${sanitizeToolName(tool)}`;
 }
 
@@ -175,7 +175,7 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
       tools.push({
         type: 'function',
         function: {
-          name: mcpToolName(id, tool.name),
+          name: makeMcpToolName(id, tool.name),
           description: tool.description || `Call "${tool.name}" on the "${id}" mcp server`,
           parameters: {
             type: 'object',
@@ -187,4 +187,16 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
     }
   }
   return tools;
+}
+
+export async function testMcp(engine: Engine, name: string, config: Config['mcps'][string]): Promise<boolean> {
+  const mcp = new Mcp(engine, engine.logger, name, config);
+  try {
+    await mcp.load();
+    return true;
+  } catch (err) {
+    return false;
+  } finally {
+    await mcp.drop();
+  }
 }

@@ -71,11 +71,8 @@ export async function loadIntegrationTools(engine: Engine, integrations: string[
   return tools;
 }
 
-// --- per-action integration tools (linked to tasks via task.integrations) ---
-
 // tool names for per-action integration tools follow `<integrationId>__<action>`
-// (double underscore, since both ids and actions may contain single underscores)
-export function integrationToolName(id: string, action: string): string {
+export function makeIntegrationToolName(id: string, action: string): string {
   return `${id}__${action}`;
 }
 
@@ -153,7 +150,7 @@ function makeActionTool(integrationId: string, integration: Integration, action:
   return {
     type: 'function',
     function: {
-      name: integrationToolName(integrationId, action),
+      name: makeIntegrationToolName(integrationId, action),
       description: `Run "${action}" on the "${integrationId}" integration: ${description}`,
       parameters: {
         type: 'object',

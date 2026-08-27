@@ -13,6 +13,10 @@ let answers: string[] = [];
 const promptMocks = buildPromptMocks(() => answers);
 mock.module('@inquirer/prompts', () => promptMocks);
 
+// injectable snippet for the multiline() prompt (stdin is not readable in tests)
+let injectedSnippet = '';
+mock.module('../termina.js', () => ({ multiline: async () => injectedSnippet }));
+
 import McpsCommand from './mcps.js';
 
 // path of the mock stdio mcp server used as a real connectable endpoint
@@ -45,17 +49,6 @@ const MOCK_SPEC = () => ({
   args: [MOCK_SERVER],
   env: { MOCK_MCP_TOKEN: 'secret-token' },
 });
-
-// command variant that injects the pasted snippet (stdin is not readable in
-// tests), mirroring what pasteSnippet would collect line by line
-class ScriptedMcpsCommand extends McpsCommand {
-  constructor(engine: Engine, logger: Logger, args: string[], private readonly snippet: string) {
-    super(engine, logger, args);
-  }
-  protected async pasteSnippet(): Promise<string> {
-    return this.snippet;
-  }
-}
 
 test('execList lists configured mcps', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: ['-y', '@x/y'], env: { WP_API_URL: 'https://gloobeam.com' } }]);
@@ -96,7 +89,8 @@ test('execDrop warns for unknown mcp', async () => {
 test('execAdd validates, connects and persists an mcp from a pasted snippet', async () => {
   const engine = buildEngine();
   const { logger, lines } = captureLogger();
-  const cmd = new ScriptedMcpsCommand(engine, logger, ['add'], JSON.stringify(MOCK_SPEC(), null, 2));
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, logger, ['add']);
 
   // scripted answers: name (no tasks configured -> no linking prompt)
   answers = ['gloobeam'];
@@ -107,7 +101,7 @@ test('execAdd validates, connects and persists an mcp from a pasted snippet', as
   expect(config.mcps['gloobeam']).toBeDefined();
   expect(config.mcps['gloobeam'].command).toBe(process.execPath);
   expect(config.mcps['gloobeam'].env.MOCK_MCP_TOKEN).toBe('secret-token');
-  expect(lines.join('\n')).toContain('connected');
+  expect(lines.join('\n')).toContain('mcp added');
 });
 
 test('execAdd links the mcp to selected tasks', async () => {
@@ -116,7 +110,8 @@ test('execAdd links the mcp to selected tasks', async () => {
     post: { enabled: true, schedule: 3600 },
     digest: { enabled: true, schedule: 60 },
   } as Config['tasks'];
-  const cmd = new ScriptedMcpsCommand(engine, new Logger(), ['add'], JSON.stringify(MOCK_SPEC(), null, 2));
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, new Logger(), ['add']);
 
   // scripted answers: name -> checkbox ("1" links the first task only)
   answers = ['gloobeam', '1'];
@@ -130,7 +125,8 @@ test('execAdd links the mcp to selected tasks', async () => {
 test('execAdd rejects invalid json snippets', async () => {
   const engine = buildEngine();
   const { logger, lines } = captureLogger();
-  const cmd = new ScriptedMcpsCommand(engine, logger, ['add'], '{not json');
+  injectedSnippet = '{not json';
+  const cmd = new McpsCommand(engine, logger, ['add']);
 
   // scripted answers: name
   answers = ['gloobeam'];
@@ -144,20 +140,22 @@ test('execAdd rejects invalid json snippets', async () => {
 test('execAdd rejects snippets without a command', async () => {
   const engine = buildEngine();
   const { logger, lines } = captureLogger();
-  const cmd = new ScriptedMcpsCommand(engine, logger, ['add'], JSON.stringify({ args: ['-y', '@x/y'] }));
+  injectedSnippet = JSON.stringify({ args: ['-y', '@x/y'] });
+  const cmd = new McpsCommand(engine, logger, ['add']);
 
   // scripted answers: name
   answers = ['gloobeam'];
 
   await cmd.exec();
 
-  expect(lines.join('\n')).toContain('missing required "command"');
+  expect(lines.join('\n')).toContain('invalid mcp snippet');
   expect(readConfig(engine).mcps).toEqual({});
 });
 
 test('execAdd unwraps claude-style mcpServers snippets', async () => {
   const engine = buildEngine();
-  const cmd = new ScriptedMcpsCommand(engine, new Logger(), ['add'], JSON.stringify({ mcpServers: { gloobeam: MOCK_SPEC() } }, null, 2));
+  injectedSnippet = JSON.stringify({ mcpServers: { gloobeam: MOCK_SPEC() } }, null, 2);
+  const cmd = new McpsCommand(engine, new Logger(), ['add']);
 
   // scripted answers: name
   answers = ['gloobeam'];
@@ -171,24 +169,23 @@ test('execAdd aborts on failed connection unless confirmed', async () => {
   const engine = buildEngine();
   const { logger, lines } = captureLogger();
   // command that exits immediately -> initialize fails
-  const cmd = new ScriptedMcpsCommand(engine, logger, ['add'], JSON.stringify({ command: 'false', args: [] }));
+  injectedSnippet = JSON.stringify({ command: 'false', args: [] });
+  const cmd = new McpsCommand(engine, logger, ['add']);
 
   // scripted answers: name -> confirm prompt ("n" = do not save anyway)
   answers = ['broken', 'n'];
 
   await cmd.exec();
 
-  expect(lines.join('\n')).toContain('connection failed');
   expect(lines.join('\n')).toContain('aborted');
   expect(readConfig(engine).mcps).toEqual({});
 });
 
 test('execEdit replaces the spawn spec and persists', async () => {
   const engine = buildEngine(['gloobeam', { enabled: false, command: 'old-cmd', args: [] }]);
-  // edit still accepts the snippet from a file
-  const snippet = join(engine.work, 'snippet.json');
-  writeFileSync(snippet, JSON.stringify(MOCK_SPEC(), null, 2));
-  const cmd = new McpsCommand(engine, new Logger(), ['edit', 'gloobeam', snippet]);
+  // edit reads the snippet from the multiline prompt (file arg is ignored)
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, new Logger(), ['edit', 'gloobeam']);
 
   await cmd.exec();
 

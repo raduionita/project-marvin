@@ -1,5 +1,7 @@
 import { createInterface } from 'readline/promises';
 
+export { checkbox, confirm, input, select, rawlist, password } from '@inquirer/prompts';
+
 // 'Paste the mcp json snippet (end with an empty line)
 export async function multiline(text: string): Promise<string> {
   const rl = createInterface({ input: process.stdin });
