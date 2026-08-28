@@ -63,6 +63,10 @@ export default class LogsCommand extends Command {
     }
 
     const follow = this.args.includes('-f') || this.args.includes('--follow');
+    if (follow) {
+      this.logger.warn('following', lpath, '(ctrl+c to stop)');
+    }
+
     const lines = this.parseLines();
 
     // print the last `lines` lines of the file
@@ -76,7 +80,6 @@ export default class LogsCommand extends Command {
     }
 
     // follow mode: stream newly appended lines, one poll per second
-    this.logger.error('[LogsCommand.execLog]', 'following', lpath, '(ctrl+c to stop)');
     let offset = statSync(lpath).size;
     while (true) {
       await delay(1000);

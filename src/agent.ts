@@ -239,6 +239,7 @@ export class Agent {
       let reply: Reply;
       let steps = -1;
       let ended = false;
+      let tokens = 0;
       do {
         steps++;
 
@@ -247,6 +248,7 @@ export class Agent {
 
         // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
         reply = await this.model.execChat(chat);
+        tokens += reply.usage.completion + reply.usage.prompt;
 
         // persist assistant reply to chat history
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
@@ -287,7 +289,7 @@ export class Agent {
       // save chat to cache
       this.saveChat(chatId, chat);
 
-      return { content: (reply?.message?.content || '').trim(), steps: steps };
+      return { content: (reply?.message?.content || '').trim(), steps: steps, tokens: tokens };
     } catch (error) {
       this.logger.error('[Agent.sendChat]', error);
       return { content: '', steps: 0, error: (error as Error).message };

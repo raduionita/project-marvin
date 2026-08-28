@@ -463,7 +463,7 @@ test('sendMessage() always sends the LLM markdown in a markdown block', async ()
   await channel.sendMessage({ role: 'assistant', content: '## Header\n\nParagraph', group: 'C123' });
 
   const call = channel.mockWeb.postMessageCalls[0]!;
-  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }, { type: 'divider' }, { type: 'markdown', text: '**Agent**: `(none)`\n**Model**: `(none)`\n**Channel**: `C123`\n**Thread**: `(none)`\n' }]);
+  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }, { type: 'divider' }, { type: 'markdown', text: '**Agent**: `(none)`\n**Model**: `(none)`\n**Channel**: `C123`\n**Thread**: `(none)`\n**Tokens**: `(none)`\n' }]);
   expect(call.text).toBeUndefined();
 });
 

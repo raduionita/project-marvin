@@ -69,14 +69,13 @@ export default class WebFetchTool extends Tool {
     // use fetch to fetch the page
     const response = await fetch(args.url);
     const html = await response.text();
-
     
     // extract the relevant content
-    const body = html.substring(html.search(/\<body.+\>/) + 6, html.search(/\<\/body\>/i))
+    // const body = html.substring(html.search(/\<body.+\>/) + 6, html.search(/\<\/body\>/i))
     // const title = html.substring(html.indexOf('<title>') + 7, html.indexOf('</title>'));
 
     return { 
-      result: this.turndown.turndown(body).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8),
+      result: this.turndown.turndown(html).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8),
     };
   }
 }

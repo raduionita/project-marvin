@@ -190,7 +190,8 @@ export default class SlackChannel extends Channel {
           text: '**Agent**: `'   + (message.agent  || '(none)') + '`\n' +
                 '**Model**: `'   + (message.model  || '(none)') + '`\n' +
                 '**Channel**: `' + (message.group  || '(none)') + '`\n' +
-                '**Thread**: `'  + (message.thread || '(none)') + '`\n'
+                '**Thread**: `'  + (message.thread || '(none)') + '`\n' + 
+                '**Tokens**: `'  + (message.tokens || '(none)') + '`\n'
         },
       ]});
 
@@ -268,7 +269,7 @@ export default class SlackChannel extends Channel {
       }
 
       // reply to user // send the result to the user
-      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId });
+      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, tokens: result.tokens });
       if (!res.ok) {
         this.logger.warn('[SlackChannel.onMention]', 'failed to post reply:', res.error, res.message);
       }
@@ -307,7 +308,7 @@ export default class SlackChannel extends Channel {
         result.content = `(AI loop error: ${result.error})`;
       }
 
-      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId });
+      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, tokens: result.tokens });
       if (!res.ok) {
         this.logger.warn('[SlackChannel.onDirectMessage]', 'failed to post reply:', res.error, res.message);
       }

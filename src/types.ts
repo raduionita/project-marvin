@@ -289,6 +289,7 @@ export interface Message {
   // agent
   agent?: string;
   model?: string;
+  tokens?: number;
 }
 
 // LLM Model sendChat reply
@@ -313,4 +314,5 @@ export interface Result {
   content: string;
   steps: number;
   error?: string;
+  tokens?: number;
 }
