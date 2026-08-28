@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Engine from '../engine.js';
@@ -9,6 +9,7 @@ import MoveFileTool from './move_file.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
+  mkdirSync(join(home, 'files'), { recursive: true });
   const engine = new Engine(new Logger());
   engine.work = home;
   return { engine, home };
@@ -29,12 +30,12 @@ test('deleteFile tool metadata', () => {
 test('deleteFile deletes a file inside the workspace', async () => {
   const { engine, home } = mockEngine();
   const tool = new DeleteFileTool(engine, new Logger());
-  writeFileSync(join(home, 'notes.txt'), 'hello');
+  writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt' });
 
   expect(result.ok).toBe(true);
-  expect(existsSync(join(home, 'notes.txt'))).toBe(false);
+  expect(existsSync(join(home, 'files', 'notes.txt'))).toBe(false);
   cleanup(home);
 });
 
@@ -92,38 +93,38 @@ test('moveFile tool metadata', () => {
 test('moveFile renames a file inside the workspace', async () => {
   const { engine, home } = mockEngine();
   const tool = new MoveFileTool(engine, new Logger());
-  writeFileSync(join(home, 'notes.txt'), 'hello');
+  writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt', newPath: 'renamed.txt' });
 
   expect(result.ok).toBe(true);
-  expect(existsSync(join(home, 'notes.txt'))).toBe(false);
-  expect(existsSync(join(home, 'renamed.txt'))).toBe(true);
+  expect(existsSync(join(home, 'files', 'notes.txt'))).toBe(false);
+  expect(existsSync(join(home, 'files', 'renamed.txt'))).toBe(true);
   cleanup(home);
 });
 
 test('moveFile moves a file into a subfolder', async () => {
   const { engine, home } = mockEngine();
   const tool = new MoveFileTool(engine, new Logger());
-  writeFileSync(join(home, 'notes.txt'), 'hello');
+  writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt', newPath: 'archive/notes.txt' });
 
   expect(result.ok).toBe(true);
-  expect(existsSync(join(home, 'archive', 'notes.txt'))).toBe(true);
+  expect(existsSync(join(home, 'files', 'archive', 'notes.txt'))).toBe(true);
   cleanup(home);
 });
 
 test('moveFile rejects a destination outside the workspace', async () => {
   const { engine, home } = mockEngine();
   const tool = new MoveFileTool(engine, new Logger());
-  writeFileSync(join(home, 'notes.txt'), 'hello');
+  writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt', newPath: '/etc/notes.txt' });
 
   expect(result.ok).toBeUndefined();
   expect(result.error).toContain('outside the workspace');
-  expect(existsSync(join(home, 'notes.txt'))).toBe(true);
+  expect(existsSync(join(home, 'files', 'notes.txt'))).toBe(true);
   cleanup(home);
 });
 

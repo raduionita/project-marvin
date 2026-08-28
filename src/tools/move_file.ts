@@ -45,8 +45,8 @@ export default class MoveFileTool extends Tool {
       return { error: `move_file: newPath "${args.newPath}" is outside the workspace (~/.marvin/files)` };
     }
 
-    const path = safeJoin(this.engine.work, args.path);
-    const newPath = safeJoin(this.engine.work, args.newPath);
+    const path = safeJoin(this.engine.work, 'files', args.path);
+    const newPath = safeJoin(this.engine.work, 'files', args.newPath);
 
     try {
       mkdirSync(dirname(newPath), { recursive: true });

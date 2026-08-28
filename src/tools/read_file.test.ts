@@ -8,6 +8,7 @@ import ReadFileTool from './read_file.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
+  mkdirSync(join(home, 'files'), { recursive: true });
   const engine = new Engine(new Logger());
   engine.work = home;
   return { engine, home };
@@ -18,7 +19,8 @@ function cleanup(home: string) {
 }
 
 function mockFile(home: string, name: string, contents: string): string {
-  const path = join(home, name);
+  const path = join(home, 'files', name);
+  mkdirSync(join(home, 'files', name.split('/').slice(0, -1).join('/')), { recursive: true });
   writeFileSync(path, contents);
   return path;
 }

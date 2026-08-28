@@ -8,6 +8,7 @@ import ListFilesTool from './list_files.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
+  mkdirSync(join(home, 'files'), { recursive: true });
   const engine = new Engine(new Logger());
   engine.work = home;
   return { engine, home };
@@ -28,9 +29,9 @@ test('listFiles tool metadata', () => {
 test('listFiles lists the workspace root by default', async () => {
   const { engine, home } = mockEngine();
   const tool = new ListFilesTool(engine, new Logger());
-  mkdirSync(join(home, 'agents'));
-  writeFileSync(join(home, 'notes.txt'), 'hello');
-  writeFileSync(join(home, 'marvin.json'), '{}');
+  mkdirSync(join(home, 'files', 'agents'));
+  writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
+  writeFileSync(join(home, 'files', 'marvin.json'), '{}');
 
   const result = await tool.call({});
 
@@ -47,8 +48,8 @@ test('listFiles lists the workspace root by default', async () => {
 test('listFiles lists a subdirectory via relative path', async () => {
   const { engine, home } = mockEngine();
   const tool = new ListFilesTool(engine, new Logger());
-  mkdirSync(join(home, 'agents', 'agent-1'), { recursive: true });
-  writeFileSync(join(home, 'agents', 'agent-1', 'IDENTITY.md'), 'id');
+  mkdirSync(join(home, 'files', 'agents', 'agent-1'), { recursive: true });
+  writeFileSync(join(home, 'files', 'agents', 'agent-1', 'IDENTITY.md'), 'id');
 
   const result = await tool.call({ path: 'agents/agent-1' });
 
@@ -62,7 +63,7 @@ test('listFiles lists a subdirectory via relative path', async () => {
 test('listFiles reports file sizes', async () => {
   const { engine, home } = mockEngine();
   const tool = new ListFilesTool(engine, new Logger());
-  writeFileSync(join(home, 'notes.txt'), 'hello world');
+  writeFileSync(join(home, 'files', 'notes.txt'), 'hello world');
 
   const result = await tool.call({});
 
@@ -75,9 +76,9 @@ test('listFiles reports file sizes', async () => {
 test('listFiles filters entries by pattern', async () => {
   const { engine, home } = mockEngine();
   const tool = new ListFilesTool(engine, new Logger());
-  writeFileSync(join(home, 'notes.txt'), 'a');
-  writeFileSync(join(home, 'ideas.md'), 'b');
-  writeFileSync(join(home, 'config.json'), 'c');
+  writeFileSync(join(home, 'files', 'notes.txt'), 'a');
+  writeFileSync(join(home, 'files', 'ideas.md'), 'b');
+  writeFileSync(join(home, 'files', 'config.json'), 'c');
 
   const result = await tool.call({ pattern: '\\.(txt|md)$' });
 

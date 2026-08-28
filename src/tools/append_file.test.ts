@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Engine from '../engine.js';
@@ -8,6 +8,7 @@ import AppendFileTool from './append_file.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
+  mkdirSync(join(home, 'files'), { recursive: true });
   const engine = new Engine(new Logger());
   engine.work = home;
   return { engine, home };
@@ -29,12 +30,12 @@ test('appendFile tool metadata', () => {
 test('appendFile appends to an existing file', async () => {
   const { engine, home } = mockEngine();
   const tool = new AppendFileTool(engine, new Logger());
-  writeFileSync(join(home, 'notes.txt'), 'line one\n');
+  writeFileSync(join(home, 'files', 'notes.txt'), 'line one\n');
 
   const result = await tool.call({ path: 'notes.txt', content: 'line two\n' });
 
   expect(result.ok).toBe(true);
-  expect(readFileSync(join(home, 'notes.txt'), 'utf-8')).toBe('line one\nline two\n');
+  expect(readFileSync(join(home, 'files', 'notes.txt'), 'utf-8')).toBe('line one\nline two\n');
   cleanup(home);
 });
 
@@ -45,7 +46,7 @@ test('appendFile creates a new file when it does not exist', async () => {
   const result = await tool.call({ path: 'created.txt', content: 'hello' });
 
   expect(result.ok).toBe(true);
-  expect(readFileSync(join(home, 'created.txt'), 'utf-8')).toBe('hello');
+  expect(readFileSync(join(home, 'files', 'created.txt'), 'utf-8')).toBe('hello');
   cleanup(home);
 });
 
@@ -56,7 +57,7 @@ test('appendFile creates parent folders when missing', async () => {
   const result = await tool.call({ path: 'journal/2026/aug.txt', content: 'entry' });
 
   expect(result.ok).toBe(true);
-  expect(readFileSync(join(home, 'journal', '2026', 'aug.txt'), 'utf-8')).toBe('entry');
+  expect(readFileSync(join(home, 'files', 'journal', '2026', 'aug.txt'), 'utf-8')).toBe('entry');
   cleanup(home);
 });
 

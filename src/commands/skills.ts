@@ -53,8 +53,8 @@ export default class SkillsCommand extends Command {
     this.logger.info('skills:');
     if (files.length === 0) this.logger.info('  (none)');
     for (const file of files) {
-      const id = file.replace(/\.md$/i, '').toLowerCase();
-      const skill = this.engine.skills[id];
+      const id = file.replace(/\.md$/i, '');
+      const skill = this.engine.skills[id] ?? this.engine.skills[id.toLowerCase()];
       this.logger.info(`  ${id}${skill ? ` (${skill.source})` : ''}`);
       if (skill?.description) this.logger.info('  -', skill.description);
     }
@@ -175,40 +175,55 @@ export default class SkillsCommand extends Command {
     // ask the necessary info for the skill (tool skills get a name + purpose/change, others a task)
     let toolName = '';
     let info = '';
-    const isToolCreate = skilId === 'tools-create';
-    const isToolEdit = skilId === 'tools-edit';
-    if (isToolCreate || isToolEdit) {
-      toolName = this.args[2] || await input({ message: 'Tool name (e.g. web_search):', required: true });
-      // replace non-alphanumeric characters with underscores
-      toolName = toolName.replace(/[^a-zA-Z0-9_]/g, '_');
-      toolName = toolName.replace(/_+/g, '_');
-      toolName = toolName.toLowerCase();
-      if (!toolName) {
-        this.logger.error('[SkillsCommand.execUse]', 'invalid tool name (use a-z, 0-9, _):', toolName);
-        return;
-      }
-      if (isToolCreate) {
-        info = await input({ message: 'What should the tool do?', required: true });
-      } else {
-        // editing an existing tool: read the current code so we can send it to the LLM
-        const tpath = join(this.engine.work, 'tools', `${toolName}.ts`);
-        if (!existsSync(tpath)) {
-          this.logger.error('[SkillsCommand.execUse]', 'tool does not exist in ~/.marvin/tools:', toolName);
+    switch (skilId.toLowerCase()) {
+      case 'tools-create': {
+        toolName = this.args[2] || await input({ message: 'Tool name (e.g. web_search):', required: true });
+        toolName = toolName.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').toLowerCase();
+        if (!toolName) {
+          this.logger.error('[SkillsCommand.execUse]', 'invalid tool name (use a-z, 0-9, _):', toolName);
           return;
         }
+        info = await input({ message: 'What should the tool do?', required: true });
+        if (!info) {
+          this.logger.error('[SkillsCommand.execUse]', 'no tool description provided, exiting');
+          return;
+        }
+        break;
+      }
+      case 'tools-edit': {
+        toolName = this.args[2] || await input({ message: 'Tool name (e.g. web_search):', required: true });
+        toolName = toolName.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').toLowerCase();
+        if (!toolName) {
+          this.logger.error('[SkillsCommand.execUse]', 'invalid tool name (use a-z, 0-9, _):', toolName);
+          return;
+        }
+        {
+          const tpath = join(this.engine.work, 'tools', `${toolName}.ts`);
+          if (!existsSync(tpath)) {
+            this.logger.error('[SkillsCommand.execUse]', 'tool does not exist in ~/.marvin/tools:', toolName);
+            return;
+          }
+        }
         info = await input({ message: 'What should change about the tool?', required: true });
+        if (!info) {
+          this.logger.error('[SkillsCommand.execUse]', 'no tool description provided, exiting');
+          return;
+        }
+        break;
       }
-      if (!info) {
-        this.logger.error('[SkillsCommand.execUse]', 'no tool description provided, exiting');
-        return;
-      }
-    } else {
-      info = await input({ message: 'Describe what you want to do with this skill:', required: true });
-      if (!info) {
-        this.logger.error('[SkillsCommand.execUse]', 'no task provided, exiting');
-        return;
+      default: {
+        info = await input({ message: 'Describe what you want to do with this skill:', required: true });
+        if (!info) {
+          this.logger.error('[SkillsCommand.execUse]', 'no task provided, exiting');
+          return;
+        }
+        break;
       }
     }
+
+    const normalizedSkillId = skilId.toLowerCase();
+    const isToolCreate = normalizedSkillId === 'tools-create';
+    const isToolEdit = normalizedSkillId === 'tools-edit';
 
     const currentCode = isToolEdit
       ? readFileSync(join(this.engine.work, 'tools', `${toolName}.ts`), 'utf8')
@@ -228,7 +243,8 @@ export default class SkillsCommand extends Command {
     if (this.engine.isDry) {
       this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
     } else {
-      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt);
+      const agent = this.engine.agents[this.engine.config.settings.name]!;
+      const result = await agent.sendChat(undefined, prompt);
       if (result.error || !result.content) {
         this.logger.error('[SkillsCommand.execUse]', 'no result from the LLM');
         return;
