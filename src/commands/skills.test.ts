@@ -121,30 +121,30 @@ test('skills list prints default and custom skills', async () => {
 
   const out = lines.join('\n');
   expect(out).toContain('skills:');
-  expect(out).toContain('tools-create (default)');
-  expect(out).toContain('tools-edit (default)');
+  expect(out).toContain('TOOLS-CREATE (default)');
+  expect(out).toContain('TOOLS-EDIT (default)');
   expect(out).toContain('my-skill (custom)');
 });
 
-// register the "tools-create" skill (the one used by `skills use`) like the meta skill
+// register the "TOOLS-CREATE" skill (the one used by `skills use`) like the meta skill
 function addToolsSkill(engine: Engine): Skill {
   const toolsSkill: Skill = {
-    id: 'tools-create',
+    id: 'TOOLS-CREATE',
     title: 'Create a Tool',
     description: 'Creates tools',
     file: join(engine.work, 'skills', '__tools__.md'),
     source: 'default',
   };
   writeFileSync(toolsSkill.file, '# Create a Tool\n\nYou are creating a new Marvin tool.');
-  engine.skills['tools-create'] = toolsSkill;
+  engine.skills['TOOLS-CREATE'] = toolsSkill;
   return toolsSkill;
 }
 
-test('skills use runs the tools-create skill and saves the generated tool', async () => {
+test('skills use runs the TOOLS-CREATE skill and saves the generated tool', async () => {
   const engine = mockEngine();
   addToolsSkill(engine);
   const { logger, lines } = captureLogger();
-  const cmd = new SkillsCommand(engine, logger, ['use', 'tools-create', 'web_fetch']);
+  const cmd = new SkillsCommand(engine, logger, ['use', 'TOOLS-CREATE', 'web_fetch']);
   answers = ['fetch a URL and return the text'];
 
   // stub the LLM call to return generated tool source
@@ -158,9 +158,9 @@ test('skills use runs the tools-create skill and saves the generated tool', asyn
   // the MARVIN_ROOT placeholder is resolved before writing
   expect(readFileSync(tpath, 'utf8')).toContain(engine.root);
   expect(readFileSync(tpath, 'utf8')).not.toContain('{MARVIN_ROOT}');
-  expect(engine.skills['tools-create']).toBeDefined();
+  expect(engine.skills['TOOLS-CREATE']).toBeDefined();
   expect(lines.join('\n')).toContain('tool "web_fetch" created');
-  expect(lines.join('\n')).toContain('used skill "tools-create"');
+  expect(lines.join('\n')).toContain('used skill "TOOLS-CREATE"');
 });
 
 test('skills use prompts for the skill and info when missing', async () => {
@@ -168,7 +168,7 @@ test('skills use prompts for the skill and info when missing', async () => {
   addToolsSkill(engine);
   const cmd = new SkillsCommand(engine, new Logger(), ['use']);
   // answers: skill pick, tool name, tool purpose
-  answers = ['tools-create', 'my_tool', 'does something'];
+  answers = ['TOOLS-CREATE', 'my_tool', 'does something'];
 
   engine.agents['marvin']!.sendChat = async () => ({ content: 'export default class MyTool extends Tool { /* ... */ }', steps: 1 });
 

@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, readError, safeJoin } from '../helpers.js';
-import { join } from 'path';
+import { dirname, join } from 'path';
 
 export default class EditFileTool extends Tool {
   public meta: ToolMeta = {
@@ -45,26 +45,25 @@ export default class EditFileTool extends Tool {
       return { error: `edit_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
-    let path = safeJoin(this.engine.work, args.path);
-        // remove ~/.marvin/files from the path, to extract relative path `/path/to/file`
-        path = path.slice(path.indexOf(this.engine.config.settings.name) + this.engine.config.settings.name.length + 1).replace('files', '')
-        // ~/.marvin + files + /path/to/file
-        path = join(this.engine.work, 'files', path);
-
-        // !todo make sure the folder exists
+    let path = safeJoin(this.engine.work, 'files', args.path);
 
     try {
       let content = args.newString;
 
-      // snippet replace mode
+      // is replace?
       if (args.oldString !== undefined) {
+        if (!existsSync(path)) {
+          return { path: args.path, error: 'edit_file: file not found' };
+        }
         const current = readFileSync(path, 'utf-8');
         if (!current.includes(args.oldString)) {
           return { path: args.path, error: 'edit_file: oldString not found in file' };
         }
-        content = current.split(args.oldString).join(args.newString);
+        content = current.replaceAll(args.oldString, args.newString);
       }
 
+      // else write new
+      mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, content, 'utf-8');
 
       return { path: path, ok: true };

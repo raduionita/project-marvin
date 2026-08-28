@@ -8,13 +8,13 @@ export default class ListFilesTool extends Tool {
     type: 'function',
     function: {
       name: 'list_files',
-      description: 'List the files and folders inside a directory of the ~/.marvin workspace. Omit "path" to list the workspace root, or pass a relative path. Optionally filter entries by a regex "pattern" matched against the entry name',
+      description: 'List the files and folders inside a directory of the `~/.marvin/files` folder. Omit "path" to list the workspace root, or pass a relative path. Optionally filter entries by a regex "pattern" matched against the entry name',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Relative path of the directory to list (must be inside ~/.marvin). Omit for the workspace root',
+            description: 'Relative path of the directory to list (must be inside ~/.marvin/files). Omit for the workspace root',
           },
           pattern: {
             type: 'string',
@@ -30,10 +30,10 @@ export default class ListFilesTool extends Tool {
     this.logger.debug('[ListFilesTool.call]', Object.keys(args));
 
     if (!isSafePath(args?.path || '.')) {
-      return { error: `list_files: path "${args?.path || '.'}" is outside the workspace (~/.marvin)` };
+      return { error: `list_files: path "${args?.path || '.'}" is outside the workspace (~/.marvin/files)` };
     }
 
-    const dir = safeJoin(this.engine.work, args?.path || '.');
+    const dir = safeJoin(this.engine.work, 'files', args?.path || '.');
 
     let regex: RegExp | null = null;
     if (args?.pattern) {

@@ -265,10 +265,10 @@ test('execSkills loads default skills shipped with marvin', async () => {
 
   await engine.loadSkills();
 
-  expect(engine.skills['skills-create']).toBeDefined();
-  expect(engine.skills['tools-create']).toBeDefined();
-  expect(engine.skills['tools-edit']).toBeDefined();
-  expect(engine.skills['skills-create']!.source).toBe('default');
+  expect(engine.skills['SKILLS-CREATE']).toBeDefined();
+  expect(engine.skills['TOOLS-CREATE']).toBeDefined();
+  expect(engine.skills['TOOLS-EDIT']).toBeDefined();
+  expect(engine.skills['SKILLS-CREATE']!.source).toBe('default');
 });
 
 test('execSkills loads custom skills from the workspace', async () => {
@@ -282,7 +282,7 @@ test('execSkills loads custom skills from the workspace', async () => {
 
   expect(engine.skills['my-skill']).toBeDefined();
   expect(engine.skills['my-skill']!.source).toBe('custom');
-  expect(engine.skills['skills-create']).toBeDefined();
+  expect(engine.skills['SKILLS-CREATE']).toBeDefined();
 });
 
 test('custom skills override default skills with the same id', async () => {
@@ -290,12 +290,12 @@ test('custom skills override default skills with the same id', async () => {
   engine.config = mockConfig();
   engine.work = join(tmpdir(), 'marvin-skills-' + Date.now());
   mkdirSync(join(engine.work, 'skills'), { recursive: true });
-  writeFileSync(join(engine.work, 'skills', 'tools-create.md'), '# Custom Tools\n\nOverrides the default.');
+  writeFileSync(join(engine.work, 'skills', 'TOOLS-CREATE.md'), '# Custom Tools\n\nOverrides the default.');
 
   await engine.loadSkills();
 
-  expect(engine.skills['tools-create']!.source).toBe('custom');
-  expect(engine.skills['tools-create']!.title).toBe('Custom Tools');
+  expect(engine.skills['TOOLS-CREATE']!.source).toBe('custom');
+  expect(engine.skills['TOOLS-CREATE']!.title).toBe('Custom Tools');
 });
 
 test('dropSkills clears all skills', async () => {

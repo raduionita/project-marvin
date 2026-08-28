@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Tool, ToolMeta } from '../types.js';
+import { safeJoin } from '../helpers.js';
 
 const DEFAULT_LINES = 20;
 
@@ -32,7 +33,7 @@ export default class ReadLogsTool extends Tool {
 
     const file = args?.file || 'marvin.log';
     const lines = Math.min(Math.max(args?.lines || DEFAULT_LINES, 1), 200);
-    const logPath = join(this.engine.work, 'logs', file);
+    const logPath = safeJoin(this.engine.work, 'logs', file);
 
     try {
       const content = readFileSync(logPath, 'utf-8');

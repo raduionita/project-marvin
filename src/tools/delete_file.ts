@@ -32,7 +32,7 @@ export default class DeleteFileTool extends Tool {
       return { error: `delete_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
-    const path = safeJoin(this.engine.work, args.path);
+    const path = safeJoin(this.engine.work, 'files',  args.path);
 
     try {
       unlinkSync(path);

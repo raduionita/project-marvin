@@ -1,24 +1,26 @@
 import { test, expect } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import EditFileTool from './edit_file.js';
 
-function mockEngine(): { engine: Engine; home: string } {
-  const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
+function mockEngine(): { engine: Engine; work: string, files: string } {
+  const work = mkdtempSync(join(tmpdir(), 'marvin-home-'));
+  const files = join(work, 'files');
+  mkdirSync(files);
   const engine = new Engine(new Logger());
-  engine.work = home;
-  return { engine, home };
+  engine.work = work;
+  return { engine, work, files };
 }
 
 function cleanup(home: string) {
   rmSync(home, { recursive: true, force: true });
 }
 
-function mockFile(home: string, name: string, contents: string): string {
-  const path = join(home, name);
+function mockFile(work: string, name: string, contents: string): string {
+  const path = join(work, name);
   writeFileSync(path, contents);
   return path;
 }
@@ -33,65 +35,65 @@ test('editFile tool metadata', () => {
 });
 
 test('editFile replaces a snippet with oldString/newString', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work, files } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
-  mockFile(home, 'notes.txt', 'hello world');
+  mockFile(files, 'notes.txt', 'hello world');
 
   const result = await tool.call({ path: 'notes.txt', oldString: 'world', newString: 'there' });
 
   expect(result.ok).toBe(true);
-  expect(readFileSync(join(home, 'notes.txt'), 'utf-8')).toBe('hello there');
-  cleanup(home);
+  expect(readFileSync(join(files, 'notes.txt'), 'utf-8')).toBe('hello there');
+  cleanup(work);
 });
 
 test('editFile replaces all occurrences of oldString', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work, files } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
-  mockFile(home, 'notes.txt', 'red blue red blue');
+  mockFile(files, 'notes.txt', 'red blue red blue');
 
   await tool.call({ path: 'notes.txt', oldString: 'red', newString: 'green' });
 
-  expect(readFileSync(join(home, 'notes.txt'), 'utf-8')).toBe('green blue green blue');
-  cleanup(home);
+  expect(readFileSync(join(files, 'notes.txt'), 'utf-8')).toBe('green blue green blue');
+  cleanup(work);
 });
 
 test('editFile reports when oldString is not found', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work, files } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
-  mockFile(home, 'notes.txt', 'hello world');
+  mockFile(files, 'notes.txt', 'hello world');
 
   const result = await tool.call({ path: 'notes.txt', oldString: 'nope', newString: 'there' });
 
   expect(result.ok).toBeUndefined();
   expect(result.error).toContain('oldString not found');
-  expect(readFileSync(join(home, 'notes.txt'), 'utf-8')).toBe('hello world');
-  cleanup(home);
+  expect(readFileSync(join(files, 'notes.txt'), 'utf-8')).toBe('hello world');
+  cleanup(work);
 });
 
 test('editFile creates a new file when only newString is provided', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work, files } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
 
   const result = await tool.call({ path: 'created.txt', newString: 'brand new file' });
 
   expect(result.ok).toBe(true);
-  expect(readFileSync(join(home, 'created.txt'), 'utf-8')).toBe('brand new file');
-  cleanup(home);
+  expect(readFileSync(join(files, 'created.txt'), 'utf-8')).toBe('brand new file');
+  cleanup(work);
 });
 
 test('editFile overwrites the whole file when oldString is omitted', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work, files } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
-  mockFile(home, 'notes.txt', 'old content');
+  mockFile(files, 'notes.txt', 'old content');
 
   await tool.call({ path: 'notes.txt', newString: 'new content' });
 
-  expect(readFileSync(join(home, 'notes.txt'), 'utf-8')).toBe('new content');
-  cleanup(home);
+  expect(readFileSync(join(files, 'notes.txt'), 'utf-8')).toBe('new content');
+  cleanup(work);
 });
 
 test('editFile rejects absolute paths outside the workspace', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
   const outside = join(tmpdir(), 'marvin-outside-' + Date.now() + '.txt');
 
@@ -99,36 +101,36 @@ test('editFile rejects absolute paths outside the workspace', async () => {
 
   expect(result.ok).toBeUndefined();
   expect(result.error).toContain('outside the workspace');
-  cleanup(home);
+  cleanup(work);
 });
 
 test('editFile rejects paths that escape via ..', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
 
-  const result = await tool.call({ path: join(home, '..', 'escaped.txt'), newString: 'nope' });
+  const result = await tool.call({ path: join(work, '..', 'escaped.txt'), newString: 'nope' });
 
   expect(result.ok).toBeUndefined();
   expect(result.error).toContain('outside the workspace');
-  cleanup(home);
+  cleanup(work);
 });
 
 test('editFile returns an error when no path is provided', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
 
   const result = await tool.call({ path: '', newString: 'nope' });
 
   expect(result.error).toBe('edit_file: no path provided');
-  cleanup(home);
+  cleanup(work);
 });
 
 test('editFile returns an error when no newString is provided', async () => {
-  const { engine, home } = mockEngine();
+  const { engine, work } = mockEngine();
   const tool = new EditFileTool(engine, new Logger());
 
   const result = await tool.call({ path: 'x.txt' } as { path: string; newString?: string; oldString?: string });
 
   expect(result.error).toBe('edit_file: no newString provided');
-  cleanup(home);
+  cleanup(work);
 });

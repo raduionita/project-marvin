@@ -93,12 +93,12 @@ export default class SkillsCommand extends Command {
       return;
     }
 
-    // load the skills-create skill that teaches how to create skills
+    // load the SKILLS-CREATE skill that teaches how to create skills
     let instructions: string;
     try {
-      instructions = readSkill(loadSkill(this.engine, 'skills-create'));
+      instructions = readSkill(loadSkill(this.engine, 'SKILLS-CREATE'));
     } catch {
-      this.logger.error('[SkillsCommand.execAdd]', 'the "skills-create" skill was not found, cannot create skills');
+      this.logger.error('[SkillsCommand.execAdd]', 'the "SKILLS-CREATE" skill was not found, cannot create skills');
       return;
     }
 
@@ -147,38 +147,36 @@ export default class SkillsCommand extends Command {
     // ensure skills are loaded (defaults + custom) so we can pick from them
     await this.engine.load();
 
-    const ids = [...new Set(listSkills(this.engine).map(f => f.replace(/\.md$/i, '').toLowerCase()))];
+    const skills = listSkills(this.engine);
 
     // pick a skill (positional arg or prompt)
-    let id = (this.args[1] || '').toLowerCase();
-    if (!id) {
-      id = await select({
-        message: 'Pick a skill:',
-        choices: ids.map(sid => ({
-          name: sid,
-          value: sid,
-          description: this.engine.skills[sid]?.description,
-        })),
-      });
-      if (!id) {
-        this.logger.error('[SkillsCommand.execUse]', 'no skill selected, exiting');
-        return;
-      }
+    let skilId = this.args[1] || await select({
+      message: 'Pick a skill:',
+      choices: skills.map(sid => ({
+        name: sid,
+        value: sid,
+        description: this.engine.skills[sid]?.description,
+      })),
+    });
+    if (!skilId) {
+      this.logger.error('[SkillsCommand.execUse]', 'no skill selected, exiting');
+      return;
     }
+    
 
     let instructions: string;
     try {
-      instructions = readSkill(loadSkill(this.engine, id));
+      instructions = readSkill(loadSkill(this.engine, skilId));
     } catch {
-      this.logger.error('[SkillsCommand.execUse]', 'unknown skill:', id);
+      this.logger.error('[SkillsCommand.execUse]', 'unknown skill:', skilId);
       return;
     }
 
     // ask the necessary info for the skill (tool skills get a name + purpose/change, others a task)
     let toolName = '';
     let info = '';
-    const isToolCreate = id === 'tools-create';
-    const isToolEdit = id === 'tools-edit';
+    const isToolCreate = skilId === 'tools-create';
+    const isToolEdit = skilId === 'tools-edit';
     if (isToolCreate || isToolEdit) {
       toolName = this.args[2] || await input({ message: 'Tool name (e.g. web_search):', required: true });
       // replace non-alphanumeric characters with underscores
@@ -253,7 +251,7 @@ export default class SkillsCommand extends Command {
     }
 
     this.logger.info('');
-    this.logger.info(`used skill "${id}":`);
+    this.logger.info(`used skill "${skilId}":`);
     this.logger.info(output || '(dry run, no output produced)');
   }
 }

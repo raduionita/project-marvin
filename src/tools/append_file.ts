@@ -41,7 +41,7 @@ export default class AppendFileTool extends Tool {
       return { error: `append_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
-    const path = safeJoin(this.engine.work, args.path);
+    const path = safeJoin(this.engine.work, 'files',  args.path);
 
     try {
       mkdirSync(dirname(path), { recursive: true });

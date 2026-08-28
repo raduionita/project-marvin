@@ -7,13 +7,13 @@ export default class ReadFileTool extends Tool {
     type: 'function',
     function: {
       name: 'read_file',
-      description: 'Read the contents of a file from disk (only inside the ~/.marvin workspace)',
+      description: 'Read the contents of a file from disk (only inside the `~/.marvin/files` folder)',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Path to the file to read (must be inside ~/.marvin)',
+            description: 'Path to the file to read (must be inside ~/.marvin/files)',
           },
         },
         required: ['path'],
@@ -29,10 +29,10 @@ export default class ReadFileTool extends Tool {
     }
 
     if (!isSafePath(args.path)) {
-      return { error: `read_file: path "${args.path}" is outside the workspace (~/.marvin)` };
+      return { error: `read_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
-    const path = safeJoin(this.engine.work, args.path);
+    const path = safeJoin(this.engine.work, 'files', args.path);
 
     try {
       const content = readFileSync(path, 'utf-8');

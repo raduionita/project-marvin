@@ -17,7 +17,7 @@ A general-purpose AI assistant daemon: agents run scheduled tasks, each task see
 - `src/channels/` - user-facing output channels (`slack`, `telegram`, `whatsapp`): `sendMessage(message)`, plus `load()`/`drop()`.
 - `src/integrations/` - external service integrations (`wordpress`) with named actions. Integrations can be linked to tasks (`task.integrations` in marvin.json): each linked action becomes a per-action tool named `<integrationId>__<action>` (built by `loadIntegrationTools` in `src/integrations/index.ts`, merged into `chat.tools` by `execTask`, routed by `execTool`). Standalone calls go through `call_integration`/`find_integration`.
 - `src/systems/` - internal infrastructure (`api` HTTP server, `browser`, `watch` file watcher) with `load()`/`drop()`.
-- `src/skills/` - markdown skill docs (header + body, e.g. `skills-create.md`, `tools-create.md`, `wordpress-connect.md`); parsed and injected into the system prompt. User skills in `~/.marvin/skills/` override.
+- `src/skills/` - markdown skill docs (header + body, e.g. `SKILLS-CREATE.md`, `TOOLS-CREATE.md`, `WORDPRESS-CONNECT.md`); parsed and injected into the system prompt. User skills in `~/.marvin/skills/` override.
 - `src/constants.ts` - project-wide constants (`DEFAULT_MAX_STEPS`, `DEFAULT_CONFIG`).
 - `src/helpers.ts` - pure helpers: `tryJsonParse`, `extractOutput`, `cleanContent`, `markdownToHtml`, `safeJoin`, ...
 - `src/logger.ts`, `src/memory.ts` - logging and memory storage (see below). Interactive prompts use `@inquirer/prompts` directly in commands (mock it in tests via `src/tests.ts`).

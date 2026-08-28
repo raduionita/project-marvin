@@ -17,7 +17,7 @@ function listInternalSkills(engine: Engine): string[] {
     !f.includes('.d.ts') &&
     (engine.isTest || !f.includes('.mock.ts')) &&
     f.endsWith('.md')
-  ).map(f => f.replace('.ts', ''));
+  ).map(f => f.replace('.md', ''));
 }
 
 // custom skill files in the user workspace (~/.marvin/skills/*.md)
@@ -30,13 +30,13 @@ function listCustomSkills(engine: Engine): string[] {
     !f.includes('.d.ts') &&
     (engine.isTest || !f.includes('.mock.ts')) &&
     f.endsWith('.md')
-  ).map(f => f.replace('.ts', ''));
+  ).map(f => f.replace('.md', ''));
 }
 
 // listSkills combines internal and custom skills
 export function listSkills(engine: Engine): string[] {
   if (!skills.length) skills;
-  return skills =[...listInternalSkills(engine), ...listCustomSkills(engine)];
+  return skills = [...new Set([...listInternalSkills(engine), ...listCustomSkills(engine)])];
 }
 
 /**
@@ -46,9 +46,11 @@ export function listSkills(engine: Engine): string[] {
 export function loadSkill(engine: Engine, id: string): Skill {
   // custom workspace skills override internal ones with the same id
   const cpath = join(engine.work, 'skills', `${id}.md`);
-  if (existsSync(cpath)) return parseSkill(cpath, 'custom');
+  if (existsSync(cpath)) 
+    return parseSkill(cpath, 'custom');
   const ipath = join(dirname(fileURLToPath(import.meta.url)), `${id}.md`);
-  if (existsSync(ipath)) return parseSkill(ipath, 'default');
+  if (existsSync(ipath)) 
+    return parseSkill(ipath, 'default');
   // else throw
   throw new Error(`skill "${id}" not found`);
 }
@@ -56,7 +58,7 @@ export function loadSkill(engine: Engine, id: string): Skill {
 // parse the .md header into skill meta data: id = file name (uppercased),
 // title = first # heading, description = first paragraph after the heading
 export function parseSkill(file: string, source: 'default' | 'custom'): Skill {
-  const id = basename(file, '.md').toUpperCase();
+  const id = basename(file, '.md');
   const content = readFileSync(file, 'utf8');
 
   let title = id;

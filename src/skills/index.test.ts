@@ -21,8 +21,8 @@ function buildEngine(customSkills?: Record<string, string>): Engine {
 test('listSkills combines internal and custom skills', () => {
   const engine = buildEngine({ 'my-skill': '# My Skill\n\nDoes something.' });
   const skills = listSkills(engine);
-  expect(skills).toContain('skills-create.md');
-  expect(skills).toContain('my-skill.md');
+  expect(skills).toContain('SKILLS-CREATE');
+  expect(skills).toContain('my-skill');
 });
 
 test('loadSkill loads an internal skill by lowercase id', () => {
@@ -54,7 +54,7 @@ test('loadSkill throws for an unknown skill', () => {
 });
 
 test('parseSkill extracts id, title, description and source', () => {
-  const file = join(tmpdir(), `parse-skill-${Date.now()}.md`);
+  const file = join(tmpdir(), `PARSE-SKILL-${Date.now()}.md`);
   writeFileSync(file, '# Release Notes\n\nTurn changes into release notes.\nMore text here.');
 
   const skill = parseSkill(file, 'custom');
@@ -67,7 +67,7 @@ test('parseSkill extracts id, title, description and source', () => {
 });
 
 test('parseSkill falls back to the file name when there is no heading', () => {
-  const file = join(tmpdir(), `plain-${Date.now()}.md`);
+  const file = join(tmpdir(), `PLAIN-${Date.now()}.md`);
   writeFileSync(file, 'Just some text without a heading.');
 
   const skill = parseSkill(file, 'default');
@@ -78,8 +78,8 @@ test('parseSkill falls back to the file name when there is no heading', () => {
 });
 
 test('readSkill loads the .md content dynamically', () => {
-  const engine = buildEngine({ 'my-skill': '# My Skill\n\nInstruction body.' });
-  const file = join(engine.work, 'skills', 'my-skill.md');
+  const engine = buildEngine({ 'MY-SKILL': '# My Skill\n\nInstruction body.' });
+  const file = join(engine.work, 'skills', 'MY-SKILL.md');
   const skill = parseSkill(file, 'custom');
 
   const content = readSkill(skill);
