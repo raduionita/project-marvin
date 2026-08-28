@@ -5,6 +5,7 @@ import type BrowserSystem from '../systems/browser.js';
 import type Engine from '../engine.js';
 import { type Logger } from '../logger.js';
 import * as constants from '../constants.js';
+import { readError } from '../helpers.js';
 
 export default class WebBrowseTool extends Tool {
   public meta: ToolMeta = {
@@ -81,13 +82,16 @@ export default class WebBrowseTool extends Tool {
     let body  = '';
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5_000 });
-      await page.$eval('header, footer, script, iframe', el => el.remove());
-      const text = await page.$eval('body', el => el.innerText);
+      body = await page.evaluate(function () {
+        const body = document.querySelector('body');
+        if (!body) return '';
+        return body.innerHTML;
+      });
       // output
       title = await page.title();
-      body = this.turndown.turndown(text).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8);
+      body  = this.turndown.turndown(body).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8);
     } catch (error) {
-      this.logger.error('[WebBrowseTool.call]', 'error:', error);
+      this.logger.error('[WebBrowseTool.call]', 'error:', readError(error), 'url:', url);
       title = 'error';
       error = 'web_browse: error';
     } finally {

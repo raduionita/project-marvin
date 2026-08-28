@@ -2,6 +2,9 @@ import { Tool } from '../types.js';
 import type { ToolMeta } from '../types.js';
 import { delay, rand, readError, tryJsonParse } from '../helpers.js';
 import type BrowserSystem from '../systems/browser.js';
+import TurndownService from 'turndown';
+import Engine from '../engine.js';
+import { Logger } from '../logger.js';
 
 const SEARCH_START_TAG = "DDG.pageLayout.load('d',";
 const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
@@ -23,6 +26,38 @@ export default class WebSearchTool extends Tool {
         required: ['query'],
       }
     },
+  }
+
+  private turndown: TurndownService = new TurndownService({ headingStyle: 'atx', hr: '---', codeBlockStyle: 'fenced' });
+
+  constructor(engine: Engine, logger: Logger) {
+    super(engine, logger);
+    this.turndown.remove([
+      'script',
+      'style',
+      'aside',
+      'nav',
+      'footer',
+      'iframe',
+      'noscript',
+      'meta',
+      'link',
+      'button',
+      'canvas',
+      'audio',
+      'video',
+      'source',
+      'track',
+      'embed',
+      'object',
+      'picture',
+      'colgroup',
+      'form', 'input', 'select', 'textarea', 'optgroup', 'option', 'label', 'fieldset',
+      'head',
+      'map', 'area',
+      'template',
+      'dialog',
+    ]);
   }
 
   public async call(args: { query: string }) {
@@ -75,18 +110,18 @@ export default class WebSearchTool extends Tool {
       const end = text.indexOf(SEARCH_END_TAG, start);
             raw = text.substring(start + SEARCH_START_TAG.length, end);
       const json: any[] = tryJsonParse(raw) || [];
-
+            json.length = Math.min(json.length, 10);
       return { 
         results: json.map((o: { [key: string]: any }) => ({
-          title: o.t.replace(/<\/?[^>]+(>|$)/g, ''),
-          body: o.a.replace(/<\/?[^>]+(>|$)/g, ''),
-          link: o.c
+          title: this.turndown.turndown(o.t || ''),
+          body: this.turndown.turndown(o.a || ''),
+          link: o.c || '',
         })),
       };
     } catch (error) {
       // distinguish "search failed" from "no results", so the LLM does not
       // conclude nothing exists when the scrape/parse simply failed
-      this.logger.error('[WebSearchTool.call]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw);
+      this.logger.error('[WebSearchTool.call]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw?.substring(0,100));
       return { 
         results: [], 
         error: `web_search failed: ${(error as Error).message}` 

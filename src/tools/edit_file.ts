@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
-import { isSafePath, safeJoin } from '../helpers.js';
+import { isSafePath, readError, safeJoin } from '../helpers.js';
+import { join } from 'path';
 
 export default class EditFileTool extends Tool {
   public meta: ToolMeta = {
@@ -44,7 +45,13 @@ export default class EditFileTool extends Tool {
       return { error: `edit_file: path "${args.path}" is outside the workspace (~/.marvin/files)` };
     }
 
-    const path = safeJoin(this.engine.work, args.path);
+    let path = safeJoin(this.engine.work, args.path);
+        // remove ~/.marvin/files from the path, to extract relative path `/path/to/file`
+        path = path.slice(path.indexOf(this.engine.config.settings.name) + this.engine.config.settings.name.length + 1).replace('files', '')
+        // ~/.marvin + files + /path/to/file
+        path = join(this.engine.work, 'files', path);
+
+        // !todo make sure the folder exists
 
     try {
       let content = args.newString;
@@ -60,10 +67,10 @@ export default class EditFileTool extends Tool {
 
       writeFileSync(path, content, 'utf-8');
 
-      return { path: args.path, ok: true };
+      return { path: path, ok: true };
     } catch (err) {
-      this.logger.error('[EditFileTool.call]', 'error:', err);
-      return { path: args.path, error: (err as Error).message };
+      this.logger.error('[EditFileTool.call]', 'error:', readError(err), 'path:', args.path, '->', path);
+      return { path: path, error: (err as Error).message };
     }
   }
 }
