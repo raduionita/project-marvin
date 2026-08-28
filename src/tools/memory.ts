@@ -1,5 +1,6 @@
-import { Tool, ToolMeta, ToolContext } from '../types';
+import { Tool, ToolMeta } from '../types';
 import { saveMemory, readMemory, dropMemory, listMemories } from '../memory';
+import { Agent } from '../agent';
 
 export default class MemoryTool extends Tool {
   public meta: ToolMeta = {
@@ -29,12 +30,12 @@ export default class MemoryTool extends Tool {
     },
   }
 
-  public async call(args: { operation: string; key?: string; content?: string }, ctx?: ToolContext): Promise<{ [key: string]: any }> {
+  public async call(args: { operation: string; key?: string; content?: string }, agent?: Agent): Promise<{ [key: string]: any }> {
     this.logger.debug('[MemoryTool.call]', Object.keys(args));
 
     // memories are per-agent: use the calling agent, or the orchestrator when
     // the tool is invoked outside of an agent (e.g. `marvin tools memory ...`)
-    const agentId = ctx?.agent?.id || this.engine.config.settings.name;
+    const agentId = agent?.id || this.engine.config.settings.name;
 
     const operation = args?.operation;
     if (!operation) {

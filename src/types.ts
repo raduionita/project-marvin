@@ -80,12 +80,6 @@ export abstract class System {
 
 export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string, enum?:string[]}}, required?:string[]}} };
 
-// per-call context passed to tools by the executing agent
-export interface ToolContext {
-  // the agent that triggered this tool call (e.g. memory is per-agent)
-  agent?: Agent;
-}
-
 export abstract class Tool {
   constructor(public engine: Engine, public logger: Logger) {
     this.logger.debug(`[${this.constructor.name||'Tool'}.constructor]`);
@@ -96,7 +90,7 @@ export abstract class Tool {
   // tool descriptor
   public readonly meta: ToolMeta = { type: 'function', function: { name: 'stop', description: 'STOP', parameters: { type: 'object', properties: {}, required: [] } } };
 
-  public abstract call(args: {[key:string]:any}, ctx?: ToolContext): Promise<{[key:string]:any}>;
+  public abstract call(args: {[key:string]:any}, agent?: Agent, chat?: Chat): Promise<{[key:string]:any}>;
 }
 
 export interface ChannelMeta {

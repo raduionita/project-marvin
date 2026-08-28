@@ -185,14 +185,14 @@ export class Agent {
   }
 
   // tool call
-  async execTool(tool: string, args: {[key:string]:any}) : Promise<{[key:string]:any}> {
+  async execTool(tool: string, args: {[key:string]:any}, chat?: Chat) : Promise<{[key:string]:any}> {
     this.logger.debug('[Agent.execTool]', tool);
     try {
       // internal tools
       const instance = this.engine.tools[tool];
       if (instance) {
         // ! tool call
-        return await instance.call(args, { agent: this });
+        return await instance.call(args, this, chat);
       }
 
       // integration tools (<integrationId>__<action>) loaded per-task
@@ -273,7 +273,7 @@ export class Agent {
             chat.messages.push({role: 'tool', content: JSON.stringify({ skipped: true }), toolId: call.id});
           } else {
             // ! tool call
-            let result = await this.execTool(call.name, call.arguments);  
+            let result = await this.execTool(call.name, call.arguments, chat);  
             // add tool call to chat history, truncating huge results (e.g. full
             // web pages) so they cannot blow past the model context window
             chat.messages.push({role: 'tool', content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS), toolId: call.id});

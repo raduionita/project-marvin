@@ -5,14 +5,35 @@ import { Command } from "../types";
 export default class DisableCommand extends Command {
   async exec() {
     this.logger.debug('[DisableCommand.exec]');
+    switch (this.args[0]) {
+      case 'help':
+        this.execHelp();
+      break;
+      case 'tool': break;
+      case 'integration': break;
+      case 'mcp': break;
+      default:
+        await this.execDisable();
+      break;
+    }
+  }
 
+  execHelp() {
+    this.logger.info('usage: marvin disable [command]');
+    this.logger.info('commands:');
+    this.logger.info('  help  ', 'show this help');
+    this.logger.info('        ', 'stop the daemon and disable it from starting at boot');
+  }
+
+  async execDisable() {
+    this.logger.debug('[DisableCommand.execDisable]');
     try {
       // stop service
       if (this.engine.isDry) {
         this.logger.info('[dry]', 'stop service: systemctl --user stop marvin');
         this.logger.info('[dry]', 'disable service: systemctl --user disable marvin');
       } else {
-        this.logger.debug('[DisableCommand.exec]', 'stopping service...');
+        this.logger.debug('[DisableCommand.execDisable]', 'stopping service...');
         // stop and disable
         execSync(['systemctl', '--user', 'stop', 'marvin'].join(' '), { stdio: 'inherit' });
         execSync(['systemctl', '--user', 'disable', 'marvin'].join(' '), { stdio: 'inherit' });
