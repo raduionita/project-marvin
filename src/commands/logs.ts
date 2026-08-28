@@ -1,16 +1,64 @@
-import { existsSync, readFileSync, statSync, openSync, readSync, closeSync } from 'fs';
+import { existsSync, readFileSync, statSync, openSync, readSync, closeSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Command } from "../types";
 import { delay } from '../helpers';
 
 // `marvin logs [-f|--follow] [-n|--lines <n>]` tail the daemon log file
+// `marvin logs clear` clears the log file, `marvin logs help` shows help
 export default class LogsCommand extends Command {
   async exec() {
-    this.logger.debug('[LogsCommand.exec]');
+    this.logger.debug('[LogsCommand.exec]', this.args);
+
+    const cmd = this.args[0] || '';
+    switch (cmd) {
+      case 'clear':
+        await this.execClear();
+        break;
+      case 'help':
+        await this.execHelp();
+        break;
+      case '':
+        await this.execLog();
+        break;
+      default:
+        // also handle flags as default log view: `marvin logs -n 2`, `marvin logs -f`
+        if (cmd.startsWith('-')) {
+          await this.execLog();
+          break;
+        }
+        this.logger.warn('[LogsCommand.exec]', 'unknown command: logs', cmd);
+        await this.execHelp();
+        break;
+    }
+  }
+
+  async execHelp() {
+    this.logger.info('usage: marvin logs [command] [-f|--follow] [-n|--lines <n>]');
+    this.logger.info('commands:');
+    this.logger.info('  help                 ', 'show this help');
+    this.logger.info('  clear                ', 'clear the daemon log file');
+    this.logger.info('  (default)            ', 'tail the daemon log file [-f|--follow] [-n|--lines <n>]');
+  }
+
+  async execClear() {
+    this.logger.debug('[LogsCommand.execClear]');
 
     const lpath = join(this.engine.work, 'logs', 'marvin.log');
     if (!existsSync(lpath)) {
-      this.logger.error('[LogsCommand.exec]', 'no log file found at', lpath, 'run "marvin enable" first');
+      this.logger.warn('[LogsCommand.execClear]', 'no log file found at', lpath);
+      return;
+    }
+
+    writeFileSync(lpath, '');
+    this.logger.info('log file cleared:', lpath);
+  }
+
+  async execLog() {
+    this.logger.debug('[LogsCommand.execLog]');
+
+    const lpath = join(this.engine.work, 'logs', 'marvin.log');
+    if (!existsSync(lpath)) {
+      this.logger.error('[LogsCommand.execLog]', 'no log file found at', lpath, 'run "marvin enable" first');
       return;
     }
 
@@ -28,7 +76,7 @@ export default class LogsCommand extends Command {
     }
 
     // follow mode: stream newly appended lines, one poll per second
-    this.logger.error('[LogsCommand.exec]', 'following', lpath, '(ctrl+c to stop)');
+    this.logger.error('[LogsCommand.execLog]', 'following', lpath, '(ctrl+c to stop)');
     let offset = statSync(lpath).size;
     while (true) {
       await delay(1000);
