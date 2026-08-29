@@ -62,11 +62,7 @@ export default class WordpressIntegration extends Integration {
 
   async load(): Promise<void> {
     this.logger.debug('[WordpressIntegration.load]');
-    if (this.engine.isDry) {
-      this.logger.debug('[WordpressIntegration.load]', '[dry] integration wordpress attached');
-      return;
-    }
-
+    
     if (!this.config.endpoint) {
       this.logger.error('[WordpressIntegration.load]', 'no endpoint found, skipping');
     }

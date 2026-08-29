@@ -5,6 +5,10 @@ import { join } from 'path';
 import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta } from './types.js';
 import { Agent } from './agent.js';
 import EndChatTool from './tools/end_chat.js';
+import GetDateTool from './tools/get_date.js';
+import LoadToolsTool from './tools/load_tools.js';
+import ReadFileTool from './tools/read_file.js';
+import WebSearchTool from './tools/web_search.js';
 import * as constants from './constants.js';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
@@ -71,7 +75,7 @@ class MockModel extends Model {
 
 /** A minimal mock tool. */
 class MockTool extends Tool {
-  meta = { type: 'function', function: { name: 'mock_tool', description: '', parameters: { type: 'object', properties: {}, required: [] } } };
+  meta = { type: 'function', group: 'general', function: { name: 'mock_tool', description: '', parameters: { type: 'object', properties: {}, required: [] } } } as ToolMeta;
   async call(_args: any): Promise<any> {
     return { result: 'tool output' };
   }
@@ -775,4 +779,117 @@ test('makeChat omits the memory block when memory is disabled', () => {
 
   expect(agent.loadChat('chat-1').messages[0]!.content).toBe('my identity');
   rmSync(engine.work, { recursive: true, force: true });
+});
+
+// ==================== Available Tools (lazy loading) tests ====================
+
+// install a representative set of tools so makeChat has something to summarize
+function installSampleTools(engine: Engine) {
+  engine.tools['read_file'] = new ReadFileTool(engine, new Logger());
+  engine.tools['web_search'] = new WebSearchTool(engine, new Logger());
+  engine.tools['get_date'] = new GetDateTool(engine, new Logger());
+  engine.tools['end_chat'] = new EndChatTool(engine, new Logger());
+  engine.tools['load_tools'] = new LoadToolsTool(engine, new Logger());
+}
+
+test('makeChat seeds the system prompt with a grouped "## Available Tools" block', () => {
+  const engine = buildTestEngine();
+  installSampleTools(engine);
+  const agent = engine.agents['marvin']!;
+  rmSync(engine.work, { recursive: true, force: true });
+
+  const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
+
+  expect(prompt).toContain('## Available Tools');
+  // grouped entries (one line per group, tools comma-separated)
+  expect(prompt).toMatch(/filesystem:.*read_file/);
+  expect(prompt).toMatch(/web:.*web_search/);
+  expect(prompt).toMatch(/general:.*get_date/);
+  // hint to use load_tools
+  expect(prompt).toContain('load_tools');
+  // always-known tools are NOT listed as available (they are already in chat.tools)
+  expect(prompt).not.toMatch(/^end_chat:/m);
+  // includes mock_tool from buildTestEngine (default group 'general')
+  expect(prompt).toContain('mock_tool');
+});
+
+test('makeChat only includes always-known tools in chat.tools by default', () => {
+  const engine = buildTestEngine();
+  installSampleTools(engine);
+  const agent = engine.agents['marvin']!;
+  rmSync(engine.work, { recursive: true, force: true });
+
+  const chat = agent.loadChat('chat-1');
+  const names = chat.tools?.map(t => t.function.name) || [];
+
+  // always-known: end_chat (stop) + load_tools
+  expect(names).toContain('end_chat');
+  expect(names).toContain('load_tools');
+  // engine tools are NOT loaded by default
+  expect(names).not.toContain('read_file');
+  expect(names).not.toContain('web_search');
+  expect(names).not.toContain('get_date');
+  expect(names).not.toContain('mock_tool');
+});
+
+test('makeChat merges per-task tools with always-known tools', () => {
+  const engine = buildTestEngine();
+  installSampleTools(engine);
+  const agent = engine.agents['marvin']!;
+  rmSync(engine.work, { recursive: true, force: true });
+
+  const taskTool: ToolMeta = {
+    type: 'function',
+    group: 'task',
+    function: { name: 'custom__do', description: 'custom', parameters: { type: 'object', properties: {}, required: [] } },
+  };
+  const chat = agent.loadChat('chat-1', [taskTool]);
+  const names = chat.tools?.map(t => t.function.name) || [];
+
+  expect(names).toContain('end_chat');
+  expect(names).toContain('load_tools');
+  expect(names).toContain('custom__do');
+  // engine tools still not loaded
+  expect(names).not.toContain('read_file');
+});
+
+test('makeChat omits the available-tools block when no loadable tools are configured', () => {
+  const engine = buildTestEngine();
+  // remove mock_tool so only always-known tools remain (buildTestEngine installs mock_tool)
+  delete engine.tools['mock_tool'];
+  const agent = engine.agents['marvin']!;
+  rmSync(engine.work, { recursive: true, force: true });
+
+  const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
+
+  expect(prompt).not.toContain('## Available Tools');
+});
+
+test('loadTools tool is always present in chat.tools even when the tool itself is not installed', () => {
+  // mirrors the real engine: load_tools is loaded from disk by Engine.loadTools
+  // and makeChat picks it up via the always-known filter
+  const engine = buildTestEngine();
+  engine.tools['load_tools'] = new LoadToolsTool(engine, new Logger());
+  const agent = engine.agents['marvin']!;
+  rmSync(engine.work, { recursive: true, force: true });
+
+  const chat = agent.loadChat('chat-1');
+  const names = chat.tools?.map(t => t.function.name) || [];
+  expect(names).toContain('load_tools');
+});
+
+test('the loadTools tool adds a tool to the live chat, making it available to the model', async () => {
+  const engine = buildTestEngine();
+  installSampleTools(engine);
+  const agent = engine.agents['marvin']!;
+  rmSync(engine.work, { recursive: true, force: true });
+
+  // load the chat, then have the agent call load_tools to pull in read_file
+  const chat = agent.loadChat('chat-1');
+  const tool = engine.tools['load_tools']!;
+  const result = await tool.call({ names: ['read_file'] }, agent, chat);
+  rmSync(engine.work, { recursive: true, force: true });
+
+  expect(result.loaded).toEqual(['read_file']);
+  expect(chat.tools!.map(t => t.function.name)).toContain('read_file');
 });

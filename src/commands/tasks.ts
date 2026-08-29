@@ -4,7 +4,7 @@ import { join } from 'path';
 
 import { Command } from "../types";
 
-// `marvin tasks [command] [--dry]` add/list tasks
+// `marvin tasks [command]` add/list tasks
 export default class TasksCommand extends Command {
   async exec() {
     this.logger.debug('[TasksCommand.exec]');
@@ -14,7 +14,7 @@ export default class TasksCommand extends Command {
       default:
         this.logger.warn('[TasksCommand.exec]', 'unknown command: tasks', cmd);
       case 'help':
-        this.logger.info('usage: marvin tasks [command] [--dry]');
+        this.logger.info('usage: marvin tasks [command]');
         this.logger.info('commands:');
         this.logger.info('  help    ', 'show this help');
         this.logger.info('  list    ', 'list tasks');
@@ -115,12 +115,8 @@ export default class TasksCommand extends Command {
     let ppath: string = '';
     if (taskInput) {
       ppath = join(this.engine.work, 'tasks', taskId, 'TASK.md');
-      if (this.engine.isDry) {
-        this.logger.info('[dry]', 'task prompt file:', ppath);
-      } else {
-        mkdirSync(join(this.engine.work, 'tasks', taskId), { recursive: true });
-        writeFileSync(ppath, taskInput + '\n');
-      }
+      mkdirSync(join(this.engine.work, 'tasks', taskId), { recursive: true });
+      writeFileSync(ppath, taskInput + '\n');
     }
 
     // register the task in config
@@ -134,11 +130,7 @@ export default class TasksCommand extends Command {
 
     // persist to marvin.json
     const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', `would configure task "${taskId}" for agent "${taskAgent}", config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    }
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
     this.logger.info(`task "${taskId}" configured for agent "${taskAgent}" (schedule: ${taskSchedule}s ${ppath ? `, prompt saved to ${ppath}` : ''}`);
   }

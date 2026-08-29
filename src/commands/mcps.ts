@@ -6,7 +6,7 @@ import { Mcp, testMcp, specMcp } from '../mcp.js';
 import { tryJsonParse } from '../helpers.js';
 import { editor, checkbox, confirm, input } from '../terminal.js';
 
-// `marvin mcps [command] [--dry]` list, add, edit, info, drop mcp connectors
+// `marvin mcps [command]` list, add, edit, info, drop mcp connectors
 export default class McpsCommand extends Command {
   async exec() {
     this.logger.debug('[McpsCommand.exec]');
@@ -147,13 +147,9 @@ export default class McpsCommand extends Command {
 
     // save config
     const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', `would persist: config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-      this.logger.info(`config updated: ${cpath}`);
-    }
-
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+    
+    this.logger.info(`config updated: ${cpath}`);
     this.logger.info('mcp added');
   }
 
@@ -202,13 +198,9 @@ export default class McpsCommand extends Command {
 
     // save config
     const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', `would persist: config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-      this.logger.info(`config updated: ${cpath}`);
-    }
-
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+    
+    this.logger.info(`config updated: ${cpath}`);
     this.logger.info('mcp updated');
   }
 
@@ -284,13 +276,9 @@ export default class McpsCommand extends Command {
 
     // save config
     const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', `would persist: config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-      this.logger.info(`config updated: ${cpath}`);
-    }
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
+    this.logger.info(`config updated: ${cpath}`);
     this.logger.info('mcp dropped');
   }
 }

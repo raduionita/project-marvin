@@ -149,6 +149,7 @@ function makeActionTool(integrationId: string, integration: Integration, action:
 
   return {
     type: 'function',
+    group: 'integration',
     function: {
       name: makeIntegrationToolName(integrationId, action),
       description: `Run "${action}" on the "${integrationId}" integration: ${description}`,

@@ -10,6 +10,7 @@ import { readError } from '../helpers.js';
 export default class WebBrowseTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'web',
     function: {
       name: 'web_browse',
       description: 'Browse the web',
@@ -58,14 +59,8 @@ export default class WebBrowseTool extends Tool {
     ]);
   }
 
-
   public async call(args: { url: string }) {
     this.logger.debug('[WebBrowseTool.call]', Object.keys(args));
-
-    if (this.engine.isDry) {
-      this.logger.info('[WebBrowseTool.call]', '[dry] browse:', args.url);
-      return { title: '', body: '', error: '' };
-    }
 
     if (!this.engine.systems['browser']) {
       return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server engine' }

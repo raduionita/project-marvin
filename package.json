@@ -20,7 +20,6 @@
     "watch": "npx tsc --watch",
     "nuke": "rm -rf out node_modules",
     "start": "bun run src/marvin.ts serve",
-    "start:dry": "bun run src/marvin.ts serve --dry",
     "compile:linux": "bun build --compile --minify ./src/marvin.ts --outfile ./marvin",
     "test": "bun test"
   },

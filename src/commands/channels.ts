@@ -1,12 +1,12 @@
 
-import { input, password, select } from '../terminal.js';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
 
+import { input, password, select } from '../terminal';
 import { Command, Message } from "../types";
 import { listChannels, loadChannel } from '../channels';
 
-// `marvin channels [command] [--dry]` list, add, bind, chat, drop channels
+// `marvin channels [command]` list, add, bind, chat, drop channels
 export default class ChannelsCommand extends Command {
   async exec() {
     this.logger.debug('[ChannelsCommand.exec]');
@@ -130,11 +130,7 @@ export default class ChannelsCommand extends Command {
     const cpath = join(this.engine.work, 'marvin.json');
 
     // write to config file
-    if (this.engine.isDry) {
-      this.logger.info('[ChannelsCommand.execAdd]', '[dry]',`would configure channel ${channelId}, config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    }
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
     
     this.logger.info('[ChannelsCommand.execAdd]', `channel "${channelId}" configured, config persisted to ${cpath}`);
   }
@@ -172,11 +168,7 @@ export default class ChannelsCommand extends Command {
 
     // persist to marvin.json
     const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[ChannelsCommand.execInfo]', '[dry]', `would cache channel info for ${channelId}, config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    }
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
     // display the cached info from config
     const groups = this.engine.config.channels[channelId].groups || {};
@@ -224,19 +216,15 @@ export default class ChannelsCommand extends Command {
       return;
     }
 
-    if (this.engine.isDry) {
-      this.logger.info('[ChannelsCommand.execBind]', '[dry]', `would bind channel ${channelId}:${groupId} to agent ${agentId}`);
-    } else {
-      // add the binding (overwrites if already bound to this channel)
-      this.engine.config.agents[agentId].channels = this.engine.config.agents[agentId].channels || {};
-      this.engine.config.agents[agentId].channels[channelId] = groupId; 
+    // add the binding (overwrites if already bound to this channel)
+    this.engine.config.agents[agentId].channels = this.engine.config.agents[agentId].channels || {};
+    this.engine.config.agents[agentId].channels[channelId] = groupId; 
 
-      // persist to marvin.json
-      const cpath = join(this.engine.work, 'marvin.json');
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+    // persist to marvin.json
+    const cpath = join(this.engine.work, 'marvin.json');
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
-      this.logger.info('[ChannelsCommand.execBind]', `agent "${agentId}" bound to channel "${channelId}:${groupId}", config persisted to ${cpath}`);
-    }
+    this.logger.info('[ChannelsCommand.execBind]', `agent "${agentId}" bound to channel "${channelId}:${groupId}", config persisted to ${cpath}`);
   }
 
   // `marvin channels chat [channelId] [groupId]`

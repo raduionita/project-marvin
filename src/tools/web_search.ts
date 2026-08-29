@@ -12,6 +12,7 @@ const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
 export default class WebSearchTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'web',
     function: {
       name: 'web_search',
       description: 'Search the web',
@@ -62,11 +63,6 @@ export default class WebSearchTool extends Tool {
 
   public async call(args: { query: string }) {
     this.logger.debug('[WebSearchTool.call]', Object.keys(args));
-
-    if (this.engine.isDry) {
-      this.logger.info('[WebSearchTool.call]', '[dry] search:', args.query);
-      return { results: [] };
-    }
 
     if (!this.engine.systems['browser']) {
       throw new Error('[WebSearchTool.call] ERROR - Browser is not loaded in the server engine');

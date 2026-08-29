@@ -6,7 +6,7 @@ import { Command } from "../types";
 import { listSkills, loadSkill, readSkill, parseSkill } from '../skills';
 import * as constants from '../constants';
 
-// `marvin skills [command] [--dry]` list and add (create) skills
+// `marvin skills [command]` list and add (create) skills
 export default class SkillsCommand extends Command {
   async exec() {
     this.logger.debug('[SkillsCommand.exec]');
@@ -35,7 +35,7 @@ export default class SkillsCommand extends Command {
 
   // `marvin skills help`
   async execHelp() {
-    this.logger.info('usage: marvin skills [command] [--dry]');
+    this.logger.info('usage: marvin skills [command]');
     this.logger.info('commands:');
     this.logger.info('  help                 ', 'show this help');
     this.logger.info('  list                 ', 'list available skills');
@@ -115,27 +115,19 @@ export default class SkillsCommand extends Command {
       'Return ONLY the skill file content.',
     ].join('\n');
 
-    let content = '';
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
-    } else {
-      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt);
-      if (result.error || !result.content) {
-        this.logger.error('[SkillsCommand.execAdd]', 'no result from the LLM');
-        return;
-      }
-      content = result.content.trim();
+
+    const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt);
+    if (result.error || !result.content) {
+      this.logger.error('[SkillsCommand.execAdd]', 'no result from the LLM');
+      return;
     }
+    let content = result.content.trim();
 
     // persist the skill to ~/.marvin/skills/<id>.md
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', `would write skill to ${spath}`);
-    } else {
-      mkdirSync(join(this.engine.work, 'skills'), { recursive: true });
-      writeFileSync(spath, content + '\n');
-      // register the skill in the engine (no reload needed)
-      this.engine.skills[id] = parseSkill(spath, 'custom');
-    }
+    mkdirSync(join(this.engine.work, 'skills'), { recursive: true });
+    writeFileSync(spath, content + '\n');
+    // register the skill in the engine (no reload needed)
+    this.engine.skills[id] = parseSkill(spath, 'custom');
 
     this.logger.info(`skill "${id}" created, saved to ${spath}`);
   }
@@ -239,31 +231,23 @@ export default class SkillsCommand extends Command {
       '',
     ].filter(l => l !== undefined).join('\n');
 
-    let output = '';
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
-    } else {
-      const agent = this.engine.agents[this.engine.config.settings.name]!;
-      const result = await agent.sendChat(undefined, prompt);
-      if (result.error || !result.content) {
-        this.logger.error('[SkillsCommand.execUse]', 'no result from the LLM');
-        return;
-      }
-      output = result.content.trim();
+    const agent = this.engine.agents[this.engine.config.settings.name]!;
+    const result = await agent.sendChat(undefined, prompt);
+    if (result.error || !result.content) {
+      this.logger.error('[SkillsCommand.execUse]', 'no result from the LLM');
+      return;
     }
+    
+    let output = result.content.trim();
 
     // persist tools (~/.marvin/tools) so the custom tools feature can pick them up
     if (isToolCreate || isToolEdit) {
-      if (this.engine.isDry) {
-        this.logger.info('[dry]', isToolCreate ? 'would create tool in ~/.marvin/tools' : 'would update tool in ~/.marvin/tools');
-      } else {
-        // resolve the MARVIN_ROOT placeholder the tool skills keep literal in the import
-        output = output.replaceAll('{MARVIN_ROOT}', this.engine.root);
-        const tpath = join(this.engine.work, 'tools', `${toolName.toLowerCase()}.ts`);
-        mkdirSync(join(this.engine.work, 'tools'), { recursive: true });
-        writeFileSync(tpath, output + '\n');
-        this.logger.info(`${isToolCreate ? 'tool' : 'tool'} "${toolName.toLowerCase()}" ${isToolCreate ? 'created' : 'updated'}, saved to ${tpath}`);
-      }
+      // resolve the MARVIN_ROOT placeholder the tool skills keep literal in the import
+      output = output.replaceAll('{MARVIN_ROOT}', this.engine.root);
+      const tpath = join(this.engine.work, 'tools', `${toolName.toLowerCase()}.ts`);
+      mkdirSync(join(this.engine.work, 'tools'), { recursive: true });
+      writeFileSync(tpath, output + '\n');
+      this.logger.info(`${isToolCreate ? 'tool' : 'tool'} "${toolName.toLowerCase()}" ${isToolCreate ? 'created' : 'updated'}, saved to ${tpath}`);
     }
 
     this.logger.info('');

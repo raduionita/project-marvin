@@ -18,7 +18,7 @@ function flattenFields(fields: Field[], prefix = ''): { name: string, type: stri
   return out;
 }
 
-// `marvin integrations [command] [--dry]` list, add, drop integrations
+// `marvin integrations [command]` list, add, drop integrations
 export default class IntegrationsCommand extends Command {
   async exec() {
     this.logger.debug('[IntegrationsCommand.exec]');
@@ -275,11 +275,7 @@ export default class IntegrationsCommand extends Command {
     const cpath = join(this.engine.work, 'marvin.json');
 
     // write to config file
-    if (this.engine.isDry) {
-      this.logger.info('[IntegrationsCommand.execAdd]', '[dry]',`would configure integration ${name}, config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    }
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
     this.logger.info('[IntegrationsCommand.execAdd]', `integration "${name}" (${type}) configured, config persisted to ${cpath}`);
   }
@@ -428,11 +424,8 @@ export default class IntegrationsCommand extends Command {
 
     // persist to marvin.json
     const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[IntegrationsCommand.execEdit]', '[dry]', `would update integration ${pname}, config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    }
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+    
     this.logger.info('[IntegrationsCommand.execEdit]', `integration "${pname}" updated, config persisted to ${cpath}`);
   }
 
@@ -458,11 +451,7 @@ export default class IntegrationsCommand extends Command {
 
     // persist to marvin.json
     const cpath = join(this.engine.work, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[IntegrationsCommand.execDrop]', '[dry]', `would drop integration ${pname}, config persisted to ${cpath}`);
-    } else {
-      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    }
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
     this.logger.info('[IntegrationsCommand.execDrop]', `integration "${pname}" dropped, config persisted to ${cpath}`);
   }

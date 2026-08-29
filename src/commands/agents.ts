@@ -5,7 +5,7 @@ import { join } from 'path';
 import { Command } from "../types";
 import * as constants from '../constants';
 
-// `marvin agents [command] [--dry]` list, add, bind, chat, drop agents
+// `marvin agents [command]` list, add, bind, chat, drop agents
 export default class AgentsCommand extends Command {
   async exec() {
     this.logger.debug('[AgentsCommand.exec]');
@@ -15,7 +15,7 @@ export default class AgentsCommand extends Command {
       default:
         this.logger.warn('[AgentsCommand.exec]', 'unknown command: agents', cmd); 
       case 'help':
-        this.logger.info('usage: marvin agents [command] [--dry]');
+        this.logger.info('usage: marvin agents [command]');
         this.logger.info('commands:');
         this.logger.info('  help    ', 'show this help');
         this.logger.info('  add     ', 'add an agent');
@@ -57,26 +57,22 @@ export default class AgentsCommand extends Command {
         return;
       }
 
-      // send chat message to server /chat
-      if (this.engine.isDry) {
-        this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'message:', answer);
-        this.logger.debug('[AgentsCommand.execChat]', '[dry]', 'agent:', agentId);
-      } else {
-        // send message to the LLM
-        const agent = this.engine.agents[agentId];
-        if (!agent) {
-          throw new Error(`agent "${agentId}" not found`);
-        }
-        const result = await agent.sendChat(chatId, answer);
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
-        // call send chat
-        this.logger.log('LLM: ', result.content);
-
-        this.logger.debug('[AgentsCommand.execChat]', 'done');
+      // TODO: send chat message to server /chat
+      
+      // send message to the LLM
+      const agent = this.engine.agents[agentId];
+      if (!agent) {
+        throw new Error(`agent "${agentId}" not found`);
       }
+      const result = await agent.sendChat(chatId, answer);
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // call send chat
+      this.logger.log('LLM: ', result.content);
+
+      this.logger.debug('[AgentsCommand.execChat]', 'done');
     } catch (error) {
       this.logger.error('[AgentsCommand.execChat]', 'error:', error);
     }
@@ -158,24 +154,16 @@ export default class AgentsCommand extends Command {
   
       // persist agent identity to ~/.marvin/agents/<agentId>/IDENTITY.md
       const apath = join(this.engine.work, 'agents', agentId);
+      mkdirSync(apath, { recursive: true });
       const ipath = join(apath, 'IDENTITY.md');
-      if (this.engine.isDry) {
-        this.logger.info('[AgentsCommand.execAdd]', '[dry]', 'identity file:', ipath);
-      } else {
-        mkdirSync(apath, { recursive: true });
-        writeFileSync(ipath, identity + '\n');
-      }
+      writeFileSync(ipath, identity + '\n');
   
       // register the agent in config
       this.engine.config.agents[agentId] = { enabled: true, model: modelId, channels };
   
       // persist to marvin.json
       const cpath = join(this.engine.work, 'marvin.json');
-      if (this.engine.isDry) {
-        this.logger.info('[AgentsCommand.execAdd]', '[dry]', `would configure agent "${agentId}", config persisted to ${cpath}`);
-      } else {
-        writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-      }
+      writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
   
       this.logger.info(`[AgentsCommand.execAdd]`, `agent "${agentId}" configured (model: ${modelId}, channels: ${Object.keys(channels).join(', ') || 'none'}), config persisted to ${cpath}`);
     } catch (error) {

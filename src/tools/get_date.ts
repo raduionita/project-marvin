@@ -3,6 +3,7 @@ import { Tool, ToolMeta } from '../types.js';
 export default class GetDateTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'general',
     function: {
       name: 'get_date',
       description: 'Get the current date',

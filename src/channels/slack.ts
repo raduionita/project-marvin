@@ -61,11 +61,6 @@ export default class SlackChannel extends Channel {
     try {
       this.logger.debug('[SlackChannel.load]');
 
-      if (this.engine.isDry) {
-        this.logger.debug('[SlackChannel.load]', '[dry] channel slack attached');
-        return;
-      }
-
       const config = this.engine.config.channels.slack as SlackConfig | undefined;
       if (!config) {
         this.logger.error('[SlackChannel.load]', 'no settings found, skipping');
@@ -158,11 +153,6 @@ export default class SlackChannel extends Channel {
   public async sendMessage(message: Message) : Promise<SlackResponse> {
     try {
       this.logger.debug('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'} agent=${message.agent || '(none)'}`);
-
-      if (this.engine.isDry) {
-        this.logger.info('[SlackChannel.sendMessage]', '[dry] send message to:', message.group);
-        return { ts: '0000000000.000000', ok: true, error: '', message: '(dry)', channel: message.group };
-      }
 
       // need web client
       if (!this.webClient) {
@@ -371,7 +361,7 @@ export default class SlackChannel extends Channel {
   }
 
   protected async onConnecting() {
-    this.logger.info('[SlackChannel.onConnecting]', 'connecting...');
+    this.logger.info('[SlackChannel.onConnecting]', 'connecting?');
   }
 
   protected async onConnected() {

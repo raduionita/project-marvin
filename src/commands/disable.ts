@@ -27,20 +27,17 @@ export default class DisableCommand extends Command {
 
   async execDisable() {
     this.logger.debug('[DisableCommand.execDisable]');
+    
     try {
       // stop service
-      if (this.engine.isDry) {
-        this.logger.info('[dry]', 'stop service: systemctl --user stop marvin');
-        this.logger.info('[dry]', 'disable service: systemctl --user disable marvin');
-      } else {
-        this.logger.debug('[DisableCommand.execDisable]', 'stopping service...');
-        // stop and disable
-        execSync(['systemctl', '--user', 'stop', 'marvin'].join(' '), { stdio: 'inherit' });
-        execSync(['systemctl', '--user', 'disable', 'marvin'].join(' '), { stdio: 'inherit' });
-        // check
-        const state = execSync(['systemctl', '--user', 'is-active', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
-        this.logger.info('marvin is', state);
-      }
+      this.logger.debug('[DisableCommand.execDisable]', 'stopping service...');
+      // stop and disable
+      execSync(['systemctl', '--user', 'stop', 'marvin'].join(' '), { stdio: 'inherit' });
+      execSync(['systemctl', '--user', 'disable', 'marvin'].join(' '), { stdio: 'inherit' });
+      // check
+      const state = execSync(['systemctl', '--user', 'is-active', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
+      // output
+      this.logger.info('marvin is', state);
     } catch (err) {
       this.logger.info('marvin is now inactive');
     }

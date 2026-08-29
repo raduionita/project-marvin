@@ -17,11 +17,7 @@ export default class ReloadCommand extends Command {
 
     // restart (not reload): the unit has no ExecReload= and EnvironmentFile is
     // only re-read at process start, so reload cannot apply a new log level
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'restart service:', ['systemctl', '--user', 'restart', 'marvin'].join(' '));
-    } else {
-      execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
-    }
+    execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
 
     this.logger.info('marvin service reloaded');
   }

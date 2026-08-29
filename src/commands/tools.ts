@@ -37,7 +37,7 @@ export default class ToolsCommand extends Command {
   }
 
   execHelp() {
-    this.logger.info('usage: marvin tools [subcommand] [params] [--dry]');
+    this.logger.info('usage: marvin tools [subcommand] [params]');
     this.logger.info('commands:');
     this.logger.info('  help         ', 'show this help');
     this.logger.info('  list         ', 'list available tools, for each one, it\'s connected agents');
@@ -73,11 +73,6 @@ export default class ToolsCommand extends Command {
       const params = tryJsonParse(this.args.slice(1).join(' ')) as { [key: string]: any };
       // load tool (repo tools first, then custom workspace tools)
       const tool = await loadTool(this.engine, name);
-      // dry guard
-      if (this.engine.isDry) {
-        this.logger.info('[ToolCommand.execTool]', '[dry] tool:', name, JSON.stringify(params));
-        return;
-      }
       // call the tool
       const output = await tool.call(params);
       // output
@@ -145,29 +140,20 @@ export default class ToolsCommand extends Command {
       return;
     }
 
-    let content = '';
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
-    } else {
-      const result = await marvin.sendChat(undefined, prompt);
-      if (result.error || !result.content) {
-        this.logger.error('[ToolCommand.execAdd]', 'no result from the LLM');
-        return;
-      }
-      content = result.content.trim();
+    const result = await marvin.sendChat(undefined, prompt);
+    if (result.error || !result.content) {
+      this.logger.error('[ToolCommand.execAdd]', 'no result from the LLM');
+      return;
     }
+
     // resolve the MARVIN_ROOT placeholder the skill keeps literal in the tool import
-    content = content.replaceAll('{MARVIN_ROOT}', this.engine.root);
+    let content = result.content.trim().replaceAll('{MARVIN_ROOT}', this.engine.root);
 
     // persist the tool to ~/.marvin/tools/<name>.ts
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', `would write tool to ${tpath}`);
-    } else {
-      mkdirSync(join(this.engine.work, 'tools'), { recursive: true });
-      writeFileSync(tpath, content + '\n');
-      // register the tool in the engine (no reload needed)
-      await this.reloadTools();
-    }
+    mkdirSync(join(this.engine.work, 'tools'), { recursive: true });
+    writeFileSync(tpath, content + '\n');
+    // register the tool in the engine (no reload needed)
+    await this.reloadTools();
 
     this.logger.info(`tool "${name}" created, saved to ${tpath}`);
   }
@@ -229,28 +215,19 @@ export default class ToolsCommand extends Command {
       'Return ONLY the complete updated tool file content.',
     ].join('\n');
 
-    let content = '';
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'prompt:', prompt.slice(0, 200));
-    } else {
-      const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt);
-      if (result.error || !result.content) {
-        this.logger.error('[ToolCommand.execEdit]', 'no result from the LLM');
-        return;
-      }
-      content = result.content.trim();
+    const result = await this.engine.agents[this.engine.config.settings.name]!.sendChat(undefined, prompt);
+    if (result.error || !result.content) {
+      this.logger.error('[ToolCommand.execEdit]', 'no result from the LLM');
+      return;
     }
+    
     // resolve the MARVIN_ROOT placeholder the skill keeps literal in the tool import
-    content = content.replaceAll('{MARVIN_ROOT}', this.engine.root);
+    let content = result.content.trim().replaceAll('{MARVIN_ROOT}', this.engine.root);
 
     // persist the edited tool back to ~/.marvin/tools/<name>.ts
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', `would write tool to ${tpath}`);
-    } else {
-      writeFileSync(tpath, content + '\n');
-      // re-register the tool in the engine (no reload needed)
-      await this.reloadTools();
-    }
+    writeFileSync(tpath, content + '\n');
+    // re-register the tool in the engine (no reload needed)
+    await this.reloadTools();
 
     this.logger.info(`tool "${name}" updated, saved to ${tpath}`);
   }

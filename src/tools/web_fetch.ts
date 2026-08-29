@@ -10,6 +10,7 @@ import * as constants from '../constants.js';
 export default class WebFetchTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'web',
     function: {
       name: 'web_fetch',
       description: 'Fetch a web page and extract the content',
@@ -60,11 +61,6 @@ export default class WebFetchTool extends Tool {
 
   public async call(args: { url: string }) {
     this.logger.debug('[WebFetchTool.call]', Object.keys(args));
-
-    if (this.engine.isDry) {
-      this.logger.info('[WebFetchTool.call]', '[dry] fetch:', args.url);
-      return { results: [] };
-    }
 
     // use fetch to fetch the page
     const response = await fetch(args.url);

@@ -10,11 +10,6 @@ export default class BrowserSystem extends System {
   public async load(): Promise<void> {
     this.logger.debug('[BrowserSystem.load]');
 
-    if (this.engine.isDry) {
-      this.logger.info('[BrowserSystem.load]', '[dry] loading chromium');
-      return;
-    }
-    
     puppeteer.use(stealth());
 
     this.browser = await puppeteer.launch({

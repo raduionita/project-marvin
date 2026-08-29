@@ -3,6 +3,7 @@ import { Tool, ToolMeta } from '../types.js';
 export default class MarvinStateTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'marvin',
     function: {
       name: 'marvin_state',
       description: 'Read the current Marvin runtime state. Omit "area" for a full summary, or filter to "agents", "tasks", "models", "channels", "integrations", "skills", or "settings"',

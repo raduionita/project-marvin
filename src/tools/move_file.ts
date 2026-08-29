@@ -6,6 +6,7 @@ import { isSafePath, safeJoin } from '../helpers.js';
 export default class MoveFileTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'filesystem',
     function: {
       name: 'move_file',
       description: 'Move or rename a file or folder inside the `~/.marvin/files` folder. Both the source and the destination must be inside ~/.marvin',

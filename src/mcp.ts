@@ -174,6 +174,7 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
       const schema = tool.inputSchema || {};
       tools.push({
         type: 'function',
+        group: 'mcp',
         function: {
           name: makeMcpToolName(id, tool.name),
           description: tool.description || `Call "${tool.name}" on the "${id}" mcp server`,

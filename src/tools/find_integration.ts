@@ -3,6 +3,7 @@ import { Tool, ToolMeta, Field } from '../types.js';
 export default class FindIntegrationTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'integration',
     function: {
       name: 'find_integration',
       description: 'Look up the schema (fields, required fields, allowed values) of an action on a configured integration, e.g. create_post on a wordpress site. Call this before call_integration to learn which fields to send.',

@@ -37,7 +37,6 @@ export default class Engine {
   // root (~/) app folder
   public root: string = import.meta.dirname.replace(/\/src.*/, '');
 
-  public isDry: boolean = process.argv.includes('--dry') || process.argv.includes('-dry');
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
   public isDebug: boolean =  process.env.MARVIN_LOG_LEVEL === 'debug';
 
@@ -105,11 +104,6 @@ export default class Engine {
 
     // for each task, start setTimeout
     for (const [taskId, task] of Object.entries(this.tasks)) {
-      if (this.isDry) {
-        this.logger.info('[Engine.execAgents]', `[dry] task ${taskId} scheduled (${task.schedule}ms) (agent ${task.agent?.id})`);
-        continue;
-      }
-
       // route each task to its handler by type
       let run: (taskId: string) => void;
       switch (task.type) {
@@ -137,36 +131,28 @@ export default class Engine {
 
     // create project/workspace folder (~/.marvin)
     const hpath = this.work;
-    if (this.isDry) {
-      this.logger.info('[Engine.scanProject]', '[dry]', hpath);
-    } else if (!existsSync(hpath)) {
+    if (!existsSync(hpath)) {
       this.logger.error('[Engine.scanProject]', `missing ${hpath} folder`, 'please run "marvin install" again');
       return;
     }
 
     // agents folder (~/.marvin/agents)
     const apath = join(hpath, 'agents');
-    if (this.isDry) {
-      this.logger.info('[Engine.scanProject]', '[dry]', apath);
-    } else if (!existsSync(apath)) {
+    if (!existsSync(apath)) {
       this.logger.error('[Engine.scanProject]', `missing ${apath} folder`, 'please run "marvin install" again');
       return;
     }
 
     // create ~/.marvin/MARVIN.md from constants (orchestrator identity)
     const mpath = join(hpath, 'MARVIN.md');
-    if (this.isDry) {
-      this.logger.info('[Engine.scanProject]', '[dry]', mpath);
-    } else if (!existsSync(mpath)) {
+    if (!existsSync(mpath)) {
       this.logger.error('[Engine.scanProject]', `missing ${mpath} file`, 'please run "marvin install" again');
       return;
     }
 
     // create marvin.json if missing (~/.marvin/marvin.json)
     const cpath = join(hpath, 'marvin.json');
-    if (this.isDry) {
-      this.logger.info('[Engine.scanProject]', '[dry]', cpath);
-    } else if (!existsSync(cpath)) {
+    if (!existsSync(cpath)) {
       this.logger.error('[Engine.scanProject]', `missing ${cpath} file`, 'please run "marvin install" again');
       return;
     }
@@ -553,11 +539,6 @@ export default class Engine {
         enabled = false;
       }
 
-      if (this.isDry) {
-        this.logger.info('[Engine.loadTasks]', `[dry] task "${taskId}" created (agent ${agent.id})`);
-        continue;
-      }
-
       // add task to the engine
       this.tasks[taskId] = {
         id: taskId,
@@ -757,22 +738,13 @@ export default class Engine {
           this.logger.debug('[Engine.execSweep]', `removing idle chat ${chatId}`);
           delete agent.cache[chatId];
           // also drop the persisted copy, so the chat is fully forgotten
-          try {
-            unlinkSync(join(this.work, 'chats', `${chatId}.json`));
-          } catch {
-            // no persisted copy, nothing to remove
-          }
+          try { unlinkSync(join(this.work, 'chats', `${chatId}.json`)); } catch { }
           removed++;
         }
       }
     }
 
     this.logger.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
-
-    if (this.isDry) {
-      this.logger.info('[Engine.execSweep]', '[dry]', 'task executed (once)');
-      return;
-    }
 
     const schedule = Math.max(60*60*1000, Math.min(60*1000, removed === 0 ? task.schedule * 2 : task.schedule / 2));
 
@@ -860,12 +832,6 @@ export default class Engine {
       } catch (err) {
         this.logger.error('[Engine.execTask]', `channel ${channelId} send failed:`, err);
       }
-    }
-
-    // don't schedule anything
-    if (this.isDry) {
-      this.logger.info('[Engine.execTask]', '[dry]', 'task executed (once)');
-      return;
     }
 
     // ! re-schedule next execution

@@ -19,6 +19,7 @@ import { Tool, ToolMeta } from '{MARVIN_ROOT}/src/types.js';
 export default class MyTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'general',
     function: {
       name: 'my_tool',
       description: 'Short, self-explanatory description of what the tool does',

@@ -5,6 +5,7 @@ import { isSafePath, safeJoin } from '../helpers.js';
 export default class ReadFileTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'filesystem',
     function: {
       name: 'read_file',
       description: 'Read the contents of a file from disk (only inside the `~/.marvin/files` folder)',

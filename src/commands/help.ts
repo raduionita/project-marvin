@@ -4,7 +4,7 @@ export default class HelpCommand extends Command {
   async exec() {
     this.logger.debug('[HelpCommand.exec]');
 
-    this.logger.info('usage: marvin [command] [options] [--dry] [--log-level=level]');
+    this.logger.info('usage: marvin [command] [options] [--log-level=level]');
     this.logger.info('commands:');
     this.logger.info('  help    ', 'show this help');
     this.logger.info('  install ', 'install the project');

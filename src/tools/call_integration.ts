@@ -39,6 +39,7 @@ export default class CallIntegrationTool extends Tool {
 
     return {
       type: 'function',
+      group: 'integration',
       function: {
         name: 'call_integration',
         description: 'Execute an action on a configured 3rd party integration (e.g. a Wordpress site). Use find_integration first to learn the required fields for the action.',

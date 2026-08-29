@@ -6,6 +6,7 @@ import { dirname, join } from 'path';
 export default class EditFileTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'filesystem',
     function: {
       name: 'edit_file',
       description: 'Edit a file inside the `~/.marvin/files` folder: pass oldString + newString to replace a snippet, or just newString to create/overwrite the file',

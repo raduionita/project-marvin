@@ -78,7 +78,31 @@ export abstract class System {
   abstract drop(): Promise<void>;
 }
 
-export type ToolMeta = { type: string, function: {name:string, description:string, parameters:{type:string, properties:{[key:string]:{type:string, description:string, enum?:string[]}}, required?:string[]}} };
+export type ToolMeta = {
+  type: string,
+  // category used to group tools in the "## Available Tools" system prompt block
+  group: string,
+  function: {
+    name: string,
+    description: string,
+    parameters: {
+      type: string,
+      properties: {
+        [key: string]: {
+          type: string,
+          description: string,
+          items?: {
+            type: string,
+            description?: string,
+            enum?: string[]
+          },
+          enum?: string[]
+        }
+      },
+      required?: string[]
+    }
+  }
+};
 
 export abstract class Tool {
   constructor(public engine: Engine, public logger: Logger) {
@@ -88,7 +112,7 @@ export abstract class Tool {
   // there might be multiple tools that end the chat (end_chat, ask_question, etc.)
   public readonly stop: boolean = false;
   // tool descriptor
-  public readonly meta: ToolMeta = { type: 'function', function: { name: 'stop', description: 'STOP', parameters: { type: 'object', properties: {}, required: [] } } };
+  public readonly meta: ToolMeta = { type: 'function', group: 'general', function: { name: 'stop', description: 'STOP', parameters: { type: 'object', properties: {}, required: [] } } };
 
   public abstract call(args: {[key:string]:any}, agent?: Agent, chat?: Chat): Promise<{[key:string]:any}>;
 }

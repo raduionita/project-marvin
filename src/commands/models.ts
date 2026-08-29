@@ -61,12 +61,8 @@ export default class ModelsCommand extends Command {
 
         const cpath = join(this.engine.work, 'marvin.json');
         // write to config file
-        if (this.engine.isDry) {
-          this.logger.info('[ModelsCommand.exec]', '[dry]',`would configure model "${modelId}", config persisted to ${cpath}`);
-        } else {
-          writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-          this.logger.info('[ModelsCommand.exec]', `model "${modelId}" configured, config persisted to ${cpath}`);
-        }
+        writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+        this.logger.info(`model "${modelId}" configured, config persisted to ${cpath}`);
       } break;
     }
   }

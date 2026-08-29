@@ -6,6 +6,7 @@ import { isSafePath, safeJoin } from '../helpers.js';
 export default class ListFilesTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'filesystem',
     function: {
       name: 'list_files',
       description: 'List the files and folders inside a directory of the `~/.marvin/files` folder. Omit "path" to list the workspace root, or pass a relative path. Optionally filter entries by a regex "pattern" matched against the entry name',

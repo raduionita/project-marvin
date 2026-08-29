@@ -68,7 +68,7 @@ class MockModel extends Model {
 
 /** A minimal mock tool. */
 class MockTool extends Tool {
-  meta = { type: 'function', function: { name: 'mock_tool', description: '', parameters: { type: 'object', properties: {}, required: [] } } };
+  meta = { type: 'function', group: 'general', function: { name: 'mock_tool', description: '', parameters: { type: 'object', properties: {}, required: [] } } } as ToolMeta;
   async call(_args: any): Promise<any> {
     return { result: 'tool output' };
   }
@@ -322,6 +322,7 @@ test('loadTools loads custom tools from the workspace', async () => {
     'export default class CustomPingTool extends Tool {',
     '  public meta: ToolMeta = {',
     "    type: 'function',",
+    "    group: 'custom',",
     '    function: {',
     "      name: 'custom_ping',",
     "      description: 'pings the custom tool loader',",
@@ -613,17 +614,26 @@ test('execTask merges task integration tools into chat.tools', async () => {
     integrations: ['gloobeam'],
   } as Task;
 
-  // capture the tool metas the model receives on each call
+  // capture the chat the model receives on each call
   const model = engine.models['mock.model'] as MockModel;
-  const seen: ToolMeta[][] = [];
-  model.execChat = async (chat: Chat) => { seen.push(chat.tools || []); return (model as any)._reply; };
+  const seen: Chat[] = [];
+  model.execChat = async (chat: Chat) => { seen.push(chat); return (model as any)._reply; };
 
   await engine.execTask('test-task');
   clearTimeout(engine.tasks['test-task']!.timeout!);
 
   expect(seen.length).toBeGreaterThan(0);
-  const names = seen[0]!.map(t => t.function.name);
-  // task-linked integration tool is present alongside the engine default tools
-  expect(names).toContain('gloobeam__create_post');
-  expect(names).toContain('mock_tool');
+  const toolNames = seen[0]!.tools?.map(t => t.function.name) || [];
+  // task-linked integration tool is merged into chat.tools. engine tools
+  // (e.g. mock_tool) are NOT in chat.tools by default; they are listed in
+  // the "## Available Tools" system prompt block and loaded on demand via
+  // the load_tools tool.
+  expect(toolNames).toContain('gloobeam__create_post');
+  expect(toolNames).not.toContain('mock_tool');
+
+  // the system prompt seeds the available-tools catalog so the LLM can
+  // discover and load engine tools via load_tools
+  const prompt = seen[0]!.messages[0]!.content as string;
+  expect(prompt).toContain('## Available Tools');
+  expect(prompt).toContain('mock_tool');
 });

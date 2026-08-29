@@ -22,9 +22,7 @@ export default class EnableCommand extends InstallCommand {
 
     // ~/.marvin/.env (systemd EnvironmentFile must exist or the unit will never start)
     const epath = join(hpath, '.env');
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'write', epath);
-    } else if (!existsSync(epath)) {
+    if (!existsSync(epath)) {
       writeFileSync(epath, [
         '# marvin environment variables (systemd EnvironmentFile)',
         '# set to debug|info|warn|error to control log verbosity',
@@ -44,20 +42,14 @@ export default class EnableCommand extends InstallCommand {
 
     // ~/.local/bin/marvin
     const wpath = join(homedir(), '.local', 'bin', 'marvin');
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'would ensure wrapper:', wpath);
-    } else {
-      mkdirSync(dirname(wpath), { recursive: true });
-      writeFileSync(wpath, `#!/bin/sh\nexec "${bpath}" "${join(this.engine.root, 'src', 'marvin.ts')}" "$@"\n`, { mode: 0o755 });
-      this.logger.info('created wrapper:', wpath, 'bun =', bpath);
-    }
+    mkdirSync(dirname(wpath), { recursive: true });
+    writeFileSync(wpath, `#!/bin/sh\nexec "${bpath}" "${join(this.engine.root, 'src', 'marvin.ts')}" "$@"\n`, { mode: 0o755 });
+    this.logger.info('created wrapper:', wpath, 'bun =', bpath);
 
     // ~/.config/systemd/user/marvin.service
     const spath = join(this.engine.root, 'marvin.service');
     const dpath = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'would write service file:', dpath);
-    } else if (!existsSync(spath)) {
+    if (!existsSync(spath)) {
       this.logger.error('[EnableCommand.execSystemd]', 'service file missing:', spath);
     } else {
       // always refresh the unit so re-running enable picks up changes
@@ -67,17 +59,13 @@ export default class EnableCommand extends InstallCommand {
     }
 
     // start service
-    if (this.engine.isDry) {
-      this.logger.info('[dry]', 'enable service: systemctl --user daemon-reload && systemctl --user enable marvin && systemctl --user restart marvin');
-    } else {
-      this.logger.debug('[EnableCommand.execSystemd]', 'enabling service...');
-      execSync(['systemctl', '--user', 'daemon-reload'].join(' '), { stdio: 'inherit' });
-      // restart (not "enable --now"): also applies a refreshed unit file to an already-running daemon
-      execSync(['systemctl', '--user', 'enable', 'marvin'].join(' '), { stdio: 'inherit' });
-      execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
-      // wait for the service to start
-      await this.waitForActive();
-    }
+    this.logger.debug('[EnableCommand.execSystemd]', 'enabling service...');
+    execSync(['systemctl', '--user', 'daemon-reload'].join(' '), { stdio: 'inherit' });
+    // restart (not "enable --now"): also applies a refreshed unit file to an already-running daemon
+    execSync(['systemctl', '--user', 'enable', 'marvin'].join(' '), { stdio: 'inherit' });
+    execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
+    // wait for the service to start
+    await this.waitForActive();
 
     this.logger.info('marvin enabled!');
   }

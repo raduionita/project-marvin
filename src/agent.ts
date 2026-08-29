@@ -38,28 +38,26 @@ export class Agent {
   loadChat(chatId: string | undefined, tools?: ToolMeta[]): Chat {
     this.logger.debug('[Agent.loadChat]');
 
-    // try from cache or disk
-    if (chatId) {
-      const cached = this.cache[chatId];
-      if (cached) {
-        cached.updated = Date.now();
-        return cached;
-      }
+    try {
+      // try from cache or disk
+      if (chatId) {
+        const cached = this.cache[chatId];
+        if (cached) {
+          cached.updated = Date.now();
+          return cached;
+        }
 
-      if (!this.engine.isDry) {
-        try {
-          const file = join(this.engine.work, 'chats', `${chatId}.json`);
-          if (existsSync(file)) {
-            // load from disk, then re-cache
-            const chat = JSON.parse(readFileSync(file, 'utf-8')) as Chat;
-            chat.updated = Date.now();
-            this.cache[chatId] = chat;
-            return chat;
-          }
-        } catch (err) {
-          this.logger.debug('[Agent.makeChat]', 'failed to load chat from disk:', err);
+        const file = join(this.engine.work, 'chats', `${chatId}.json`);
+        if (existsSync(file)) {
+          // load from disk, then re-cache
+          const chat = JSON.parse(readFileSync(file, 'utf-8')) as Chat;
+          chat.updated = Date.now();
+          this.cache[chatId] = chat;
+          return chat;
         }
       }
+    } catch (err) {
+      this.logger.debug('[Agent.makeChat]', 'failed to load chat from disk:', err);
     }
 
     // or make a new chat
@@ -70,73 +68,99 @@ export class Agent {
   makeChat(chatId: string | undefined, tools?: ToolMeta[]): Chat {
     this.logger.debug('[Agent.makeChat]');
 
-    let system = this.identity;
+    let system: string = this.identity;
+    let always: ToolMeta[] = [];
 
-    const entries = Object.entries(this.engine.integrations);
-    const configs = entries.length ? entries : Object.entries(this.engine.config.integrations || {});
+    {
+      const entries = Object.entries(this.engine.integrations);
+      const configs = entries.length ? entries : Object.entries(this.engine.config.integrations || {});
 
-    const blocks = configs.map(([id, integration]) => {
-      const isLoaded = integration instanceof Integration;
-      const config = isLoaded ? integration.config : integration;
-      const meta = isLoaded ? integration.meta :  {
-        type: config?.type || 'integration',
-        title: id,
-        description: '',
-        actions: {},
-        arguments: {},
-      };
-      const endpoint = config?.endpoint || config?.url || config?.baseUrl || '';
-      const actions = Object.keys(meta.actions).length
-        ? `\nActions: ${Object.entries(meta.actions).map(([name, description]) => `${name} - ${description}`).join('; ')}`
-        : '';
-      const url = endpoint ? ` (${endpoint})` : '';
-      return `### ${id}${url}\n${meta.description || meta.title}${actions}`;
-    });
+      const blocks = configs.map(([id, integration]) => {
+        const isLoaded = integration instanceof Integration;
+        const config = isLoaded ? integration.config : integration;
+        const meta = isLoaded ? integration.meta :  {
+          type: config?.type || 'integration',
+          title: id,
+          description: '',
+          actions: {},
+          arguments: {},
+        };
+        const endpoint = config?.endpoint || config?.url || config?.baseUrl || '';
+        const actions = Object.keys(meta.actions).length
+          ? `\nActions: ${Object.entries(meta.actions).map(([name, description]) => `${name} - ${description}`).join('; ')}`
+          : '';
+        const url = endpoint ? ` (${endpoint})` : '';
+        return `### ${id}${url}\n${meta.description || meta.title}${actions}`;
+      });
 
-    // inject the integrations block
-    if (blocks.length) {
-      system += '\n\n';
-      system += '## Integrations\n';
-      system += blocks.join('\n');
-    }
-
-    // inject the mcps block: loaded servers list their tools, config-only
-    // entries just their spawn spec
-    const mcpBlocks = Object.entries(this.engine.mcps).map(([id, client]) => {
-      const tools = Object.keys(client.tools).length
-        ? `\nTools: ${Object.keys(client.tools).join('; ')}`
-        : '';
-      return `### ${id}${tools}`;
-    });
-    const mcpConfigBlocks = Object.keys(this.engine.config.mcps || {})
-      .filter(id => !this.engine.mcps[id])
-      .map(id => `### ${id} (not connected)`);
-    const allMcpBlocks = [...mcpBlocks, ...mcpConfigBlocks];
-    if (allMcpBlocks.length) {
-      system += '\n\n';
-      system += '## Mcps\n';
-      system += allMcpBlocks.join('\n');
-    }
-
-    // inject a compact summary of the most recently updated memory notes, so
-    // the agent keeps cross-run context (facts, preferences, progress)
-    if (this.engine.config.settings.memory || this.memory) {
-      const memory = readMemorySummary(this.engine, this.id);
-      if (memory) {
+      // inject the integrations block
+      if (blocks.length) {
         system += '\n\n';
-        system += '## Memory\n';
-        system += memory + '\n';
-        system += 'Use the memory tool (remember/recall) to read and update these notes.';
-        this.logger.debug('[Agent.makeChat]', 'memory:', memory);
+        system += '## Integrations\n';
+        system += blocks.join('\n');
       }
-    }
+    } // integrations
+    
+    {
+      // inject the mcps block: loaded servers list their tools, config-only entries just their spawn spec
+      const mcpBlocks = Object.entries(this.engine.mcps).map(([id, client]) => {
+        const tools = Object.keys(client.tools).length
+          ? `\nTools: ${Object.keys(client.tools).join('; ')}`
+          : '';
+        return `### ${id}${tools}`;
+      });
+      const mcpConfigBlocks = Object.keys(this.engine.config.mcps || {})
+        .filter(id => !this.engine.mcps[id])
+        .map(id => `### ${id} (not connected)`);
+      const allMcpBlocks = [...mcpBlocks, ...mcpConfigBlocks];
+      if (allMcpBlocks.length) {
+        system += '\n\n';
+        system += '## Mcps\n';
+        system += allMcpBlocks.join('\n');
+      }
+    } // mcps
+
+    {
+      // inject a compact summary of the most recently updated memory notes, so
+      // the agent keeps cross-run context (facts, preferences, progress)
+      if (this.engine.config.settings.memory || this.memory) {
+        const memory = readMemorySummary(this.engine, this.id);
+        if (memory) {
+          system += '\n\n';
+          system += '## Memory\n';
+          system += memory + '\n';
+          system += 'Use the memory tool (remember/recall) to read and update these notes.';
+          this.logger.debug('[Agent.makeChat]', 'memory:', memory);
+        }
+      }
+    } // memories
+
+    {
+      // inject a compact catalog of loadable tools so the agent can discover and load them on demand via the load_tools
+      const available = Object.values(this.engine.tools).filter(t => !t.stop && t.meta.function.name !== 'load_tools');
+      if (available.length) {
+        const groups: Record<string, string[]> = {};
+        for (const tool of available) {
+          (groups[tool.meta.group] ||= []).push(tool.meta.function.name);
+        }
+        system += '\n\n';
+        system += '## Available Tools\n';
+        system += Object.entries(groups).map(([group, names]) => `${group}: ${names.join(', ')}`).join('\n');
+        system += '\nUse the load_tools tool to load a tool before calling it.';
+      }
+
+      // always-known tools: load_tools (tool discovery) + stop tools (end_chat)
+      always = Object.values(this.engine.tools)
+        .filter(t => t.stop || t.meta.function.name === 'load_tools')
+        .map(t => t.meta);
+    } // tools
 
     return {
       id: chatId,
       messages: [{ role: 'system', content: system }],
       thinking: false,
       userId: '',
-      tools: [...Object.values(this.engine.tools).map(t => t.meta), ...(tools || [])],
+      tools: [...always, ...(tools || [])],
       updated: Date.now(),
     } as Chat;
   }
@@ -148,7 +172,6 @@ export class Agent {
     if (!chatId) return;
     chat.updated = Date.now();
     this.cache[chatId] = chat;
-    if (this.engine.isDry) return;
 
     try {
       mkdirSync(join(this.engine.work, 'chats'), { recursive: true });
@@ -228,13 +251,6 @@ export class Agent {
       // load task input as user message
       chat.messages.push({ role: 'user', content: message.trim() });
 
-      // return early
-      if (this.engine.isDry) {
-        this.logger.info('[Agent.sendChat]', '[dry]', 'send messages to:', this.model.model);
-        this.saveChat(chatId, chat);
-        return { content: '(dry)', steps: 0 };
-      }
-
       // AI loop: call model, execute tool calls, repeat until done
       let reply: Reply;
       let steps = -1;
@@ -274,8 +290,7 @@ export class Agent {
           } else {
             // ! tool call
             let result = await this.execTool(call.name, call.arguments, chat);  
-            // add tool call to chat history, truncating huge results (e.g. full
-            // web pages) so they cannot blow past the model context window
+            // add tool call to chat history, truncating huge results
             chat.messages.push({role: 'tool', content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS), toolId: call.id});
           }
         }

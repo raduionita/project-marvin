@@ -15,9 +15,7 @@ export default class InstallCommand extends Command {
   async makeProject() {
     // ~/.marvin
     const hpath = this.engine.work;
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', hpath);
-    } else if (!existsSync(hpath)) {
+    if (!existsSync(hpath)) {
       mkdirSync(hpath, { recursive: true });
       this.logger.info('created workspace directory:', hpath);
     } else {
@@ -26,9 +24,7 @@ export default class InstallCommand extends Command {
 
     // ~/.marvin/agents
     const apath = join(hpath, 'agents');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', apath);
-    } else if (!existsSync(apath)) {
+    if (!existsSync(apath)) {
       mkdirSync(apath, { recursive: true });
       this.logger.info('created agents directory:', apath);
     } else {
@@ -37,9 +33,7 @@ export default class InstallCommand extends Command {
 
     // ~/.marvin/skills
     const kpath = join(hpath, 'skills');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', kpath);
-    } else if (!existsSync(kpath)) {
+    if (!existsSync(kpath)) {
       mkdirSync(kpath, { recursive: true });
       this.logger.info('created skills directory:', kpath);
     } else {
@@ -48,9 +42,7 @@ export default class InstallCommand extends Command {
 
     // ~/.marvin/tools
     const tpath = join(hpath, 'tools');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', tpath);
-    } else if (!existsSync(tpath)) {
+    if (!existsSync(tpath)) {
       mkdirSync(tpath, { recursive: true });
       this.logger.info('created tools directory:', tpath);
     } else {
@@ -59,9 +51,7 @@ export default class InstallCommand extends Command {
 
     // ~/.marvin/logs (daemon log file lives here)
     const lpath = join(hpath, 'logs');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', lpath);
-    } else if (!existsSync(lpath)) {
+    if (!existsSync(lpath)) {
       mkdirSync(lpath, { recursive: true });
       this.logger.info('created logs directory:', lpath);
     } else {
@@ -70,9 +60,7 @@ export default class InstallCommand extends Command {
 
     // ~/.marvin/memories (persistent memory notes live here)
     const memPath = join(hpath, 'memories');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', memPath);
-    } else if (!existsSync(memPath)) {
+    if (!existsSync(memPath)) {
       mkdirSync(memPath, { recursive: true });
       this.logger.info('created memories directory:', memPath);
     } else {
@@ -81,9 +69,7 @@ export default class InstallCommand extends Command {
 
     // ~/.marvin/chats (persisted chat transcripts live here)
     const chatsPath = join(hpath, 'chats');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', chatsPath);
-    } else if (!existsSync(chatsPath)) {
+    if (!existsSync(chatsPath)) {
       mkdirSync(chatsPath, { recursive: true });
       this.logger.info('created chats directory:', chatsPath);
     } else {
@@ -92,9 +78,7 @@ export default class InstallCommand extends Command {
 
     // ~/.marvin/files
     const fpath = join(hpath, 'files');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', fpath);
-    } else if (!existsSync(fpath)) {
+    if (!existsSync(fpath)) {
       mkdirSync(fpath, { recursive: true });
       this.logger.info('created agents directory:', fpath);
     } else {
@@ -103,9 +87,7 @@ export default class InstallCommand extends Command {
 
     //  ~/.marvin/MARVIN.md
     const mpath = join(hpath, 'MARVIN.md');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.makeProject]', '[dry]', mpath);
-    } else if (!existsSync(mpath)) {
+    if (!existsSync(mpath)) {
       writeFileSync(mpath, constants.MARVIN_MD.trim());
       this.logger.info('created MARVIN.md:', mpath);
     } else {
@@ -114,9 +96,7 @@ export default class InstallCommand extends Command {
 
     // create marvin.json if missing (~/.marvin/marvin.json)
     const cpath = join(hpath, 'marvin.json');
-    if (this.engine.isDry) {
-      this.logger.info('[InstallCommand.exec]', '[dry]', cpath);
-    } else if (!existsSync(cpath)) {
+    if (!existsSync(cpath)) {
       const config = constants.DEFAULT_CONFIG;
       writeFileSync(cpath, JSON.stringify(config, null, 2));
       this.logger.info('created config file:', cpath);

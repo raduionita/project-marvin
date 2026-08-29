@@ -34,6 +34,7 @@ function parseValue(raw: any): any {
 export default class MarvinConfigTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'marvin',
     function: {
       name: 'marvin_config',
       description: 'Read or edit the Marvin config file (~/.marvin/marvin.json). Default reads the whole config; pass "key" for a dotted path. Use operation "set" with "key" and "value" (JSON or string) to persist a value.',

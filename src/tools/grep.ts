@@ -14,6 +14,7 @@ function isBinary(content: string): boolean {
 export default class GrepTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'filesystem',
     function: {
       name: 'grep',
       description: 'Search the contents of files inside the ~/.marvin workspace for a regex pattern. Returns up to 100 matches with file paths and line numbers. Omit "path" to search the whole workspace, or pass a relative path to search a subdirectory or a single file',

@@ -5,6 +5,7 @@ import { isSafePath, safeJoin } from '../helpers.js';
 export default class DeleteFileTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'filesystem',
     function: {
       name: 'delete_file',
       description: 'Delete a file inside the `~/.marvin/files` folder. Only files can be deleted, not folders',

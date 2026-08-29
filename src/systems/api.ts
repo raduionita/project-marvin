@@ -15,11 +15,6 @@ export default class ApiSystem extends System {
     this.port = this.engine.config.settings.port || 7331;
     this.host = this.engine.config.settings.host || '127.0.0.1';
 
-    if (this.engine.isDry) {
-      this.logger.info('[ApiSystem.load]', '[dry] loading server', this.host, this.port);
-      return;
-    }
-
     this.server = http.createServer(async (req, res) => {
       const url = new URL(req.url || '/', `http://localhost:${this.port}`);
       const command = url.pathname.split('/')[1];

@@ -8,6 +8,7 @@ const DEFAULT_LINES = 20;
 export default class ReadLogsTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',
+    group: 'marvin',
     function: {
       name: 'read_logs',
       description: 'Read the last N lines (default 20) of the a marvin log file (~/.marvin/logs/marvin.log). Use it to inspect recent activity, errors, or what the assistant did',

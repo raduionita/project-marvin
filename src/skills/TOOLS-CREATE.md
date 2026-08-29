@@ -19,6 +19,7 @@ export default class MyTool extends Tool {
   // tool descriptor
   public meta: ToolMeta = {
     type: 'function',
+    group: 'general',
     function: {
       name: 'my_tool',
       description: 'Short, self-explanatory description of what the tool does',
@@ -54,8 +55,7 @@ literally in the import; the `marvin tools add` command replaces it for you.
 
 ## Rules
 
-- File name must match the tool name (snake_case), e.g. tool `web_search` lives
-  in `~/.marvin/tools/web_search.ts`.
+- File name must match the tool name (snake_case), e.g. tool `web_search` lives in `~/.marvin/tools/web_search.ts`.
 - `meta.function.name` must be the same snake_case name as the file.
 - Keep the `description` short and describe when to use the tool.
 - Declare every parameter in `properties` with a clear `description`.
@@ -64,10 +64,8 @@ literally in the import; the `marvin tools add` command replaces it for you.
   - validate the inputs and return `{ error: '...' }` on bad input
   - return a plain JSON object (never throw to the agent)
 - Log with `this.logger.debug('[ToolName.call]', args)`.
-- Use the engine only when needed: `this.engine` (e.g. `this.engine.isDry`,
-  `this.engine.work`, `this.engine.integrations`, `this.engine.skills`).
-- Respect the workspace: paths must stay inside `~/.marvin` (see
-  `safeJoin` from `helpers.js` in `read_file.ts`/`edit_file.ts`).
+- Use the engine only when needed: `this.engine` (e.g. `this.engine.work`, `this.engine.integrations`, `this.engine.skills`).
+- Respect the workspace: paths must stay inside `~/.marvin` (see `safeJoin` from `helpers.js` in `read_file.ts`/`edit_file.ts`).
 
 ## Examples to study
 
