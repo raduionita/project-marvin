@@ -208,7 +208,6 @@ function mockConfig(options: {
 
 function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine: Engine; model: MockModel; channel: MockSlackChannel } {
   const engine = new Engine(new Logger());
-  engine.isDry = false;
   engine.state = 'exec';
   engine.tools['get_date'] = new GetDateTool(engine, new Logger());
 
@@ -701,7 +700,6 @@ test('E2E: empty AI content posts the (no response) placeholder', async () => {
 
 test('E2E: missing agent does not crash', async () => {
   const engine = new Engine(new Logger());
-  engine.isDry = false;
   engine.state = 'exec';
   engine.config = mockConfig({
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xoxb-test' } },

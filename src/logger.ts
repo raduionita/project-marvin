@@ -23,8 +23,7 @@ export type LogMethod = 'log' | LogLevel;
 // intercepts every emitted line instead of writing to the console
 export type LogOutput = (level: LogMethod, args: unknown[]) => void;
 
-// a `[ClassName.method]` tag (contains a dot). `[dry]` and other markers
-// without a dot are not tags and are kept as-is.
+// a `[ClassName.method]` tag (contains a dot). other markers without a dot are not tags and are kept as-is.
 const TAG_RE = /^\[[^\]]+\.[^\]]+\]$/;
 
 // shared output mode applied to every Logger instance (console vs daemon):

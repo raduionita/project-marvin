@@ -119,16 +119,6 @@ test('Logger strips leading [ClassName.method] tags by default', () => {
   expect(lines[2]!.args[0]).toBeInstanceOf(Error);
 });
 
-test('Logger keeps [dry] markers when stripping tags', () => {
-  const lines: { level: LogMethod; args: unknown[] }[] = [];
-  const out: LogOutput = (level, args) => lines.push({ level, args });
-  const lg = new Logger({ output: out, level: 'info' });
-
-  lg.info('[InstallCommand.makeProject]', '[dry]', '/tmp/x');
-
-  expect(lines[0]!.args).toEqual(['[dry]', '/tmp/x']);
-});
-
 test('Logger.setStripTags(false) keeps the tags', () => {
   const lines: { level: LogMethod; args: unknown[] }[] = [];
   const out: LogOutput = (level, args) => lines.push({ level, args });

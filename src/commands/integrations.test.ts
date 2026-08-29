@@ -58,6 +58,36 @@ test('execDrop removes an integration and persists to marvin.json', async () => 
   expect(config.integrations['gloobeam']).toBeUndefined();
 });
 
+test('execDrop prompts via rawList when no <name> arg is given', async () => {
+  const engine = buildEngine(
+    ['gloobeam', { enabled: true, type: 'wordpress' }],
+    ['hubspot', { enabled: true, type: 'wordpress' }],
+  );
+  const cmd = new IntegrationsCommand(engine, new Logger(), ['drop']);
+
+  // 3 choices (gloobeam, hubspot, cancel) -> pick "1"=gloobeam
+  answers = ['1'];
+
+  await cmd.exec();
+
+  expect(readConfig(engine).integrations['gloobeam']).toBeUndefined();
+  expect(readConfig(engine).integrations['hubspot']).toBeDefined();
+});
+
+test('execDrop bails when the user picks "cancel" from rawList', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, type: 'wordpress' }]);
+  const { logger, lines } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, logger, ['drop']);
+
+  // 2 choices (gloobeam, cancel) -> pick "2"=cancel
+  answers = ['2'];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('no integration selected');
+  expect(readConfig(engine).integrations['gloobeam']).toBeDefined();
+});
+
 test('execDrop warns for unknown integration', async () => {
   const engine = buildEngine();
   const { logger, lines } = captureLogger();

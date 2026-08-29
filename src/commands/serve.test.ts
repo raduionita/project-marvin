@@ -22,9 +22,8 @@ function mockConfig(channels: Config['channels'] = {}, models: Config['models'] 
   } as Config;
 }
 
-function mockEngine(isDry = false): Engine {
+function mockEngine(): Engine {
   const engine = new Engine(new Logger());
-  engine.isDry = isDry;
   engine.state = 'exec';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-serve-'));
   return engine;
@@ -96,7 +95,6 @@ function buildTestEngine(opts?: {
   agentId?: string;
   agentModel?: string;
   agentChannels?: Record<string, string>;
-  isDry?: boolean;
   replyContent?: string;
   replyStop?: boolean;
   toolCalls?: Message['tools'];
@@ -109,7 +107,6 @@ function buildTestEngine(opts?: {
     agentId = 'marvin',
     agentModel = 'mock.model',
     agentChannels = { 'test.channel': 'default' },
-    isDry = false,
     replyContent = 'end chat',
     replyStop,
     toolCalls,
@@ -117,7 +114,7 @@ function buildTestEngine(opts?: {
     configAgents,
   } = opts || {};
 
-  const engine = mockEngine(isDry);
+  const engine = mockEngine();
 
   engine.config = mockConfig(
     channelEnabled ? { [channelName]: { enabled: true } } : {},

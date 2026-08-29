@@ -28,9 +28,8 @@ function mockConfig(channels: Config['channels'] = {}, models: Config['models'] 
   } as Config;
 }
 
-function mockEngine(isDry = false): Engine {
+function mockEngine(): Engine {
   const engine = new Engine(new Logger());
-  engine.isDry = isDry;
   engine.state = 'exec';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-agent-'));
   engine.config = mockConfig();
@@ -103,7 +102,6 @@ function buildTestEngine(opts?: {
   agentId?: string;
   agentModel?: string;
   agentChannels?: Record<string, string>;
-  isDry?: boolean;
   replyContent?: string;
   replyStop?: boolean;
   toolCalls?: Message['tools'];
@@ -116,7 +114,6 @@ function buildTestEngine(opts?: {
     agentId = 'marvin',
     agentModel = 'mock.model',
     agentChannels = { 'test.channel': 'default' },
-    isDry = false,
     replyContent = 'end chat',
     replyStop,
     toolCalls,
@@ -124,7 +121,7 @@ function buildTestEngine(opts?: {
     configAgents,
   } = opts || {};
 
-  const engine = mockEngine(isDry);
+  const engine = mockEngine();
 
   engine.config = mockConfig(
     channelEnabled ? { [channelName]: { enabled: true } } : {},
@@ -177,20 +174,6 @@ function chatWith(messages: Chat['messages']): Chat {
 }
 
 // ==================== sendChat (AI loop) tests ====================
-
-test('sendChat returns dry result when engine.isDry is true', async () => {
-  const engine = buildTestEngine({ isDry: true });
-
-  const result = await engine.agents['marvin']!.sendChat('chat-1', 'hello');
-
-  // Dry mode returns early without calling the model
-  expect(result).toEqual({ content: '(dry)', steps: 0 });
-  // Verify the model was never invoked by checking the chat has no assistant messages
-  const chat = engine.agents['marvin']!.loadChat('chat-1');
-  expect(chat).toBeDefined();
-  const assistantMessages = chat!.messages.filter((m: Message) => m.role === 'assistant');
-  expect(assistantMessages.length).toBe(0);
-});
 
 test('sendChat pushes system and user messages to chat', async () => {
   const engine = buildTestEngine();

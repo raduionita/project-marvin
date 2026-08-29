@@ -15,9 +15,8 @@ mock.module('@inquirer/prompts', () => promptMocks);
 
 import SkillsCommand from './skills.js';
 
-function mockEngine(isDry = false): Engine {
+function mockEngine(): Engine {
   const engine = new Engine(new Logger());
-  engine.isDry = isDry;
   engine.work = join(tmpdir(), 'marvin-skills-cmd-' + Date.now() + Math.random().toString(36).slice(2, 8));
   mkdirSync(join(engine.work, 'skills'), { recursive: true });
   engine.config = {
@@ -92,19 +91,6 @@ test('skills add refuses an existing skill', async () => {
   await cmd.execAdd();
 
   expect(lines.join('\n')).toContain('already exists');
-});
-
-test('skills add works in dry mode without calling the LLM', async () => {
-  const engine = mockEngine(true);
-  const cmd = new SkillsCommand(engine, new Logger(), ['add', 'dry-skill', 'desc']);
-  answers = [];
-  let called = false;
-  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
-
-  await cmd.execAdd();
-
-  expect(called).toBe(false);
-  expect(existsSync(join(engine.work, 'skills', 'dry-skill.md'))).toBe(false);
 });
 
 test('skills list prints default and custom skills', async () => {
@@ -215,18 +201,4 @@ test('skills use edits an existing tool with the tools-edit skill', async () => 
 
   expect(readFileSync(tpath, 'utf8')).toContain('new code');
   expect(engine.skills['tools-edit']).toBeDefined();
-});
-
-test('skills use works in dry mode without calling the LLM or writing the tool', async () => {
-  const engine = mockEngine(true);
-  addToolsSkill(engine);
-  const cmd = new SkillsCommand(engine, new Logger(), ['use', 'tools-create', 'dry_tool']);
-  answers = ['does something'];
-  let called = false;
-  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
-
-  await cmd.execUse();
-
-  expect(called).toBe(false);
-  expect(existsSync(join(engine.work, 'tools', 'dry_tool.ts'))).toBe(false);
 });

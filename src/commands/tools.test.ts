@@ -15,9 +15,8 @@ mock.module('@inquirer/prompts', () => promptMocks);
 
 import ToolsCommand from './tools.js';
 
-function mockEngine(isDry = false): Engine {
+function mockEngine(): Engine {
   const engine = new Engine(new Logger());
-  engine.isDry = isDry;
   engine.work = join(tmpdir(), 'marvin-tools-cmd-' + Date.now() + Math.random().toString(36).slice(2, 8));
   mkdirSync(join(engine.work, 'skills'), { recursive: true });
   mkdirSync(join(engine.work, 'tools'), { recursive: true });
@@ -101,19 +100,6 @@ test('tools add refuses an existing tool', async () => {
   expect(lines.join('\n')).toContain('already exists');
 });
 
-test('tools add works in dry mode without calling the LLM', async () => {
-  const engine = mockEngine(true);
-  const cmd = new ToolsCommand(engine, new Logger(), ['add', 'dry_tool', 'desc']);
-  answers = [];
-  let called = false;
-  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
-
-  await cmd.execAdd();
-
-  expect(called).toBe(false);
-  expect(existsSync(join(engine.work, 'tools', 'dry_tool.ts'))).toBe(false);
-});
-
 test('tools add replaces the MARVIN_ROOT placeholder in generated code', async () => {
   const engine = mockEngine();
   const cmd = new ToolsCommand(engine, new Logger(), ['add', 'rooted_tool', 'desc']);
@@ -166,19 +152,4 @@ test('tools edit errors when the tool does not exist', async () => {
   await cmd.execEdit();
 
   expect(lines.join('\n')).toContain('not found');
-});
-
-test('tools edit works in dry mode without calling the LLM', async () => {
-  const engine = mockEngine(true);
-  const tpath = join(engine.work, 'tools', 'dry_tool.ts');
-  writeFileSync(tpath, 'old code');
-  const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'dry_tool', 'update']);
-  answers = [];
-  let called = false;
-  engine.agents['marvin']!.sendChat = async () => { called = true; return { content: "", steps: 0 }; };
-
-  await cmd.execEdit();
-
-  expect(called).toBe(false);
-  expect(readFileSync(tpath, 'utf8')).toBe('old code');
 });

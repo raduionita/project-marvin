@@ -433,9 +433,16 @@ export default class IntegrationsCommand extends Command {
   async execDrop() {
     this.logger.info('[IntegrationsCommand.execDrop]', 'dropping an integration...');
 
-    const pname = this.args[1];
+    // pick from args, the configured integrations (rawList)
+    let pname = this.args[1] || await rawlist({
+      message: 'Select an integration to drop (or cancel):',
+      choices: [
+        ...Object.keys(this.engine.config.integrations).map(id => ({ name: id, value: id })),
+        { name: 'cancel (type a name instead)', value: '' },
+      ],
+    });
     if (!pname) {
-      this.logger.warn('[IntegrationsCommand.execDrop]', 'usage: marvin integrations drop <name>');
+      this.logger.warn('[IntegrationsCommand.execDrop]', 'no integration selected');
       return;
     }
 
@@ -444,15 +451,15 @@ export default class IntegrationsCommand extends Command {
       return;
     }
 
-    // drop the integration from the engine if loaded
-    await this.engine.dropIntegration(pname);
+    // TODO: send message to serve/engine, if running, to drop the integration
 
+    // remove the integration from the config
     delete this.engine.config.integrations[pname];
 
     // persist to marvin.json
     const cpath = join(this.engine.work, 'marvin.json');
     writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
-    this.logger.info('[IntegrationsCommand.execDrop]', `integration "${pname}" dropped, config persisted to ${cpath}`);
+    this.logger.info(`integration "${pname}" dropped, config ${cpath} updated`);
   }
 }

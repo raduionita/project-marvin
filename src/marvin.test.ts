@@ -204,7 +204,6 @@ function mentionEvent(overrides: { [key: string]: any } = {}): { event: any; bod
 
 function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChannel; browser: FakeBrowserSystem; wpCalls: { url: string; init: any }[] } {
   const engine = new Engine(new Logger());
-  engine.isDry = false;
   engine.state = 'exec';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-flow-'));
   engine.config = mockConfig();
@@ -295,17 +294,4 @@ test('full flow: the tool results are kept in the chat cache for context', async
   expect(toolMessages[0]!.content).toContain('Coffee');
   expect(toolMessages[1]!.content).toContain('create_post');
   expect(toolMessages[2]!.content).toContain('42');
-});
-
-test('full flow: dry mode skips the search, the publish and the post', async () => {
-  const { channel, model, browser, wpCalls } = buildFlow();
-  channel.engine.isDry = true;
-  await channel.load();
-
-  await channel.mockSok.emit('app_mention', mentionEvent());
-
-  expect(model.callCount).toBe(0);
-  expect(browser.pagesOpened).toBe(0);
-  expect(wpCalls.length).toBe(0);
-  expect(channel.mockWeb.postMessageCalls.length).toBe(0);
 });

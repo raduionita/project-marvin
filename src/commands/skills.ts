@@ -252,6 +252,6 @@ export default class SkillsCommand extends Command {
 
     this.logger.info('');
     this.logger.info(`used skill "${skilId}":`);
-    this.logger.info(output || '(dry run, no output produced)');
+    this.logger.info(output || '(no output produced)');
   }
 }
