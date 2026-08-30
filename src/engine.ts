@@ -796,14 +796,8 @@ export default class Engine {
     // TODO: `task-${agentId}-${taskId}` - need a way to decide if chatId should be reused OR new (stateless) chat (current)
     const chatId = undefined; // stateless, design choice, for not
 
-    // merge engine (default) tools with the task's integration + mcp tools
-    const tools = [
-      ...await loadIntegrationTools(this, task.integrations || []),
-      ...await loadMcpTools(this, task.mcps || []),
-    ];
-
     // ! set task input as user message to LLM
-    const result = await agent.sendChat(chatId, task.input, tools);
+    const result = await agent.sendChat(chatId, task.input);
     if (result.error) {
       this.logger.error('[Engine.execTask]', `no result from sendChat for task ${taskId}:`, result.error);
       return;

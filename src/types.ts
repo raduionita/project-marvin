@@ -53,7 +53,7 @@ export interface Config {
     agent?: string;
     schedule: number;
     input?: string;
-    // integrations linked to this task: their actions become tools
+    // integrations linked to this task: their tools become tools
     integrations?: string[];
     // mcps linked to this task: their tools become tools
     mcps?: string[];
@@ -176,7 +176,7 @@ export interface IntegrationMeta {
   title: string;
   // one line description (e.g. "Post articles to a Wordpress site")
   description: string;
-  // all actions this integration type supports: action name -> description
+  // all tools this integration type supports: tool name -> description
   tools: { [key: string]: string };
   // config keys the integration needs (endpoint, credentials, ...) with placeholder values
   arguments: { [key: string]: any };
@@ -184,7 +184,7 @@ export interface IntegrationMeta {
 
 // integration interface: a bridge to a 3rd party endpoint (e.g. Wordpress API)
 export abstract class Integration {
-  // static info about this integration type (type, title, description, actions, arguments).
+  // static info about this integration type (type, title, description, tools, arguments).
   // used to build the ## Integrations system-prompt block and the wizard prompts.
   abstract meta: IntegrationMeta;
 
@@ -196,13 +196,13 @@ export abstract class Integration {
 
   abstract load(): Promise<void>;
   abstract drop(): Promise<void>;
-  // run a named action on the integration (e.g. create_post, publish_post)
+  // run a named tool on the integration (e.g. create_post, publish_post)
   abstract call(args: {[key:string]:any}): Promise<{[key:string]:any}>;
 
-  // discover the fields an action accepts from the provider (e.g. via OPTIONS
+  // discover the fields an tool accepts from the provider (e.g. via OPTIONS
   // on the Wordpress REST API). returns normalized FieldDef[], throws when the
   // provider cannot be reached or exposes no schema.
-  async discover(_action: string): Promise<Field[]> {
+  async discover(tool: string): Promise<Field[]> {
     return [];
   }
 }
@@ -274,7 +274,7 @@ export interface Task {
   timeout: NodeJS.Timeout | null;
   // task prompt for the LLM
   input?: string;
-  // integrations linked to this task: their actions become tools for this task
+  // integrations linked to this task: their tools become tools for this task
   integrations?: string[];
   // mcps linked to this task: their tools become tools for this task
   mcps?: string[];

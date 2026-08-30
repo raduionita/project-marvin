@@ -72,7 +72,6 @@ export class Agent {
     this.logger.debug('[Agent.makeChat]');
 
     let system: string = this.identity;
-    let always: ToolMeta[] = [];
 
     {
       if (Object.keys(this.engine.integrations).length) {
@@ -80,8 +79,8 @@ export class Agent {
         system += '## Integrations\n';
         for (const [id, integration] of Object.entries(this.engine.integrations)) {
           system += `### ${id} Integration tools:\n`;
-          for (const tool of Object.values(integration.meta.tools)) {
-            system += `- ${id}__${tool} (${integration.meta.tools[tool]})\n`;
+          for (const [tool, desc] of Object.entries(integration.meta.tools)) {
+            system += `- \`${id}__${tool}\`: ${desc}\n`;
           }
         }
       }
@@ -96,7 +95,7 @@ export class Agent {
           if (mcp.isLoaded) {
             system += `### ${id} MCP tools:\n`;
             for (const tool of Object.values(mcp.tools)) {
-              system += `- ${id}__${tool.name} (${tool.description})\n`;
+              system += `- \`${id}__${tool.name}\`: ${tool.description}\n`;
             }
           }
         }
@@ -136,14 +135,11 @@ export class Agent {
         for (const [group, names] of Object.entries(groups)) {
           system += `## ${group} tools:\n`;
           for (const { name, info, args } of names) {
-            system += `- \`${name}\` (${info})\n`;
+            system += `- \`${name}\`: ${info}\n`;
           }
         }
         system += '\nUse the `load_tools()` tool to load tools before calling them.';
       }
-
-      // always-known tools: load_tools (tool discovery) + end_chat (stop tools)
-      always = Object.values(this.engine.tools).filter(t => t.stop || t.meta.function.name === 'load_tools').map(t => t.meta);
     } // tools
 
     return {
@@ -151,7 +147,12 @@ export class Agent {
       messages: [{ role: 'system', content: system }],
       thinking: false,
       userId: '',
-      tools: [...always, ...(tools || [])],
+      tools: [
+        // always-known tools: load_tools (tool discovery) + end_chat (stop tools)
+        ...Object.values(this.engine.tools).filter(t => t.stop || t.meta.function.name === 'load_tools').map(t => t.meta), 
+        // user-defined tools
+        ...(tools || []),
+      ],
       updated: Date.now(),
     } as Chat;
   }

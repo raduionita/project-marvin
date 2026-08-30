@@ -20,19 +20,19 @@ export default class CallIntegrationTool extends Tool {
   private buildMeta(): ToolMeta {
     const integrations = Object.keys(this.engine.config.integrations || {});
 
-    // collect the union of actions across the configured integration types,
+    // collect the union of tools across the configured integration types,
     // deduped, so the enum stays valid
-    const actions = new Map<string, string>();
+    const tools = new Map<string, string>();
     for (const [id, config] of Object.entries(this.engine.config.integrations || {})) {
       const type = config.type || '';
       const integration = this.engine.integrations[id];
-      const info = integration ? integration.meta : { actions: {} };
-      for (const [name, description] of Object.entries(info.tools)) {
-        if (!actions.has(name)) actions.set(name, description);
+      const info = integration ? integration.meta : { tools: {} } as any;
+      for (const [name, description] of Object.entries(info.tools as Record<string, string>)) {
+        if (!tools.has(name)) tools.set(name, description as string);
       }
-      if (type && !Object.keys(info.tools).length && !actions.has('request')) {
-        // unknown/undescribed integration type: fall back to a generic action
-        actions.set('request', 'Run a raw request against the integration');
+      if (type && !Object.keys((info as any).tools).length && !tools.has('request')) {
+        // unknown/undescribed integration type: fall back to a generic tool
+        tools.set('request', 'Run a raw request against the integration');
       }
     }
 
@@ -41,7 +41,7 @@ export default class CallIntegrationTool extends Tool {
       group: 'integration',
       function: {
         name: 'call_integration',
-        description: 'Execute an action on a configured 3rd party integration (e.g. a Wordpress site). Use find_integration first to learn the required fields for the action.',
+        description: 'Execute an tool on a configured 3rd party integration (e.g. a Wordpress site). Use find_integration first to learn the required fields for the tool.',
         parameters: {
           type: 'object',
           properties: {
@@ -50,23 +50,23 @@ export default class CallIntegrationTool extends Tool {
               enum: integrations,
               description: 'Integration id as configured in marvin.json (e.g. gloobeam)',
             },
-            action: {
+            tool: {
               type: 'string',
-              ...(actions.size ? { enum: Array.from(actions.keys()) } : {}),
+              ...(tools.size ? { enum: Array.from(tools.keys()) } : {}),
               description: 'Action to run (e.g. create_post, publish_post)',
             },
             params: {
               type: 'object',
-              description: 'Action parameters. Call find_integration with the integration and action to learn the exact fields and which are required (e.g. title, content, meta fields).',
+              description: 'Action parameters. Call find_integration with the integration and tool to learn the exact fields and which are required (e.g. title, content, meta fields).',
             },
           },
-          required: ['integration', 'action'],
+          required: ['integration', 'tool'],
         }
       },
     };
   }
 
-  public async call(args: { integration: string, action: string, params?: { [key: string]: any } }) {
+  public async call(args: { integration: string, tool: string, params?: { [key: string]: any } }) {
     this.logger.debug('[CallIntegrationTool.call]', Object.keys(args));
 
     const integration = this.engine.integrations[args.integration];
@@ -74,6 +74,6 @@ export default class CallIntegrationTool extends Tool {
       return { error: `integration "${args.integration}" does not exist`, integrations: Object.keys(this.engine.integrations) };
     }
 
-    return integration.call({ action: args.action, ...(args.params || {}) });
+    return integration.call({ tool: args.tool, ...(args.params || {}) });
   }
 }

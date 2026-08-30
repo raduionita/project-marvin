@@ -13,18 +13,18 @@ function mockEngine(integrations: Record<string, Integration> = {}, configIntegr
 }
 
 class FakeIntegration extends Integration {
-  meta = { type: 'fake', title: 'Fake', description: '', arguments: { endpoint: 'https://example.com' }, actions: {} };
-  calls: { action: string, params: { [key: string]: any } }[] = [];
+  meta = { type: 'fake', title: 'Fake', description: '', arguments: { endpoint: 'https://example.com' }, tools: {} };
+  calls: { tool: string, params: { [key: string]: any } }[] = [];
   async load() {}
   async drop() {}
   async call(args: { [key: string]: any }) {
-    this.calls.push({ action: args.action, params: args });
+    this.calls.push({ tool: args.action, params: args });
     return { ok: true, echo: args };
   }
 }
 
 class WordpressLikeIntegration extends Integration {
-  meta = { type: 'wordpress', title: 'Wordpress', description: '', arguments: { endpoint: 'https://example.com' }, actions: { create_post: 'Create a post', publish_post: 'Publish a post' } };
+  meta = { type: 'wordpress', title: 'Wordpress', description: '', arguments: { endpoint: 'https://example.com' }, tools: { create_post: 'Create a post', publish_post: 'Publish a post' } };
   async load() {}
   async drop() {}
   async call() { return {}; }
@@ -35,10 +35,10 @@ test('call_integration executes an action on the configured integration', async 
   const engine = mockEngine({ gloobeam: fake });
   const tool = new CallIntegrationTool(engine);
 
-  const result = await tool.call({ integration: 'gloobeam', action: 'create_post', params: { title: 'Hello' } });
+  const result = await tool.call({ integration: 'gloobeam', tool: 'create_post', params: { title: 'Hello' } });
 
-  expect(result).toEqual({ ok: true, echo: { action: 'create_post', title: 'Hello' } });
-  expect(fake.calls[0]?.action).toBe('create_post');
+  expect(result).toEqual({ ok: true, echo: { tool: 'create_post', title: 'Hello' } });
+  expect(fake.calls[0]?.tool).toBe('create_post');
 });
 
 test('call_integration works without params', async () => {
@@ -46,16 +46,16 @@ test('call_integration works without params', async () => {
   const engine = mockEngine({ gloobeam: fake });
   const tool = new CallIntegrationTool(engine);
 
-  const result = await tool.call({ integration: 'gloobeam', action: 'list_posts' });
+  const result = await tool.call({ integration: 'gloobeam', tool: 'list_posts' });
 
-  expect(result).toEqual({ ok: true, echo: { action: 'list_posts' } });
+  expect(result).toEqual({ ok: true, echo: { tool: 'list_posts' } });
 });
 
 test('call_integration returns an error for an unknown integration', async () => {
   const engine = mockEngine();
   const tool = new CallIntegrationTool(engine);
 
-  const result = await tool.call({ integration: 'nope', action: 'create_post' });
+  const result = await tool.call({ integration: 'nope', tool: 'create_post' });
 
   expect(result.error).toContain('does not exist');
   expect(result.integrations).toEqual([]);

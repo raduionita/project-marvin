@@ -696,7 +696,7 @@ test('makeChat seeds a system prompt with an integrations block for loaded integ
       title: 'Wordpress',
       description: 'Post articles to a Wordpress site via its REST API',
       arguments: { endpoint: 'https://gloobeam.com' },
-      actions: {
+      tools: {
         create_post: 'Create a new post',
         publish_post: 'Publish an existing draft post',
       },
@@ -712,12 +712,12 @@ test('makeChat seeds a system prompt with an integrations block for loaded integ
   const prompt = chat.messages[0]!.content as string;
 
   expect(prompt).toContain('## Integrations');
-  expect(prompt).toContain('### gloobeam (https://gloobeam.com)');
-  expect(prompt).toContain('create_post - Create a new post');
-  expect(prompt).toContain('publish_post - Publish an existing draft post');
+  expect(prompt).toContain('### gloobeam Integration tools:');
+  expect(prompt).toContain('gloobeam__create_post (Create a new post)');
+  expect(prompt).toContain('gloobeam__publish_post (Publish an existing draft post)');
 });
 
-test('makeChat falls back to config when integrations are not loaded', () => {
+test('makeChat omits integrations block when integrations are not loaded (config only)', () => {
   const engine = mockEngine();
   engine.config.integrations = { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://gloobeam.com' } };
   const agent = new Agent(engine, { memory: true, identity: '' });
@@ -725,8 +725,7 @@ test('makeChat falls back to config when integrations are not loaded', () => {
   const chat = agent.loadChat('chat-1');
   const prompt = chat.messages[0]!.content as string;
 
-  expect(prompt).toContain('## Integrations');
-  expect(prompt).toContain('### gloobeam (https://gloobeam.com)');
+  expect(prompt).not.toContain('## Integrations');
 });
 
 test('makeChat seeds only the identity when there are no integrations', () => {
@@ -762,6 +761,48 @@ test('makeChat omits the memory block when memory is disabled', () => {
   rmSync(engine.work, { recursive: true, force: true });
 });
 
+test('makeChat seeds a system prompt with an MCPs block for loaded mcps', () => {
+  const engine = mockEngine();
+  engine.mcps['my_mcp'] = {
+    isLoaded: true,
+    tools: {
+      my_tool: { name: 'my_tool', description: 'Does a thing', inputSchema: { type: 'object', properties: {} } },
+      other_tool: { name: 'other_tool', description: 'Other', inputSchema: { type: 'object', properties: {} } },
+    },
+  } as any;
+
+  const agent = new Agent(engine, { memory: false, identity: 'my identity' });
+  const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
+
+  expect(prompt).toContain('## MCPs');
+  expect(prompt).toContain('### my_mcp MCP tools:');
+  expect(prompt).toContain('my_mcp__my_tool (Does a thing)');
+  expect(prompt).toContain('my_mcp__other_tool (Other)');
+  rmSync(engine.work, { recursive: true, force: true });
+});
+
+test('makeChat omits MCP tools when mcp is not loaded', () => {
+  const engine = mockEngine();
+  engine.mcps['my_mcp'] = {
+    isLoaded: false,
+    tools: {},
+  } as any;
+
+  const agent = new Agent(engine, { memory: false, identity: 'my identity' });
+  const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
+
+  expect(prompt).toContain('## MCPs');
+  expect(prompt).not.toContain('my_mcp__');
+  rmSync(engine.work, { recursive: true, force: true });
+});
+
+test('makeChat omits MCP block when no mcps are configured', () => {
+  const engine = mockEngine();
+  const agent = new Agent(engine, { memory: false, identity: 'my identity' });
+  expect(agent.loadChat('chat-1').messages[0]!.content).toBe('my identity');
+  rmSync(engine.work, { recursive: true, force: true });
+});
+
 // ==================== Available Tools (lazy loading) tests ====================
 
 // install a representative set of tools so makeChat has something to summarize
@@ -782,14 +823,17 @@ test('makeChat seeds the system prompt with a grouped "## Available Tools" block
   const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
 
   expect(prompt).toContain('## Available Tools');
-  // grouped entries (one line per group, tools comma-separated)
-  expect(prompt).toMatch(/filesystem:.*read_file/);
-  expect(prompt).toMatch(/web:.*web_search/);
-  expect(prompt).toMatch(/general:.*get_date/);
+  // grouped entries: "## <group> tools:" with "- `name` (desc)"
+  expect(prompt).toContain('## filesystem tools:');
+  expect(prompt).toContain('`read_file`');
+  expect(prompt).toContain('## web tools:');
+  expect(prompt).toContain('`web_search`');
+  expect(prompt).toContain('## general tools:');
+  expect(prompt).toContain('`get_date`');
   // hint to use load_tools
   expect(prompt).toContain('load_tools');
   // always-known tools are NOT listed as available (they are already in chat.tools)
-  expect(prompt).not.toMatch(/^end_chat:/m);
+  expect(prompt).not.toContain('`end_chat`');
   // includes mock_tool from buildTestEngine (default group 'general')
   expect(prompt).toContain('mock_tool');
 });
