@@ -576,7 +576,7 @@ test('dropModels clears all models', async () => {
 
 // ==================== execTask integration tools tests ====================
 
-/** A mock integration that records every call and exposes discoverable actions. */
+/** A mock integration that records every call and exposes discoverable tools. */
 class MockIntegration extends Integration {
   meta: IntegrationMeta = {
     type: 'mock',
@@ -585,12 +585,12 @@ class MockIntegration extends Integration {
     arguments: { endpoint: 'https://example.com' },
     tools: { create_post: 'Create a post' },
   };
-  calls: { action: string; args: { [key: string]: any } }[] = [];
+  calls: { tool: string; args: { [key: string]: any } }[] = [];
 
   async load() {}
   async drop() {}
   async call(args: { [key: string]: any }) {
-    this.calls.push({ action: args.action, args });
+    this.calls.push({ tool: args.tool, args });
     return { ok: true, id: 1 };
   }
 }

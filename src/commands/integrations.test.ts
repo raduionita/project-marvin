@@ -135,8 +135,8 @@ test('execAdd configures an integration via the discovery wizard', async () => {
   const cmd = new IntegrationsCommand(engine, ['add']);
 
   // scripted answers: name -> type ("1"=wordpress) -> endpoint -> user ->
-  // appPassword -> action ("1"=list_posts) -> fields ("1,2") -> required
-  // (blank = all) -> action ("6"=finish, after list_posts is removed) ->
+  // appPassword -> tool ("1"=list_posts) -> fields ("1,2") -> required
+  // (blank = all) -> tool ("6"=finish, after list_posts is removed) ->
   // meta loop (blank)
   answers = ['gloobeam', '1', 'https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', ''];
 
@@ -148,8 +148,8 @@ test('execAdd configures an integration via the discovery wizard', async () => {
   expect(integration.type).toBe('wordpress');
   expect(integration.endpoint).toBe('https://gloobeam.com');
   expect(integration.enabled).toBe(true);
-  expect(integration.actions.list_posts).toBeDefined();
-  expect(integration.actions.list_posts.fields.title).toBeDefined();
+  expect(integration.tools.list_posts).toBeDefined();
+  expect(integration.tools.list_posts.fields.title).toBeDefined();
   expect(lines.join('\n')).toContain('configured');
   restore();
 });
@@ -159,7 +159,7 @@ test('execAdd registers meta fields from the wizard', async () => {
   const engine = buildEngine();
   const cmd = new IntegrationsCommand(engine, ['add', 'gloobeam', 'wordpress']);
 
-  // name+type given via args: endpoint -> user -> appPassword -> action ("1")
+  // name+type given via args: endpoint -> user -> appPassword -> tool ("1")
   // -> field select ("1,2") -> required (blank) -> finish -> meta name
   // "custom_author" -> type ("string") -> description -> blank stops
   answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', 'custom_author', 'string', 'Byline', ''];
@@ -185,7 +185,7 @@ test('execInfo previews the discovered config without persisting', async () => {
   expect(out).toContain('"title"');
   expect(out).toContain('not persisted');
   // nothing written to marvin.json beyond the original config
-  expect(readConfig(engine).integrations['gloobeam'].actions).toBeUndefined();
+  expect(readConfig(engine).integrations['gloobeam'].tools).toBeUndefined();
   restore();
 });
 
@@ -198,7 +198,7 @@ test('execAdd no longer links the integration to tasks (tools load via load_tool
   } as Config['tasks'];
   const cmd = new IntegrationsCommand(engine, ['add', 'gloobeam', 'wordpress']);
 
-  // name+type via args: endpoint -> user -> appPassword -> action ("1") ->
+  // name+type via args: endpoint -> user -> appPassword -> tool ("1") ->
   // fields ("1,2") -> required (blank) -> finish -> meta blank (no task prompt)
   answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', ''];
 
@@ -243,7 +243,7 @@ test('execAdd lists nested sub-fields with dotted paths in the required prompt',
   const cmd = new IntegrationsCommand(engine, ['add']);
 
   // name -> type ("1"=wordpress) -> endpoint -> user -> appPassword ->
-  // action ("1"=list_posts) -> fields ("1,2"=slug,meta) -> required (blank =
+  // tool ("1"=list_posts) -> fields ("1,2"=slug,meta) -> required (blank =
   // all) -> finish ("6") -> meta loop (blank)
   answers = ['gloobeam', '1', 'https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', ''];
 
@@ -257,7 +257,7 @@ test('execAdd lists nested sub-fields with dotted paths in the required prompt',
   expect(required.choices.map(c => c.name)).toContain('gloobeam.meta.keywords (array):');
 
   // nested sub-fields are persisted with dotted keys
-  const fields = readConfig(engine).integrations['gloobeam'].actions.list_posts.fields;
+  const fields = readConfig(engine).integrations['gloobeam'].tools.list_posts.fields;
   expect(fields['meta.keywords']).toBeDefined();
   expect(fields['meta.keywords'].type).toBe('array');
   expect(fields['meta.keywords'].required).toBe(true);

@@ -183,12 +183,12 @@ export function splitMcpToolName(name: string): { id: string, name: string } | n
   return { id: name.slice(0, idx), name: name.slice(idx + 2) };
 }
 
-// split a tool name back into { integrationId, action }, or null when the name
+// split a tool name back into { integrationId, tool }, or null when the name
 // is not an integration tool
-export function splitIntegrationToolName(name: string): { id: string, action: string } | null {
+export function splitIntegrationToolName(name: string): { id: string, tool: string } | null {
   const idx = name.lastIndexOf('__');
   if (idx <= 0 || idx === name.length - 2) return null;
-  return { id: name.slice(0, idx), action: name.slice(idx + 2) };
+  return { id: name.slice(0, idx), tool: name.slice(idx + 2) };
 }
 
 export function readError(error: unknown): string {

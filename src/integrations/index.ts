@@ -46,12 +46,12 @@ export async function loadIntegrationTools(engine: Engine, integrations: string[
     }
 
     const config = integration.config || {};
-    const toolCfg = config.tools || {};
-    const hasConfigured = Object.keys(toolCfg).length > 0;
+    const toolsCfg = config.tools || {};
+    const hasConfigured = Object.keys(toolsCfg).length > 0;
 
     for (const [tool, description] of Object.entries(integration.meta.tools)) {
-      const cfg = toolCfg[tool];
-      // when any tools is configured, expose only the configured (enabled) ones
+      const cfg = toolsCfg[tool];
+      // when any tool is configured, expose only the configured (enabled) ones
       if (hasConfigured && (!cfg || cfg.enabled === false)) continue;
 
       // configured fields (OPTIONS snapshot) drive the tool schema; fall back to

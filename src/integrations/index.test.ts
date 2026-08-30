@@ -51,7 +51,7 @@ test('loadIntegration returns null for an unknown type', async () => {
   expect(integration).toBeNull();
 });
 
-// --- per-action integration tools ---
+// --- per-tool integration tools ---
 
 class MockIntegration extends Integration {
   meta: IntegrationMeta = {
@@ -69,24 +69,24 @@ class MockIntegration extends Integration {
   async load() {}
   async drop() {}
   async call() { return { ok: true }; }
-  async discover(action: string): Promise<Field[]> {
-    return this.discoverResults[action] || [];
+  async discover(tool: string): Promise<Field[]> {
+    return this.discoverResults[tool] || [];
   }
 }
 
 test('integrationToolName round-trips through splitIntegrationToolName', () => {
   expect(makeIntegrationToolName('gloobeam', 'create_post')).toBe('gloobeam__create_post');
-  expect(splitIntegrationToolName('gloobeam__create_post')).toEqual({ id: 'gloobeam', action: 'create_post' });
+  expect(splitIntegrationToolName('gloobeam__create_post')).toEqual({ id: 'gloobeam', tool: 'create_post' });
   expect(splitIntegrationToolName('web_search')).toBeNull();
   expect(splitIntegrationToolName('__create_post')).toBeNull();
   expect(splitIntegrationToolName('gloobeam__')).toBeNull();
 });
 
-test('builds a tool per configured action with its fields and required list', async () => {
+test('builds a tool per configured tool with its fields and required list', async () => {
   const engine = mockEngine();
   engine.integrations['site'] = new MockIntegration(engine, {
     type: 'mock',
-    actions: {
+    tools: {
       create_post: {
         enabled: true,
         fields: {
@@ -108,11 +108,11 @@ test('builds a tool per configured action with its fields and required list', as
   expect(fn.parameters.properties.status!.enum).toEqual(['draft', 'publish']);
 });
 
-test('exposes only configured actions once any action is configured', async () => {
+test('exposes only configured tools once any tool is configured', async () => {
   const engine = mockEngine();
   engine.integrations['site'] = new MockIntegration(engine, {
     type: 'mock',
-    actions: { create_post: { enabled: true, fields: {} } },
+    tools: { create_post: { enabled: true, fields: {} } },
   });
 
   const tools = await loadIntegrationTools(engine, ['site']);
@@ -120,7 +120,7 @@ test('exposes only configured actions once any action is configured', async () =
   expect(tools.map(t => t.function.name)).toEqual(['site__create_post']);
 });
 
-test('adds custom meta fields to every action tool', async () => {
+test('adds custom meta fields to every tool tool', async () => {
   const engine = mockEngine();
   engine.integrations['site'] = new MockIntegration(engine, {
     type: 'mock',
@@ -129,13 +129,13 @@ test('adds custom meta fields to every action tool', async () => {
 
   const tools = await loadIntegrationTools(engine, ['site']);
 
-  expect(tools.length).toBe(2); // no configured actions: all meta actions exposed
+  expect(tools.length).toBe(2); // no configured tools: all meta tools exposed
   const create = tools.find(t => t.function.name === 'site__create_post')!;
   expect(create.function.parameters.properties.byline).toEqual({ type: 'string', description: 'Byline' });
   expect(create.function.parameters.required).toContain('byline');
 });
 
-test('falls back to live discovery when an action has no configured fields', async () => {
+test('falls back to live discovery when an tool has no configured fields', async () => {
   const engine = mockEngine();
   const integration = new MockIntegration(engine, { type: 'mock' });
   integration.discoverResults['create_post'] = [{ name: 'content', type: 'string', required: false, description: 'Body' }];

@@ -142,38 +142,38 @@ export default class IntegrationsCommand extends Command {
       });
     }
 
-    // ask for the actions and their fields in a loop (until the user is done)
-    const actionsCfg: { [key: string]: any } = {};
-    const actionOptions = Object.entries(integration.meta.tools).map(([name, description]) => ({
+    // ask for the tools and their fields in a loop (until the user is done)
+    const toolsCfg: { [key: string]: any } = {};
+    const toolOptions = Object.entries(integration.meta.tools).map(([name, description]) => ({
       name: `${name} - ${description}`,
       value: name,
     }));
 
-    while (actionOptions.length) {
+    while (toolOptions.length) {
       this.logger.log('');
-      const action = await rawlist({
-        message: `Select an action for "${name}" (or finish to stop):`,
-        choices: [...actionOptions, { name: 'finish (done adding actions)', value: '' }],
+      const tool = await rawlist({
+        message: `Select an tool for "${name}" (or finish to stop):`,
+        choices: [...toolOptions, { name: 'finish (done adding tools)', value: '' }],
       });
-      if (!action) break;
+      if (!tool) break;
 
-      // discover the available fields for this action (OPTIONS request)
+      // discover the available fields for this tool (OPTIONS request)
       let fields: Field[] = [];
       try {
-        fields = await integration.discover(action);
+        fields = await integration.discover(tool);
       } catch (err) {
-        this.logger.error('[IntegrationsCommand.execAdd]', 'discovery failed for', action, ':', (err as Error).message);
+        this.logger.error('[IntegrationsCommand.execAdd]', 'discovery failed for', tool, ':', (err as Error).message);
         return;
       }
       if (!fields.length) {
-        this.logger.error('[IntegrationsCommand.execAdd]', `no fields found for action "${action}"`);
+        this.logger.error('[IntegrationsCommand.execAdd]', `no fields found for tool "${tool}"`);
         return;
       }
 
       // ask which fields to use (checkbox select), marked ones are sent;
       // picking an object/array field includes its sub-fields
       const picked = await checkbox({
-        message: `Select fields for "${name}" "${action}" (required ones are sent):`,
+        message: `Select fields for "${name}" "${tool}" (required ones are sent):`,
         choices: fields.map(f => ({
           name: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}${f.enum ? ` [${f.enum.join(', ')}]` : ''}`,
           value: f.name,
@@ -185,7 +185,7 @@ export default class IntegrationsCommand extends Command {
       // ask which of the picked fields are required (all are checked by default)
       const requiredSet = new Set(pickedFields.length
         ? await checkbox({
-            message: `Mark required fields for "${name}" "${action}":`,
+            message: `Mark required fields for "${name}" "${tool}":`,
             choices: pickedFields.map(f => ({
               name: `${name}.${f.name} (${f.type}):`,
               value: f.name,
@@ -203,15 +203,15 @@ export default class IntegrationsCommand extends Command {
           ...(f.enum ? { enum: f.enum } : {}),
         };
       }
-      actionsCfg[action] = { enabled: true, fields: fieldsCfg };
+      toolsCfg[tool] = { enabled: true, fields: fieldsCfg };
 
-      // keep offering the remaining actions
-      const idx = actionOptions.findIndex(o => o.value === action);
-      if (idx !== -1) actionOptions.splice(idx, 1);
+      // keep offering the remaining tools
+      const idx = toolOptions.findIndex(o => o.value === tool);
+      if (idx !== -1) toolOptions.splice(idx, 1);
     }
 
-    if (Object.keys(actionsCfg).length) {
-      config.actions = actionsCfg;
+    if (Object.keys(toolsCfg).length) {
+      config.tools = toolsCfg;
     }
 
     // ask for custom meta fields (site specific, not discoverable via OPTIONS)
@@ -285,8 +285,8 @@ export default class IntegrationsCommand extends Command {
       return;
     }
 
-    // run discovery for every action and preview the resulting config
-    const actions: { [key: string]: any } = {};
+    // run discovery for every tool and preview the resulting config
+    const tools: { [key: string]: any } = {};
     for (const name of Object.keys(integration.meta.tools)) {
       let fields: Field[] = [];
       try {
@@ -296,7 +296,7 @@ export default class IntegrationsCommand extends Command {
         return;
       }
       if (!fields.length) {
-        this.logger.error('[IntegrationsCommand.execInfo]', `no fields found for action "${name}"`);
+        this.logger.error('[IntegrationsCommand.execInfo]', `no fields found for tool "${name}"`);
         return;
       }
       const fieldsCfg: { [key: string]: any } = {};
@@ -308,11 +308,11 @@ export default class IntegrationsCommand extends Command {
           ...(f.enum ? { enum: f.enum } : {}),
         };
       }
-      actions[name] = { enabled: true, fields: fieldsCfg };
+      tools[name] = { enabled: true, fields: fieldsCfg };
     }
 
     this.logger.info(`config preview for "${pname}" (not persisted):`);
-    this.logger.info(JSON.stringify({ ...config, actions: actions }, null, 2));
+    this.logger.info(JSON.stringify({ ...config, tools: tools }, null, 2));
   }
 
   // `marvin integrations edit [name]`
@@ -345,35 +345,35 @@ export default class IntegrationsCommand extends Command {
     }
 
     const info = integration.meta;
-    const actionsCfg = (config.actions as { [key: string]: any }) || {};
+    const toolsCfg = (config.tools as { [key: string]: any }) || {};
 
-    const current = Object.keys(actionsCfg).length
-      ? Object.keys(actionsCfg)
+    const current = Object.keys(toolsCfg).length
+      ? Object.keys(toolsCfg)
       : (Object.keys(info.tools).length ? [Object.keys(info.tools)[0]!] : []);
-    const action = await select({
-      message: `Select an action to edit for "${pname}" (current: ${current.join(', ') || 'none'}):`,
+    const tool = await select({
+      message: `Select an tool to edit for "${pname}" (current: ${current.join(', ') || 'none'}):`,
       choices: Object.entries(info.tools).map(([name, description]) => ({ name: `${name} - ${description}`, value: name })),
     });
-    if (!action) return;
+    if (!tool) return;
 
     let fields: Field[] = [];
     try {
-      fields = await integration.discover(action);
+      fields = await integration.discover(tool);
     } catch (err) {
-      this.logger.error('[IntegrationsCommand.execEdit]', 'discovery failed for', action, ':', (err as Error).message);
+      this.logger.error('[IntegrationsCommand.execEdit]', 'discovery failed for', tool, ':', (err as Error).message);
       return;
     }
     if (!fields.length) {
-      this.logger.error('[IntegrationsCommand.execEdit]', `no fields found for action "${action}"`);
+      this.logger.error('[IntegrationsCommand.execEdit]', `no fields found for tool "${tool}"`);
       return;
     }
 
     // pre-select the currently configured fields
-    const currentFields = actionsCfg[action]?.fields as { [key: string]: any } | undefined;
+    const currentFields = toolsCfg[tool]?.fields as { [key: string]: any } | undefined;
     const flat = flattenFields(fields);
     const prePicked = currentFields ? Object.keys(currentFields) : flat.filter(f => f.required).map(f => f.name);
     const picked = await checkbox({
-      message: `Select fields for "${pname}" "${action}" (current: ${prePicked.join(', ') || 'none'}):`,
+      message: `Select fields for "${pname}" "${tool}" (current: ${prePicked.join(', ') || 'none'}):`,
       choices: flat.map(f => ({
         name: `${f.name} (${f.type})${f.required ? ' [required]' : ''} - ${f.description}`,
         value: f.name,
@@ -384,7 +384,7 @@ export default class IntegrationsCommand extends Command {
     const pickedFields = flat.filter(f => pickedSet.has(f.name));
     const requiredSet = new Set(pickedFields.length
       ? await checkbox({
-          message: `Mark required fields for "${pname}" "${action}":`,
+          message: `Mark required fields for "${pname}" "${tool}":`,
           choices: pickedFields.map(f => ({
             name: `${pname}.${f.name} (${f.type}):`,
             value: f.name,
@@ -402,8 +402,8 @@ export default class IntegrationsCommand extends Command {
         ...(f.enum ? { enum: f.enum } : {}),
       };
     }
-    actionsCfg[action] = { enabled: true, fields: fieldsCfg };
-    config.actions = actionsCfg;
+    toolsCfg[tool] = { enabled: true, fields: fieldsCfg };
+    config.tools = toolsCfg;
 
     // persist to marvin.json
     const cpath = join(this.engine.work, 'marvin.json');

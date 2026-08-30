@@ -35,9 +35,9 @@ export default class WordpressIntegration extends Integration {
   } satisfies IntegrationMeta;
 
   // live field discovery via the Wordpress REST API OPTIONS route
-  async discover(action: string): Promise<Field[]> {
-    const resource = this.actionToResource(action);
-    if (!resource) throw new Error(`no REST resource for action "${action}"`);
+  async discover(tool: string): Promise<Field[]> {
+    const resource = this.toolToResource(tool);
+    if (!resource) throw new Error(`no REST resource for tool "${tool}"`);
 
     // https://.../wp-json/wp/v2/posts
     const url = this.api(`/${resource}`);
@@ -47,12 +47,12 @@ export default class WordpressIntegration extends Integration {
     const text = await res.text().catch(() => '');
     const json = tryJsonParse<{ endpoints?: { methods?: string[], args?: { [key: string]: any } }[] }>(text) || {};
     const endpoint = (json.endpoints || []).find(e => (e.methods || []).includes('POST'));
-    if (!endpoint) throw new Error(`no POST schema found at ${url} for action "${action}"`);
+    if (!endpoint) throw new Error(`no POST schema found at ${url} for tool "${tool}"`);
     const fields = Object.entries(endpoint.args || {}).map(([name, def]) => this.normalizeArg(name, def));
 
-    // single-resource actions need the resource id, which the collection
+    // single-resource tools need the resource id, which the collection
     // OPTIONS schema does not list: inject it as a required field
-    const isSingle = ['get_post', 'update_post', 'publish_post', 'delete_post'].includes(action);
+    const isSingle = ['get_post', 'update_post', 'publish_post', 'delete_post'].includes(tool);
     if (isSingle) {
       const idField: Field = { name: 'id', type: 'integer', required: true, description: 'Post id' };
       return [idField, ...fields.filter(f => f.name !== 'id')];
@@ -79,8 +79,8 @@ export default class WordpressIntegration extends Integration {
   async call(args: { [key: string]: any }): Promise<{ [key: string]: any }> {
     this.logger.debug('[WordpressIntegration.call]', JSON.stringify(args));
 
-    const action = args.action || 'request';
-    switch (action) {
+    const tool = args.tool || 'request';
+    switch (tool) {
       case 'list_posts': {
         // standard global query params (see developer.wordpress.org/rest-api)
         const query = [
@@ -142,17 +142,17 @@ export default class WordpressIntegration extends Integration {
         return { ok: res.ok, status: res.status, data };
       }
       default:
-        return { error: `Unknown Wordpress action: ${action}` };
+        return { error: `Unknown Wordpress tool: ${tool}` };
     }
   }
 
-  // map an action to its REST resource (posts/media/pages)
-  private actionToResource(action: string): string {
+  // map an tool to its REST resource (posts/media/pages)
+  private toolToResource(tool: string): string {
     const map: Record<string, string> = {
       list_posts: 'posts', get_post: 'posts', create_post: 'posts',
       update_post: 'posts', publish_post: 'posts', delete_post: 'posts',
     };
-    return map[action] || '';
+    return map[tool] || '';
   }
 
   // normalize a raw WP REST arg definition into our Field shape, recursing into
@@ -237,19 +237,19 @@ export default class WordpressIntegration extends Integration {
     return { data, status: res.status };
   }
 
-  // build the request body from the *configured* fields only (the per-action
+  // build the request body from the *configured* fields only (the per-tool
   // fields chosen during `marvin integrations add`, or the legacy flat
   // config.parameters), plus config.meta custom fields, so invented/unknown
   // LLM params never reach the API.
-  private buildBody(action: string, args: { [key: string]: any }): { [key: string]: any } {
+  private buildBody(tool: string, args: { [key: string]: any }): { [key: string]: any } {
     const body: { [key: string]: any } = {};
 
-    // direct fields: configured per-action fields > legacy flat parameters
-    const actionCfg = this.config.actions?.[action]?.fields as { [key: string]: any } | undefined;
+    // direct fields: configured per-tool fields > legacy flat parameters
+    const toolCfg = this.config.tools?.[tool]?.fields as { [key: string]: any } | undefined;
     const flat = this.config.parameters;
     let allowed: Field[] = [];
-    if (actionCfg && typeof actionCfg === 'object' && Object.keys(actionCfg).length) {
-      allowed = Object.entries(actionCfg).map(([name, def]) => ({
+    if (toolCfg && typeof toolCfg === 'object' && Object.keys(toolCfg).length) {
+      allowed = Object.entries(toolCfg).map(([name, def]) => ({
         name,
         type: (def as any)?.type || 'string',
         required: (def as any)?.required === true,
@@ -266,8 +266,8 @@ export default class WordpressIntegration extends Integration {
       }));
     }
     for (const f of allowed) {
-      // id is a URL parameter for single-resource actions, never a body field
-      if (action === 'update_post' && f.name === 'id') continue;
+      // id is a URL parameter for single-resource tools, never a body field
+      if (tool === 'update_post' && f.name === 'id') continue;
       // dotted field names (e.g. meta.keywords) map to nested body objects;
       // the caller may pass them flat (meta.keywords) or nested (meta.keywords)
       const parts = f.name.split('.');
@@ -303,9 +303,9 @@ export default class WordpressIntegration extends Integration {
     return body;
   }
 
-  private hasConfiguredFields(action: string): boolean {
-    const actionCfg = this.config.actions?.[action]?.fields;
-    if (actionCfg && typeof actionCfg === 'object' && Object.keys(actionCfg).length) return true;
+  private hasConfiguredFields(tool: string): boolean {
+    const toolCfg = this.config.tools?.[tool]?.fields;
+    if (toolCfg && typeof toolCfg === 'object' && Object.keys(toolCfg).length) return true;
     const flat = this.config.parameters;
     return !!(flat && typeof flat === 'object' && Object.keys(flat).length);
   }

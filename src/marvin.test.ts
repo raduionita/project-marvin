@@ -9,8 +9,6 @@ import { Agent } from './agent.js';
 import SlackChannel from './channels/slack.js';
 import { type ISocketModeClient, type IWebClient } from './channels/slack.js';
 import WebSearchTool from './tools/web_search.js';
-import CallIntegrationTool from './tools/call_integration.js';
-import FindIntegrationTool from './tools/find_integration.js';
 import WordpressIntegration from './integrations/wordpress.js';
 
 // ============================================================================
@@ -142,22 +140,14 @@ class FlowModel extends Model {
       } as Reply;
     }
     if (this.callCount === 2) {
-      // learn the integration schema before publishing (find_integration)
+      // publish step via per-tool tool (lazy via load_tools)
       return {
         id: 'r2', stop: false, finish: 'tool_calls',
-        message: { role: 'assistant', content: '', tools: [{ id: 'call_2', name: 'find_integration', arguments: { integration: 'gloobeam', action: 'create_post' } }] },
-        usage: { completion: 5, prompt: 10 },
-      } as Reply;
-    }
-    if (this.callCount === 3) {
-      // publish step (schema known)
-      return {
-        id: 'r3', stop: false, finish: 'tool_calls',
         message: {
           role: 'assistant', content: '',
           tools: [{
-            id: 'call_3', name: 'call_integration',
-            arguments: { integration: 'gloobeam', action: 'create_post', params: { title: 'The History of Coffee', content: 'A short summary...', publish: true } },
+            id: 'call_2', name: 'gloobeam__create_post',
+            arguments: { title: 'The History of Coffee', content: 'A short summary...', publish: true },
           }],
         },
         usage: { completion: 5, prompt: 10 },
@@ -165,7 +155,7 @@ class FlowModel extends Model {
     }
     // final answer
     return {
-      id: 'r4', stop: true, finish: 'stop',
+      id: 'r3', stop: true, finish: 'stop',
       message: { role: 'assistant', content: 'Published to Wordpress: https://wp.example.com/?p=42' },
       usage: { completion: 5, prompt: 10 },
     } as Reply;
@@ -219,10 +209,8 @@ function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChan
     model: model,
   });
 
-  // real tools
+  // real tools (per-tool tools load lazily via load_tools)
   engine.tools['web_search'] = new WebSearchTool(engine);
-  engine.tools['call_integration'] = new CallIntegrationTool(engine);
-  engine.tools['find_integration'] = new FindIntegrationTool(engine);
 
   // fake browser so the real web_search tool runs end-to-end
   const browser = new FakeBrowserSystem(engine);
@@ -257,13 +245,13 @@ test('full flow: slack research request reaches wordpress and replies in the thr
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  // the AI loop ran: search -> schema lookup -> publish -> final reply
-  expect(model.callCount).toBe(4);
+  // the AI loop ran: search -> publish (per-tool) -> final reply
+  expect(model.callCount).toBe(3);
 
   // web_search really executed (the real tool against the fake browser page)
   expect(browser.pagesOpened).toBe(1);
 
-  // find_integration returned the wordpress schema (no extra network call)
+  // wordpress publish executed (no extra schema lookup via find_integration)
   expect(wpCalls.length).toBe(1);
   expect(wpCalls[0]!.url).toBe('https://wp.example.com/wp-json/wp/v2/posts');
   expect(wpCalls[0]!.init.method).toBe('POST');
@@ -289,9 +277,8 @@ test('full flow: the tool results are kept in the chat cache for context', async
   expect(chat).not.toBeNull();
 
   const toolMessages = chat!.messages.filter(m => m.role === 'tool');
-  // one web_search result + one find_integration schema + one call_integration (wordpress) result
-  expect(toolMessages.length).toBe(3);
+  // one web_search result + one per-tool wordpress result
+  expect(toolMessages.length).toBe(2);
   expect(toolMessages[0]!.content).toContain('Coffee');
-  expect(toolMessages[1]!.content).toContain('create_post');
-  expect(toolMessages[2]!.content).toContain('42');
+  expect(toolMessages[1]!.content).toContain('42');
 });

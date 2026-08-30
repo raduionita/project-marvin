@@ -57,7 +57,8 @@ test('listTools includes known tools', () => {
   expect(tools).toContain('edit_file');
   expect(tools).toContain('marvin_state');
   expect(tools).toContain('marvin_config');
-  expect(tools).toContain('call_integration');
+  expect(tools).toContain('load_tools');
+  expect(tools).not.toContain('call_integration');
 });
 
 test('listCustomTools returns [] when the workspace tools folder is missing', () => {

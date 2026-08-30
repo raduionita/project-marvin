@@ -206,11 +206,11 @@ export class Agent {
         return await instance.call(args, this, chat);
       }
 
-      // integration tools (<integrationId>__<action>) loaded per-task
+      // integration tools (<integrationId>__<tool>) loaded per-task
       const intSplit = splitIntegrationToolName(tool);
       const integration = intSplit ? this.engine.integrations[intSplit.id] : undefined;
       if (integration) {
-        return await integration.call({ action: intSplit!.action, ...args });
+        return await integration.call({ tool: intSplit!.tool, ...args });
       }
 
       // mcp tools (<mcpId>__<toolName>) loaded per-task

@@ -144,7 +144,7 @@ export abstract class Channel {
   abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;
 }
 
-// a single parameter/field an integration action accepts (used to build the
+// a single parameter/field an integration tool accepts (used to build the
 // call_integration tool schema and to prompt the user during `marvin
 // integrations add`). derived from the provider's API schema via discovery.
 export interface Field {

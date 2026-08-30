@@ -529,7 +529,7 @@ test('sendChat returns empty string when reply.message is undefined', async () =
 
 // ==================== execTool tests ====================
 
-/** A mock integration that records every call and exposes discoverable actions. */
+/** A mock integration that records every call and exposes discoverable tools. */
 class MockIntegration extends Integration {
   meta: IntegrationMeta = {
     type: 'mock',
@@ -538,12 +538,12 @@ class MockIntegration extends Integration {
     arguments: { endpoint: 'https://example.com' },
     tools: { create_post: 'Create a post' },
   };
-  calls: { action: string; args: { [key: string]: any } }[] = [];
+  calls: { tool: string; args: { [key: string]: any } }[] = [];
 
   async load() {}
   async drop() {}
   async call(args: { [key: string]: any }) {
-    this.calls.push({ action: args.action, args });
+    this.calls.push({ tool: args.tool, args });
     return { ok: true, id: 1 };
   }
 }
@@ -553,18 +553,18 @@ test('execTool routes integration tools to the linked integration', async () => 
   const integration = new MockIntegration(engine, { type: 'mock' });
   engine.integrations['gloobeam'] = integration;
 
-  const result = await engine.agents['marvin']!.execTool('gloobeam__create_post', { title: 'Hello' });
+  const result = await engine.agents['marvin']!.execTool('gloobeam__create_post', { title: 'Hello' }, chatWith([]));
 
   expect(integration.calls.length).toBe(1);
-  expect(integration.calls[0]!.action).toBe('create_post');
-  expect(integration.calls[0]!.args).toEqual({ action: 'create_post', title: 'Hello' });
+  expect(integration.calls[0]!.tool).toBe('create_post');
+  expect(integration.calls[0]!.args).toEqual({ tool: 'create_post', title: 'Hello' });
   expect(result.ok).toBe(true);
 });
 
 test('execTool returns an error for unknown integration tools', async () => {
   const engine = buildTestEngine();
 
-  const result = await engine.agents['marvin']!.execTool('nope__create_post', {});
+  const result = await engine.agents['marvin']!.execTool('nope__create_post', {}, chatWith([]));
 
   expect(result.error).toContain('does NOT exist');
 });

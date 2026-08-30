@@ -11,14 +11,14 @@ export default class LoadToolsTool extends Tool {
     group: 'control',
     function: {
       name: 'load_tools',
-      description: 'Load one or more callable tools into this chat. Pass the tool names (e.g. ["read_file", "web_search", "wordpressSite__create_post", "my_mcp__my_tool"]). Available tools are listed in the "## Available Tools", "## Integrations" and "## MCPs" sections of the system prompt. Integration tools use "<integrationId>__<action>" and MCP tools use "<mcpId>__<toolName>".',
+      description: 'Load one or more callable tools into this chat. Pass the tool names (e.g. ["web_search", "integration__create_post", "mcp__custom-tool"]). Available tools are listed in the "## Available Tools", "## Integrations" and "## MCPs" sections of the system prompt. Integration tools use "<integrationId>__<tool>" and MCP tools use "<mcpId>__<tool>".',
       parameters: {
         type: 'object',
         properties: {
           names: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Names of the tools to load (e.g. ["read_file", "web_search", "wordpressSite__create_post"])',
+            description: 'Names of the tools to load (e.g. ["web_search", "integration__create_post", "mcp__custom-tool"])',
           },
         },
         required: ['names'],
@@ -53,7 +53,7 @@ export default class LoadToolsTool extends Tool {
         continue;
       }
 
-      // 2) integration tool (<integrationId>__<action>) - built via loadIntegrationTools per Engine.loadIntegrations/execTask
+      // 2) integration tool (<integrationId>__<tool>) - built via loadIntegrationTools per Engine.loadIntegrations/execTask
       let found = false;
       const intSplit = splitIntegrationToolName(name);
       if (intSplit) {
@@ -73,7 +73,7 @@ export default class LoadToolsTool extends Tool {
             loaded.push(name);
             continue;
           }
-          // integration exists but action not found -> will be reported as missing after mcp check
+          // integration exists but tool not found -> will be reported as missing after mcp check
           found = true;
         }
       }

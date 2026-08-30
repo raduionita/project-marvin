@@ -301,7 +301,7 @@ export default class Engine {
     }
 
     // tools may derive meta from loaded integrations (e.g. call_integration
-    // lists the actual sites and actions), so refresh them after loading
+    // lists the actual sites and tools), so refresh them after loading
     for (const tool of Object.values(this.tools)) {
       const refresh = (tool as { refresh?: () => void }).refresh;
       if (typeof refresh === 'function') refresh.call(tool);
