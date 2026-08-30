@@ -84,7 +84,6 @@ export default class DeepseekModel extends Model {
     body.messages = chat.messages.map(m => JSON.parse(JSON.stringify({
       role: m.role, 
       content: m.content, 
-      name: 'Human', 
       tool_call_id: m.toolId, 
       tool_calls: m.tools?.map(t => ({
         id: t.id,

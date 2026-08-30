@@ -59,7 +59,7 @@ class MockIntegration extends Integration {
     title: 'Mock',
     description: 'Mock integration',
     arguments: { endpoint: 'https://example.com' },
-    actions: {
+    tools: {
       create_post: 'Create a post',
       publish_post: 'Publish a post',
     },

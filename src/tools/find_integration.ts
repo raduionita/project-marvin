@@ -33,11 +33,11 @@ export default class FindIntegrationTool extends Tool {
     }
 
     const info = integration.meta;
-    const description = info.actions[args.action];
+    const description = info.tools[args.action];
     if (description === undefined) {
       return {
         error: `action "${args.action}" does not exist on integration "${args.integration}"`,
-        actions: Object.keys(info.actions),
+        actions: Object.keys(info.tools),
       };
     }
 

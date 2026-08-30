@@ -177,7 +177,7 @@ export interface IntegrationMeta {
   // one line description (e.g. "Post articles to a Wordpress site")
   description: string;
   // all actions this integration type supports: action name -> description
-  actions: { [key: string]: string };
+  tools: { [key: string]: string };
   // config keys the integration needs (endpoint, credentials, ...) with placeholder values
   arguments: { [key: string]: any };
 }

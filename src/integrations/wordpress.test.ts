@@ -263,8 +263,8 @@ test('meta lists the wordpress actions', async () => {
   const info = integration.meta;
 
   expect(info.type).toBe('wordpress');
-  expect(Object.keys(info.actions)).toContain('create_post');
-  expect(Object.keys(info.actions)).toContain('list_posts');
+  expect(Object.keys(info.tools)).toContain('create_post');
+  expect(Object.keys(info.tools)).toContain('list_posts');
 });
 
 // --- discover (OPTIONS) ---

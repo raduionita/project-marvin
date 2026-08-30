@@ -75,51 +75,31 @@ export class Agent {
     let always: ToolMeta[] = [];
 
     {
-      const entries = Object.entries(this.engine.integrations);
-      const configs = entries.length ? entries : Object.entries(this.engine.config.integrations || {});
-
-      const blocks = configs.map(([id, integration]) => {
-        const isLoaded = integration instanceof Integration;
-        const config = isLoaded ? integration.config : integration;
-        const meta = isLoaded ? integration.meta :  {
-          type: config?.type || 'integration',
-          title: id,
-          description: '',
-          actions: {},
-          arguments: {},
-        };
-        const endpoint = config?.endpoint || config?.url || config?.baseUrl || '';
-        const actions = Object.keys(meta.actions).length
-          ? `\nActions: ${Object.entries(meta.actions).map(([name, description]) => `${name} - ${description}`).join('; ')}`
-          : '';
-        const url = endpoint ? ` (${endpoint})` : '';
-        return `### ${id}${url}\n${meta.description || meta.title}${actions}`;
-      });
-
-      // inject the integrations block
-      if (blocks.length) {
+      if (Object.keys(this.engine.integrations).length) {
         system += '\n\n';
         system += '## Integrations\n';
-        system += blocks.join('\n');
+        for (const [id, integration] of Object.entries(this.engine.integrations)) {
+          system += `### ${id} Integration tools:\n`;
+          for (const tool of Object.values(integration.meta.tools)) {
+            system += `- ${id}__${tool} (${integration.meta.tools[tool]})\n`;
+          }
+        }
       }
     } // integrations
     
     {
       // inject the mcps block: loaded servers list their tools, config-only entries just their spawn spec
-      const mcpBlocks = Object.entries(this.engine.mcps).map(([id, client]) => {
-        const tools = Object.keys(client.tools).length
-          ? `\nTools: ${Object.keys(client.tools).join('; ')}`
-          : '';
-        return `### ${id}${tools}`;
-      });
-      const mcpConfigBlocks = Object.keys(this.engine.config.mcps || {})
-        .filter(id => !this.engine.mcps[id])
-        .map(id => `### ${id} (not connected)`);
-      const allMcpBlocks = [...mcpBlocks, ...mcpConfigBlocks];
-      if (allMcpBlocks.length) {
+      if (Object.keys(this.engine.mcps).length) {
         system += '\n\n';
-        system += '## Mcps\n';
-        system += allMcpBlocks.join('\n');
+        system += '## MCPs\n';
+        for (const [id, mcp] of Object.entries(this.engine.mcps)) {
+          if (mcp.isLoaded) {
+            system += `### ${id} MCP tools:\n`;
+            for (const tool of Object.values(mcp.tools)) {
+              system += `- ${id}__${tool.name} (${tool.description})\n`;
+            }
+          }
+        }
       }
     } // mcps
 
@@ -142,20 +122,28 @@ export class Agent {
       // inject a compact catalog of loadable tools so the agent can discover and load them on demand via the load_tools
       const available = Object.values(this.engine.tools).filter(t => !t.stop && t.meta.function.name !== 'load_tools');
       if (available.length) {
-        const groups: Record<string, string[]> = {};
+        const groups: Record<string, { name: string, info: string, args: string }[]> = {};
         for (const tool of available) {
-          (groups[tool.meta.group] ||= []).push(tool.meta.function.name);
+          (groups[tool.meta.group] ||= []).push({ 
+            name: tool.meta.function.name, 
+            info: tool.meta.function.description, 
+            args: Object.keys(tool.meta.function.parameters.properties).map(p => tool.meta.function.parameters.required?.includes(p) ? `?${p}` : p).join(',')
+          });
         }
+
         system += '\n\n';
         system += '## Available Tools\n';
-        system += Object.entries(groups).map(([group, names]) => `${group}: ${names.join(', ')}`).join('\n');
-        system += '\nUse the load_tools tool to load a tool before calling it.';
+        for (const [group, names] of Object.entries(groups)) {
+          system += `## ${group} tools:\n`;
+          for (const { name, info, args } of names) {
+            system += `- \`${name}\` (${info})\n`;
+          }
+        }
+        system += '\nUse the `load_tools()` tool to load tools before calling them.';
       }
 
-      // always-known tools: load_tools (tool discovery) + stop tools (end_chat)
-      always = Object.values(this.engine.tools)
-        .filter(t => t.stop || t.meta.function.name === 'load_tools')
-        .map(t => t.meta);
+      // always-known tools: load_tools (tool discovery) + end_chat (stop tools)
+      always = Object.values(this.engine.tools).filter(t => t.stop || t.meta.function.name === 'load_tools').map(t => t.meta);
     } // tools
 
     return {

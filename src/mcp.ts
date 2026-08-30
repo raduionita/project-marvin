@@ -66,7 +66,7 @@ export class Mcp {
       },
     ]));
 
-    this.logger.info(`[Mcp.call]`, this.id, `connected, ${Object.keys(this.tools).length} tool(s)`);
+    this.logger.info(`[Mcp.call]`, this.id, 'connected', 'tools:', Object.keys(this.tools));
   }
 
   // close the connection and kill the server process
@@ -97,17 +97,17 @@ export class Mcp {
 
   // call a tool by its sanitized name, returning the flattened result content.
   async call(name: string, args: { [key: string]: any } = {}): Promise<{ [key: string]: any }> {
-    this.logger.debug(`[Mcp.call]`, this.id, name);
+    this.logger.debug(`[Mcp.call]`, this.id, name, Object.keys(args).join(','));
 
     if (!this.client) {
       this.logger.warn(`[Mcp.call]`, this.id, 'not connected, reconnecting');
       await this.load();
     }
 
-    const raw = this.tools[name]?.name || name;
+    name = this.tools[name]?.name || name;
 
     const result = await this.client!.callTool(
-      { name: raw, arguments: args },
+      { name: name, arguments: args },
       undefined,
       { timeout: constants.MCP_CALL_TIMEOUT_MS },
     );
@@ -116,7 +116,7 @@ export class Mcp {
     
     // in-band errors (isError=true) surface as thrown errors for the ai loop
     if (result.isError) {
-      throw new Error(flat.text || `tool ${raw} failed on mcp "${this.id}"`);
+      throw new Error(flat.text || `tool ${name}(${Object.keys(args).join(',')}) failed on mcp "${this.id}"`);
     }
 
     return flat;

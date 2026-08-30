@@ -24,7 +24,7 @@ export default class WordpressIntegration extends Integration {
       user: 'admin',
       appPassword: 'xxxxXXXXxxxx',
     },
-    actions: {
+    tools: {
       list_posts: 'List posts on the site',
       get_post: 'Get a single post by id',
       create_post: 'Create a new post',
@@ -62,7 +62,7 @@ export default class WordpressIntegration extends Integration {
 
   async load(): Promise<void> {
     this.logger.debug('[WordpressIntegration.load]');
-    
+
     if (!this.config.endpoint) {
       this.logger.error('[WordpressIntegration.load]', 'no endpoint found, skipping');
     }

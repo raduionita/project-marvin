@@ -27,10 +27,10 @@ export default class CallIntegrationTool extends Tool {
       const type = config.type || '';
       const integration = this.engine.integrations[id];
       const info = integration ? integration.meta : { actions: {} };
-      for (const [name, description] of Object.entries(info.actions)) {
+      for (const [name, description] of Object.entries(info.tools)) {
         if (!actions.has(name)) actions.set(name, description);
       }
-      if (type && !Object.keys(info.actions).length && !actions.has('request')) {
+      if (type && !Object.keys(info.tools).length && !actions.has('request')) {
         // unknown/undescribed integration type: fall back to a generic action
         actions.set('request', 'Run a raw request against the integration');
       }

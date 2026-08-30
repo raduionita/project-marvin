@@ -4,7 +4,7 @@ import { join } from 'path';
 import { Command } from "../types";
 import { Mcp, testMcp, specMcp } from '../mcp.js';
 import { tryJsonParse } from '../helpers/index.js';
-import { editor, checkbox, confirm, input } from '../terminal.js';
+import { editor, checkbox, confirm, input, select } from '../terminal.js';
 
 // `marvin mcps [command]` list, add, edit, info, drop mcp connectors
 export default class McpsCommand extends Command {
@@ -110,6 +110,7 @@ export default class McpsCommand extends Command {
 
     // show the specs
     this.logger.log(conf);
+    this.logger.log('testing connection...');
 
     // verify connectivity before saving (spawn + initialize + listTools)
     const ok = await testMcp(this.engine, name, conf);
@@ -157,9 +158,14 @@ export default class McpsCommand extends Command {
   async execEdit() {
     this.logger.debug('[McpsCommand.execEdit]');
 
-    const pname = this.args[1] || await input({
-      message: 'Enter mcp name (e.g. gloobeam):',
-      required: true,
+    const mcps = Object.keys(this.engine.config.mcps || {});
+    if (!mcps.length) {
+      this.logger.warn('[McpsCommand.execEdit]', 'no mcps configured');
+      return;
+    }
+    const pname = this.args[1] || await select({
+      message: 'Select mcp to edit:',
+      choices: mcps.map(id => ({ name: id, value: id })),
     });
 
     // must exist
@@ -208,11 +214,15 @@ export default class McpsCommand extends Command {
   async execInfo() {
     this.logger.debug('[McpsCommand.execInfo]');
 
-    const pname = this.args[1] || await input({ message: 'Enter mcp name (e.g. gloobeam):' });
-    if (!pname) {
-      this.logger.warn('[McpsCommand.execInfo]', 'usage: marvin mcps info <name>');
+    const mcps = Object.keys(this.engine.config.mcps || {});
+    if (!mcps.length) {
+      this.logger.warn('[McpsCommand.execInfo]', 'no mcps configured');
       return;
     }
+    const pname = this.args[1] || await select({
+      message: 'Select mcp:',
+      choices: mcps.map(id => ({ name: id, value: id })),
+    });
 
     const config = this.engine.config.mcps?.[pname];
     if (!config) {
@@ -222,6 +232,7 @@ export default class McpsCommand extends Command {
 
     const client = new Mcp(this.engine, pname, config);
     try {
+      this.logger.log(`getting ${pname} mcp info...`);
       await client.load();
 
       this.logger.log(`mcp "${pname}" (${[config.command, ...(config.args || [])].join(' ')}):`);
@@ -244,16 +255,16 @@ export default class McpsCommand extends Command {
   async execDrop() {
     this.logger.debug('[McpsCommand.execDrop]');
 
-    const pname = this.args[1] || await input({
-      message: 'Enter mcp name (e.g. gloobeam):',
-      required: true,
-      pattern: /^[a-zA-Z0-9_-]+$/,
-      patternError: 'invalid name (use a-z, 0-9, _ and -):',
-    });
-    if (!pname) {
-      this.logger.warn('[McpsCommand.execDrop]', 'usage: marvin mcps drop <name>');
+    const mcps = Object.keys(this.engine.config.mcps || {});
+    if (!mcps.length) {
+      this.logger.warn('[McpsCommand.execDrop]', 'no mcps configured');
       return;
     }
+
+    const pname = this.args[1] || await select({
+      message: 'Select mcp to drop:',
+      choices: mcps.map(id => ({ name: id, value: id })),
+    });
 
     // should exist
     if (!this.engine.config.mcps?.[pname]) {

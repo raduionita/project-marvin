@@ -228,7 +228,7 @@ export default class Engine {
       }
     }
 
-    this.logger.debug('[Engine.loadTools]', '[', Object.keys(this.tools).join(','), ']');
+    this.logger.debug('[Engine.loadTools]', `[${Object.keys(this.tools).join(',')}]`);
   }
 
   async loadChannels() {

@@ -76,14 +76,14 @@ test('execDrop removes an mcp, unlinks tasks and persists', async () => {
   expect(config.tasks.post.mcps).toEqual([]);
 });
 
-test('execDrop warns for unknown mcp', async () => {
+test('execDrop warns for no mcps configured', async () => {
   const engine = buildEngine();
   const { lines, restore } = captureLogger();
   const cmd = new McpsCommand(engine, ['drop', 'nope']);
 
   await cmd.exec();
 
-  expect(lines.join('\n')).toContain('not found');
+  expect(lines.join('\n')).toContain('no mcps configured');
   expect(readConfig(engine).mcps).toEqual({});
   restore();
 });

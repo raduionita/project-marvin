@@ -536,7 +536,7 @@ class MockIntegration extends Integration {
     title: 'Mock',
     description: 'Mock integration',
     arguments: { endpoint: 'https://example.com' },
-    actions: { create_post: 'Create a post' },
+    tools: { create_post: 'Create a post' },
   };
   calls: { action: string; args: { [key: string]: any } }[] = [];
 

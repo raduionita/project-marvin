@@ -49,7 +49,7 @@ export async function loadIntegrationTools(engine: Engine, integrations: string[
     const actionsCfg = config.actions || {};
     const hasConfigured = Object.keys(actionsCfg).length > 0;
 
-    for (const [action, description] of Object.entries(integration.meta.actions)) {
+    for (const [action, description] of Object.entries(integration.meta.tools)) {
       const cfg = actionsCfg[action];
       // when any action is configured, expose only the configured (enabled) ones
       if (hasConfigured && (!cfg || cfg.enabled === false)) continue;

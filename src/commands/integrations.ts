@@ -144,7 +144,7 @@ export default class IntegrationsCommand extends Command {
 
     // ask for the actions and their fields in a loop (until the user is done)
     const actionsCfg: { [key: string]: any } = {};
-    const actionOptions = Object.entries(integration.meta.actions).map(([name, description]) => ({
+    const actionOptions = Object.entries(integration.meta.tools).map(([name, description]) => ({
       name: `${name} - ${description}`,
       value: name,
     }));
@@ -304,7 +304,7 @@ export default class IntegrationsCommand extends Command {
 
     // run discovery for every action and preview the resulting config
     const actions: { [key: string]: any } = {};
-    for (const name of Object.keys(integration.meta.actions)) {
+    for (const name of Object.keys(integration.meta.tools)) {
       let fields: Field[] = [];
       try {
         fields = await integration.discover(name);
@@ -366,10 +366,10 @@ export default class IntegrationsCommand extends Command {
 
     const current = Object.keys(actionsCfg).length
       ? Object.keys(actionsCfg)
-      : (Object.keys(info.actions).length ? [Object.keys(info.actions)[0]!] : []);
+      : (Object.keys(info.tools).length ? [Object.keys(info.tools)[0]!] : []);
     const action = await select({
       message: `Select an action to edit for "${pname}" (current: ${current.join(', ') || 'none'}):`,
-      choices: Object.entries(info.actions).map(([name, description]) => ({ name: `${name} - ${description}`, value: name })),
+      choices: Object.entries(info.tools).map(([name, description]) => ({ name: `${name} - ${description}`, value: name })),
     });
     if (!action) return;
 
