@@ -713,8 +713,8 @@ test('makeChat seeds a system prompt with an integrations block for loaded integ
 
   expect(prompt).toContain('## Integrations');
   expect(prompt).toContain('### gloobeam Integration tools:');
-  expect(prompt).toContain('gloobeam__create_post (Create a new post)');
-  expect(prompt).toContain('gloobeam__publish_post (Publish an existing draft post)');
+  expect(prompt).toContain('`gloobeam__create_post`: Create a new post');
+  expect(prompt).toContain('`gloobeam__publish_post`: Publish an existing draft post');
 });
 
 test('makeChat omits integrations block when integrations are not loaded (config only)', () => {
@@ -776,8 +776,8 @@ test('makeChat seeds a system prompt with an MCPs block for loaded mcps', () => 
 
   expect(prompt).toContain('## MCPs');
   expect(prompt).toContain('### my_mcp MCP tools:');
-  expect(prompt).toContain('my_mcp__my_tool (Does a thing)');
-  expect(prompt).toContain('my_mcp__other_tool (Other)');
+  expect(prompt).toContain('`my_mcp__my_tool`: Does a thing');
+  expect(prompt).toContain('`my_mcp__other_tool`: Other');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -857,25 +857,27 @@ test('makeChat only includes always-known tools in chat.tools by default', () =>
   expect(names).not.toContain('mock_tool');
 });
 
-test('makeChat merges per-task tools with always-known tools', () => {
+test('makeChat no longer merges per-task tools (tools load via load_tools)', async () => {
   const engine = buildTestEngine();
   installSampleTools(engine);
   const agent = engine.agents['marvin']!;
   rmSync(engine.work, { recursive: true, force: true });
 
-  const taskTool: ToolMeta = {
-    type: 'function',
-    group: 'task',
-    function: { name: 'custom__do', description: 'custom', parameters: { type: 'object', properties: {}, required: [] } },
-  };
-  const chat = agent.loadChat('chat-1', [taskTool]);
+  const chat = agent.loadChat('chat-1');
   const names = chat.tools?.map(t => t.function.name) || [];
 
   expect(names).toContain('end_chat');
   expect(names).toContain('load_tools');
-  expect(names).toContain('custom__do');
-  // engine tools still not loaded
+  // per-task tools are not passed via loadChat anymore; they load lazily via load_tools
+  expect(names).not.toContain('custom__do');
   expect(names).not.toContain('read_file');
+
+  // verify lazy loading via load_tools still works
+  const tool = engine.tools['load_tools']!;
+  const result = await tool.call({ names: ['read_file'] }, agent, chat);
+  expect(result.loaded).toContain('read_file');
+  expect(chat.tools!.map(t => t.function.name)).toContain('read_file');
+  rmSync(engine.work, { recursive: true, force: true });
 });
 
 test('makeChat omits the available-tools block when no loadable tools are configured', () => {

@@ -53,10 +53,6 @@ export interface Config {
     agent?: string;
     schedule: number;
     input?: string;
-    // integrations linked to this task: their tools become tools
-    integrations?: string[];
-    // mcps linked to this task: their tools become tools
-    mcps?: string[];
   }>;
 }
 
@@ -123,7 +119,7 @@ export abstract class Tool {
   // tool descriptor
   public readonly meta: ToolMeta = { type: 'function', group: 'general', function: { name: 'stop', description: 'STOP', parameters: { type: 'object', properties: {}, required: [] } } };
 
-  public abstract call(args: {[key:string]:any}, agent?: Agent, chat?: Chat): Promise<{[key:string]:any}>;
+  public abstract call(args: {[key:string]:any}, agent: Agent, chat: Chat): Promise<{[key:string]:any}>;
 }
 
 export interface ChannelMeta {
@@ -274,10 +270,6 @@ export interface Task {
   timeout: NodeJS.Timeout | null;
   // task prompt for the LLM
   input?: string;
-  // integrations linked to this task: their tools become tools for this task
-  integrations?: string[];
-  // mcps linked to this task: their tools become tools for this task
-  mcps?: string[];
 }
 
 // chat = message history + tools

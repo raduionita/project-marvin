@@ -7,8 +7,8 @@ import { Agent } from './agent.js';
 import * as constants from './constants.js';
 import { listInternalTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
-import { listIntegrations, loadIntegrationTools } from "./integrations/index.js";
-import { Mcp, loadMcpTools } from "./mcp.js";
+import { listIntegrations } from "./integrations/index.js";
+import { Mcp } from "./mcp.js";
 import { listSkills, loadSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 import { join } from "path";
@@ -547,7 +547,6 @@ export default class Engine {
         schedule: schedule,
         timeout: null,
         input: input,
-        integrations: task.integrations,
       } as Task;
 
       this.logger.info('[Engine.loadTasks]', `task "${taskId}" created (agent ${agent.id})`);

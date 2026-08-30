@@ -595,7 +595,7 @@ class MockIntegration extends Integration {
   }
 }
 
-test('execTask merges task integration tools into chat.tools', async () => {
+test('execTask no longer merges task integration tools (lazy via load_tools)', async () => {
   const engine = buildTestEngine();
   engine.integrations['gloobeam'] = new MockIntegration(engine, { type: 'mock' });
 
@@ -608,7 +608,6 @@ test('execTask merges task integration tools into chat.tools', async () => {
     maxSteps: 2,
     input: 'task input',
     timeout: null,
-    integrations: ['gloobeam'],
   } as Task;
 
   // capture the chat the model receives on each call
@@ -621,16 +620,15 @@ test('execTask merges task integration tools into chat.tools', async () => {
 
   expect(seen.length).toBeGreaterThan(0);
   const toolNames = seen[0]!.tools?.map(t => t.function.name) || [];
-  // task-linked integration tool is merged into chat.tools. engine tools
-  // (e.g. mock_tool) are NOT in chat.tools by default; they are listed in
-  // the "## Available Tools" system prompt block and loaded on demand via
-  // the load_tools tool.
-  expect(toolNames).toContain('gloobeam__create_post');
+  // integration tools are NOT in chat.tools by default; they are listed in
+  // the "## Integrations" / "## MCPs" prompt blocks and loaded on demand via load_tools
+  expect(toolNames).not.toContain('gloobeam__create_post');
   expect(toolNames).not.toContain('mock_tool');
 
-  // the system prompt seeds the available-tools catalog so the LLM can
-  // discover and load engine tools via load_tools
+  // the system prompt seeds the catalogs so the LLM can discover and load via load_tools
   const prompt = seen[0]!.messages[0]!.content as string;
+  expect(prompt).toContain('## Integrations');
+  expect(prompt).toContain('gloobeam__create_post');
   expect(prompt).toContain('## Available Tools');
   expect(prompt).toContain('mock_tool');
 });

@@ -189,7 +189,7 @@ test('execInfo previews the discovered config without persisting', async () => {
   restore();
 });
 
-test('execAdd links the integration to selected tasks', async () => {
+test('execAdd no longer links the integration to tasks (tools load via load_tools)', async () => {
   mockWordpressDiscovery();
   const engine = buildEngine();
   engine.config.tasks = {
@@ -199,14 +199,13 @@ test('execAdd links the integration to selected tasks', async () => {
   const cmd = new IntegrationsCommand(engine, ['add', 'gloobeam', 'wordpress']);
 
   // name+type via args: endpoint -> user -> appPassword -> action ("1") ->
-  // fields ("1,2") -> required (blank) -> finish -> meta blank -> task ("1"=post)
-  // (digest stays unlinked)
-  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', '', '1'];
+  // fields ("1,2") -> required (blank) -> finish -> meta blank (no task prompt)
+  answers = ['https://gloobeam.com', 'admin', 'secret', '1', '1,2', '', '6', ''];
 
   await cmd.exec();
 
-  expect(engine.config.tasks!['post']!.integrations).toEqual(['gloobeam']);
-  expect(engine.config.tasks!['digest']!.integrations).toBeUndefined();
+  expect((engine.config.tasks!['post'] as any).integrations).toBeUndefined();
+  expect((engine.config.tasks!['digest'] as any).integrations).toBeUndefined();
   expect(readConfig(engine).integrations['gloobeam']).toBeDefined();
 });
 

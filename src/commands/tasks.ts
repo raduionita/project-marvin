@@ -1,4 +1,4 @@
-import { checkbox, editor, input, number, select, textbox } from '../terminal.js';
+import { editor, input, number, select } from '../terminal.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -92,23 +92,6 @@ export default class TasksCommand extends Command {
       return;
     }
 
-    // ask which configured integrations to link (their actions become tools)
-    const integrationIds = Object.keys(this.engine.config.integrations || {});
-    const taskIntegrations: string[] = [];
-    if (integrationIds.length) {
-      const picked = await checkbox({
-        message: 'Select integrations to link (space to toggle, enter to confirm):',
-        choices: integrationIds.map(id => ({ name: id, value: id })),
-      });
-      for (const id of picked) {
-        if (!integrationIds.includes(id)) {
-          this.logger.warn('[TasksCommand.execAdd]', `unknown integration "${id}", skipping`);
-          continue;
-        }
-        if (!taskIntegrations.includes(id)) taskIntegrations.push(id);
-      }
-    }
-
     this.logger.log('');
 
     // persist the task prompt to tasks/<taskId>/TASK.md
@@ -119,13 +102,12 @@ export default class TasksCommand extends Command {
       writeFileSync(ppath, taskInput + '\n');
     }
 
-    // register the task in config
+    // register the task in config (tools now load lazily via load_tools)
     this.engine.config.tasks = this.engine.config.tasks || {};
     this.engine.config.tasks[taskId] = {
       enabled: true,
       agent: taskAgent,
       schedule: taskSchedule,
-      ...(taskIntegrations.length ? { integrations: taskIntegrations } : {}),
     };
 
     // persist to marvin.json

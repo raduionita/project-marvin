@@ -4,7 +4,7 @@ import { join } from 'path';
 import { Command } from "../types";
 import { Mcp, testMcp, specMcp } from '../mcp.js';
 import { tryJsonParse } from '../helpers/index.js';
-import { editor, checkbox, confirm, input, select } from '../terminal.js';
+import { editor, confirm, input, select } from '../terminal.js';
 
 // `marvin mcps [command]` list, add, edit, info, drop mcp connectors
 export default class McpsCommand extends Command {
@@ -123,24 +123,7 @@ export default class McpsCommand extends Command {
       }
     }
 
-    // ask which tasks to link this mcp to (its tools become task tools)
-    const taskIds = Object.keys(this.engine.config.tasks || {});
-    if (taskIds.length) {
-      const pickedTasks = await checkbox({
-        message: `Link "${name}" to tasks (space to toggle, enter to confirm):`,
-        choices: taskIds.map(taskId => ({ name: taskId, value: taskId })),
-      });
-      for (const taskId of pickedTasks) {
-        const task = this.engine.config.tasks?.[taskId];
-        if (!task) {
-          this.logger.warn('[McpsCommand.execAdd]', `unknown task "${taskId}", skipping`);
-          continue;
-        }
-        task.mcps = [...new Set([...(task.mcps || []), name])];
-      }
-    }
-
-    // register the mcp in config
+    // register the mcp in config (tools now load lazily via load_tools)
     const mcps = this.engine.config.mcps || {};
     conf.enabled = true;
     mcps[name] = conf;
@@ -277,13 +260,6 @@ export default class McpsCommand extends Command {
 
     // remove the mcp from the config
     delete this.engine.config.mcps![pname];
-
-    // unlink from tasks
-    for (const task of Object.values(this.engine.config.tasks || {})) {
-      if (task.mcps?.includes(pname)) {
-        task.mcps = task.mcps.filter(id => id !== pname);
-      }
-    }
 
     // save config
     const cpath = join(this.engine.work, 'marvin.json');

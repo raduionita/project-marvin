@@ -46,35 +46,35 @@ export async function loadIntegrationTools(engine: Engine, integrations: string[
     }
 
     const config = integration.config || {};
-    const actionsCfg = config.actions || {};
-    const hasConfigured = Object.keys(actionsCfg).length > 0;
+    const toolCfg = config.tools || {};
+    const hasConfigured = Object.keys(toolCfg).length > 0;
 
-    for (const [action, description] of Object.entries(integration.meta.tools)) {
-      const cfg = actionsCfg[action];
-      // when any action is configured, expose only the configured (enabled) ones
+    for (const [tool, description] of Object.entries(integration.meta.tools)) {
+      const cfg = toolCfg[tool];
+      // when any tools is configured, expose only the configured (enabled) ones
       if (hasConfigured && (!cfg || cfg.enabled === false)) continue;
 
       // configured fields (OPTIONS snapshot) drive the tool schema; fall back to
       // live discovery (best effort, never blocks the task loop)
-      let fields = actionParameters(config, action).properties;
+      let fields = toolParameters(config, tool).properties;
       if (!Object.keys(fields).length) {
         try {
-          const discovered = await integration.discover(action);
+          const discovered = await integration.discover(tool);
           fields = Object.fromEntries(discovered.map(f => [f.name, f]));
         } catch (err) {
-          logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${action}":`, (err as Error).message);
+          logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${tool}":`, (err as Error).message);
         }
       }
 
-      tools.push(makeActionTool(id, integration, action, description, Object.values(fields)));
+      tools.push(makeIntegrationTool(id, integration, tool, description, Object.values(fields)));
     }
   }
   return tools;
 }
 
-// tool names for per-action integration tools follow `<integrationId>__<action>`
-export function makeIntegrationToolName(id: string, action: string): string {
-  return `${id}__${action}`;
+// tool names for per-tool integration tools follow `<integrationId>__<tool>`
+export function makeIntegrationToolName(id: string, tool: string): string {
+  return `${id}__${tool}`;
 }
 
 // map a Field into a JSON-schema property for the tool parameters
@@ -107,14 +107,14 @@ function setNested(properties: { [key: string]: any }, parts: string[], prop: { 
   setNested(properties[head!].properties, rest, prop);
 }
 
-// build the parameters for a single action from the configured fields (a
+// build the parameters for a single tool from the configured fields (a
 // snapshot of live OPTIONS discovery taken by `marvin integrations add`), plus
 // any custom meta/acf fields configured on the integration
-function actionParameters(config: { [key: string]: any }, action: string): { properties: { [key: string]: any }, required: string[] } {
+function toolParameters(config: { [key: string]: any }, tool: string): { properties: { [key: string]: any }, required: string[] } {
   const properties: { [key: string]: any } = {};
   const required: string[] = [];
 
-  const fieldsCfg = config.actions?.[action]?.fields as { [key: string]: { type?: string, required?: boolean, description?: string, enum?: string[] } } | undefined;
+  const fieldsCfg = config.tools?.[tool]?.fields as { [key: string]: { type?: string, required?: boolean, description?: string, enum?: string[] } } | undefined;
   if (fieldsCfg && typeof fieldsCfg === 'object') {
     for (const [name, def] of Object.entries(fieldsCfg)) {
       if (!def) continue;
@@ -123,7 +123,7 @@ function actionParameters(config: { [key: string]: any }, action: string): { pro
     }
   }
 
-  // custom meta/acf fields are available to every action
+  // custom meta/acf fields are available to every tool
   const meta = config.meta as { fields?: { [key: string]: { type?: string, required?: boolean, description?: string } } } | undefined;
   if (meta?.fields && typeof meta.fields === 'object') {
     for (const [name, def] of Object.entries(meta.fields)) {
@@ -136,10 +136,10 @@ function actionParameters(config: { [key: string]: any }, action: string): { pro
   return { properties, required };
 }
 
-// build the ToolMeta for a single integration action
-function makeActionTool(integrationId: string, integration: Integration, action: string, description: string, fields: Field[]): ToolMeta {
+// build the ToolMeta for a single integration tool
+function makeIntegrationTool(integrationId: string, integration: Integration, tool: string, description: string, fields: Field[]): ToolMeta {
   const config = integration.config || {};
-  const { properties, required } = actionParameters(config, action);
+  const { properties, required } = toolParameters(config, tool);
 
   // fall back to discovered fields when the config has none configured
   for (const f of fields) {
@@ -152,8 +152,8 @@ function makeActionTool(integrationId: string, integration: Integration, action:
     type: 'function',
     group: 'integration',
     function: {
-      name: makeIntegrationToolName(integrationId, action),
-      description: `Run "${action}" on the "${integrationId}" integration: ${description}`,
+      name: makeIntegrationToolName(integrationId, tool),
+      description: `Run "${tool}" on the "${integrationId}" integration: ${description}`,
       parameters: {
         type: 'object',
         properties,

@@ -38,7 +38,7 @@ export class Agent {
 
   // get a chat for this id: reuse the cached/persisted one, or create a new
   // chat seeded with the system prompt (identity + integrations + memory)
-  loadChat(chatId: string | undefined, tools?: ToolMeta[]): Chat {
+  loadChat(chatId: string | undefined): Chat {
     this.logger.debug('[Agent.loadChat]');
 
     try {
@@ -64,11 +64,11 @@ export class Agent {
     }
 
     // or make a new chat
-    return this.makeChat(chatId, tools);
+    return this.makeChat(chatId);
   }
 
   // make new chat seeded with the system prompt (identity + integrations + memory)
-  makeChat(chatId: string | undefined, tools?: ToolMeta[]): Chat {
+  makeChat(chatId: string | undefined): Chat {
     this.logger.debug('[Agent.makeChat]');
 
     let system: string = this.identity;
@@ -147,12 +147,8 @@ export class Agent {
       messages: [{ role: 'system', content: system }],
       thinking: false,
       userId: '',
-      tools: [
-        // always-known tools: load_tools (tool discovery) + end_chat (stop tools)
-        ...Object.values(this.engine.tools).filter(t => t.stop || t.meta.function.name === 'load_tools').map(t => t.meta), 
-        // user-defined tools
-        ...(tools || []),
-      ],
+      // only load_tools (tool discovery) + end_chat (stop tools)
+      tools: Object.values(this.engine.tools).filter(t => t.stop || t.meta.function.name === 'load_tools').map(t => t.meta), 
       updated: Date.now(),
     } as Chat;
   }
@@ -200,7 +196,7 @@ export class Agent {
   }
 
   // tool call
-  async execTool(tool: string, args: {[key:string]:any}, chat?: Chat) : Promise<{[key:string]:any}> {
+  async execTool(tool: string, args: {[key:string]:any}, chat: Chat) : Promise<{[key:string]:any}> {
     this.logger.debug('[Agent.execTool]', tool);
     try {
       // internal tools
@@ -233,12 +229,12 @@ export class Agent {
   }
 
   // exec chat // agent loop
-  async sendChat(chatId: string | undefined, message: string, tools?: ToolMeta[]) : Promise<Result> {
+  async sendChat(chatId: string | undefined, message: string) : Promise<Result> {
     try {
       this.logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
 
       // get chat from cache/store, or create a new one seeded with the system prompt
-      const chat = this.loadChat(chatId, tools);
+      const chat = this.loadChat(chatId);
 
       // load task input as user message
       chat.messages.push({ role: 'user', content: message.trim() });
@@ -265,23 +261,19 @@ export class Agent {
         this.logger.debug('[Agent.sendChat]', `ended=${ended}`, `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
 
         ended = reply.stop || ended;
-        // execute any tool calls
+        // execute any tool calls (engine tools, integration __ tools, mcp __ tools via execTool)
         for (const call of reply.message.tools || []) {
           this.logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, Object.keys(call.arguments));
-          // tool MUST exist
-          const tool = this.engine.tools[call.name] 
-          if (!tool) {
-            this.logger.error('[Agent.sendChat]', `tool ${call.name} not found`);
-            continue;
-          } else if (tool.stop) {
+          const tool = this.engine.tools[call.name];
+          if (tool?.stop) {
             ended = true;
             chat.messages.push({role: 'tool', content: JSON.stringify({ ended: true }), toolId: call.id});
           } else if (ended) {
-            // tools after end_chat are skipped, but their ids still need an answer
+            // tools after end_chat / stop are skipped, but their ids still need an answer
             chat.messages.push({role: 'tool', content: JSON.stringify({ skipped: true }), toolId: call.id});
           } else {
-            // ! tool call
-            let result = await this.execTool(call.name, call.arguments, chat);  
+            // ! tool call - delegated to execTool which handles engine, integration and mcp tools
+            let result = await this.execTool(call.name, call.arguments, chat);
             // add tool call to chat history, truncating huge results
             chat.messages.push({role: 'tool', content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS), toolId: call.id});
           }

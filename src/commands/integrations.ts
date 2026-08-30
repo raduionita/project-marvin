@@ -247,24 +247,7 @@ export default class IntegrationsCommand extends Command {
 
     this.logger.log('');
 
-    // ask which tasks to link this integration to (their actions become tools)
-    const taskIds = Object.keys(this.engine.config.tasks || {});
-    if (taskIds.length) {
-      const pickedTasks = await checkbox({
-        message: `Link "${name}" to tasks (space to toggle, enter to confirm):`,
-        choices: taskIds.map(taskId => ({ name: taskId, value: taskId })),
-      });
-      for (const taskId of pickedTasks) {
-        const task = this.engine.config.tasks?.[taskId];
-        if (!task) {
-          this.logger.warn('[IntegrationsCommand.execAdd]', `unknown task "${taskId}", skipping`);
-          continue;
-        }
-        task.integrations = [...new Set([...(task.integrations || []), name])];
-      }
-    }
-
-    // register the integration in config
+    // register the integration in config (tools now load lazily via load_tools)
     this.engine.config.integrations[name] = { enabled: true, type, ...config };
 
     // run load to see if the integration works

@@ -116,10 +116,10 @@ test('mergeConfig treats empty incoming as full defaults', () => {
 });
 
 test('mergeConfig does not merge arrays', () => {
-  const defaults = { tasks: { a: { integrations: [] } } };
-  const incoming = { tasks: { a: { integrations: ['wp'] } } };
+  const defaults = { tasks: { a: { tags: [] } } };
+  const incoming = { tasks: { a: { tags: ['wp'] } } };
 
   const merged = mergeConfig(defaults as any, incoming);
 
-  expect(merged.tasks.a.integrations).toEqual(['wp']);
+  expect(merged.tasks.a.tags).toEqual(['wp']);
 });

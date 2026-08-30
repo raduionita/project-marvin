@@ -64,16 +64,16 @@ test('execList lists configured mcps', async () => {
   restore();
 });
 
-test('execDrop removes an mcp, unlinks tasks and persists', async () => {
+test('execDrop removes an mcp and persists (no task unlinking via load_tools)', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
-  engine.config.tasks = { post: { enabled: true, schedule: 60, mcps: ['gloobeam'] } } as Config['tasks'];
+  engine.config.tasks = { post: { enabled: true, schedule: 60 } } as Config['tasks'];
   const cmd = new McpsCommand(engine, ['drop', 'gloobeam']);
 
   await cmd.exec();
 
   const config = readConfig(engine);
   expect(config.mcps['gloobeam']).toBeUndefined();
-  expect(config.tasks.post.mcps).toEqual([]);
+  expect((config.tasks.post as any).mcps).toBeUndefined();
 });
 
 test('execDrop warns for no mcps configured', async () => {
@@ -107,7 +107,7 @@ test('execAdd validates, connects and persists an mcp from a pasted snippet', as
   restore();
 });
 
-test('execAdd links the mcp to selected tasks', async () => {
+test('execAdd no longer links the mcp to tasks (tools load via load_tools)', async () => {
   const engine = buildEngine();
   engine.config.tasks = {
     post: { enabled: true, schedule: 3600 },
@@ -116,13 +116,13 @@ test('execAdd links the mcp to selected tasks', async () => {
   injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
   const cmd = new McpsCommand(engine, ['add']);
 
-  // scripted answers: name -> checkbox ("1" links the first task only)
-  answers = ['gloobeam', '1'];
+  // scripted answers: name only (no task linking prompt)
+  answers = ['gloobeam'];
 
   await cmd.exec();
 
-  expect(engine.config.tasks!['post']!.mcps).toEqual(['gloobeam']);
-  expect(engine.config.tasks!['digest']!.mcps).toBeUndefined();
+  expect((engine.config.tasks!['post'] as any).mcps).toBeUndefined();
+  expect((engine.config.tasks!['digest'] as any).mcps).toBeUndefined();
 });
 
 test('execAdd rejects invalid json snippets', async () => {

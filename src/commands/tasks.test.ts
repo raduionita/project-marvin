@@ -106,7 +106,7 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
   });
 });
 
-test('tasks add links configured integrations via checkbox', async () => {
+test('tasks add no longer links integrations (tools load via load_tools)', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
@@ -118,7 +118,7 @@ test('tasks add links configured integrations via checkbox', async () => {
   } as Config['integrations'];
 
   const cmd = new TasksCommand(engine, []);
-  answers = ['', 'post-task', '60', '1'];
+  answers = ['', 'post-task', '60'];
   taskPromptSnippet = 'write a post';
   await cmd.execAdd();
 
@@ -126,6 +126,7 @@ test('tasks add links configured integrations via checkbox', async () => {
     enabled: true,
     agent: 'my-agent',
     schedule: 60,
-    integrations: ['gloobeam'],
   });
+  // ensure no integrations field persisted
+  expect((engine.config.tasks!['post-task'] as any).integrations).toBeUndefined();
 });
