@@ -3,12 +3,13 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 import { Browser, HTTPRequest, Page } from 'puppeteer';
 
 import { System } from '../types.js';
+import logger from '../logger.js';
 
 export default class BrowserSystem extends System {
   private browser: Browser | undefined;
 
   public async load(): Promise<void> {
-    this.logger.debug('[BrowserSystem.load]');
+    logger.debug('[BrowserSystem.load]');
 
     puppeteer.use(stealth());
 
@@ -48,29 +49,29 @@ export default class BrowserSystem extends System {
       // todo: proxies
     });
 
-    this.logger.debug('[BrowserSystem.load]', 'browser:', await puppeteer.executablePath());
+    logger.debug('[BrowserSystem.load]', 'browser:', await puppeteer.executablePath());
   }
 
   public async drop(): Promise<void> {
-    this.logger.debug('[BrowserSystem.drop]');
+    logger.debug('[BrowserSystem.drop]');
     if (this.browser) {
       try {
         await this.browser.close();
-        this.logger.debug('[BrowserSystem.drop]', 'closed');
+        logger.debug('[BrowserSystem.drop]', 'closed');
       } catch (err) {
-        this.logger.error('[BrowserSystem.drop]', 'error:', err);
+        logger.error('[BrowserSystem.drop]', 'error:', err);
       }
       this.browser = undefined;
     } else {
-      this.logger.debug('[BrowserSystem.drop]', 'already closed');
+      logger.debug('[BrowserSystem.drop]', 'already closed');
     }
   }
 
   public async newPage(onRequest?: (request: HTTPRequest) => void) : Promise<Page> {
-    this.logger.debug('[BrowserSystem.newPage]');
+    logger.debug('[BrowserSystem.newPage]');
 
     if (!this.browser) {
-      this.logger.error('[BrowserSystem.newPage]', 'browser not loaded');
+      logger.error('[BrowserSystem.newPage]', 'browser not loaded');
       throw new Error('[BrowserSystem.newPage] ERROR - browser not loaded');
     }
 
@@ -85,10 +86,10 @@ export default class BrowserSystem extends System {
     if (!onRequest) {
       onRequest = (request: HTTPRequest) => {
         if (['image', 'stylesheet', 'script', 'font', 'media', 'xhr', 'other'].includes(request.resourceType())) {
-          // this.logger.debug('[BrowserSystem.newPage]', 'blocking', request.resourceType(), request.url());
+          // logger.debug('[BrowserSystem.newPage]', 'blocking', request.resourceType(), request.url());
           return request.abort();
         } else {
-          this.logger.debug('[BrowserSystem.newPage]', 'allowing', request.resourceType(), request.url());
+          logger.debug('[BrowserSystem.newPage]', 'allowing', request.resourceType(), request.url());
           return request.continue();
         }
       };

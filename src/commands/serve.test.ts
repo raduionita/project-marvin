@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
+import logger from '../logger.js';
 
 // --- helpers ---
 
@@ -79,7 +80,7 @@ class TestChannel extends Channel {
   async load(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
-    this.logger.debug('[TestChannel.sendMessage]', JSON.stringify(message));
+    logger.debug('[TestChannel.sendMessage]', JSON.stringify(message));
     return message;
   }
 

@@ -1,30 +1,31 @@
 import { Command } from "../types";
+import logger from '../logger.js';
 
 export default class HelpCommand extends Command {
   async exec() {
-    this.logger.debug('[HelpCommand.exec]');
+    logger.debug('[HelpCommand.exec]');
 
-    this.logger.info('usage: marvin [command] [options] [--log-level=level]');
-    this.logger.info('commands:');
-    this.logger.info('  help    ', 'show this help');
-    this.logger.info('  install ', 'install the project');
-    this.logger.info('  enable  ', 'load the project and service');
-    this.logger.info('  disable ', 'stop the app service');
-    this.logger.info('  serve   ', 'start the app service');
-    this.logger.info('  tools   ', 'list, add, edit, call tools');
-    this.logger.info('  update  ', 'update Marvin to the latest version');
-    this.logger.info('  version ', 'show the current version');
-    this.logger.info('  reload  ', 'reload the daemon');
-    this.logger.info('  status  ', 'check the daemon status');
-    this.logger.info('  logs    ', 'tail the daemon log file [-f|--follow] [-n|--lines]');
+    logger.info('usage: marvin [command] [options] [--log-level=level]');
+    logger.info('commands:');
+    logger.info('  help    ', 'show this help');
+    logger.info('  install ', 'install the project');
+    logger.info('  enable  ', 'load the project and service');
+    logger.info('  disable ', 'stop the app service');
+    logger.info('  serve   ', 'start the app service');
+    logger.info('  tools   ', 'list, add, edit, call tools');
+    logger.info('  update  ', 'update Marvin to the latest version');
+    logger.info('  version ', 'show the current version');
+    logger.info('  reload  ', 'reload the daemon');
+    logger.info('  status  ', 'check the daemon status');
+    logger.info('  logs    ', 'tail the daemon log file [-f|--follow] [-n|--lines]');
 
-    this.logger.info('  agents  ', 'list, add, bind, chat, drop agents');
-    this.logger.info('  channels', 'list, add, bind, chat, drop channels');
-    this.logger.info('  integrations', 'list, add, drop integrations');
-    this.logger.info('  mcps    ', 'list, add, edit, info, drop mcp connectors');
-    this.logger.info('  skills  ', 'list, add skills');
-    this.logger.info('  models  ', 'list, add, bind, drop models');
-    this.logger.info('  tasks   ', 'list, add tasks');
-    this.logger.log('');
+    logger.info('  agents  ', 'list, add, bind, chat, drop agents');
+    logger.info('  channels', 'list, add, bind, chat, drop channels');
+    logger.info('  integrations', 'list, add, drop integrations');
+    logger.info('  mcps    ', 'list, add, edit, info, drop mcp connectors');
+    logger.info('  skills  ', 'list, add skills');
+    logger.info('  models  ', 'list, add, bind, drop models');
+    logger.info('  tasks   ', 'list, add tasks');
+    logger.log('');
   }
 }

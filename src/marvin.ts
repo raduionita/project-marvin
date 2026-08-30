@@ -14,12 +14,11 @@ import Engine from './engine.js';
 await (new class Marvin {
   // shared logger (default-exported singleton from ./logger.js); see
   // `setLoggerMode` for the daemon prefix/stripTags mode
-  logger = logger;
   engine : Engine = new Engine();
   command: Command | undefined = undefined;
 
   async exec() {
-    this.logger.debug('[Marvin.exec]');
+    logger.debug('[Marvin.exec]');
     
     this.loadFlags();
     this.loadProcess();
@@ -29,21 +28,21 @@ await (new class Marvin {
   }
 
   loadProcess() {
-    this.logger.debug('[Marvin.loadProcess]');
+    logger.debug('[Marvin.loadProcess]');
 
     process.on('beforeExit', async (code) => {
-      this.logger.debug('[Marvin.loadProcess]', 'beforeExit', `${code}`);
+      logger.debug('[Marvin.loadProcess]', 'beforeExit', `${code}`);
       await this.drop();
     });
 
     // process exit (graceful shutdown = stopServer)
     process.on('exit', async (code) => {
-      this.logger.debug('[Marvin.loadProcess]', 'exit', `${code}`);
+      logger.debug('[Marvin.loadProcess]', 'exit', `${code}`);
     });
 
     // SIGINT (Ctrl+C)
     process.on('SIGINT', async () => {
-      this.logger.info('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
+      logger.info('[Marvin.loadProcess]', 'SIGINT', 'exiting...');
       // goto process.on('exit') instead
       await this.drop();
       process.exit(0);
@@ -51,7 +50,7 @@ await (new class Marvin {
 
     // SIGTERM (kill)
     process.on('SIGTERM', async () => {
-      this.logger.info('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
+      logger.info('[Marvin.loadProcess]', 'SIGTERM', 'exiting...');
       // goto process.on('exit')
       await this.drop();
       process.exit(0);
@@ -59,19 +58,19 @@ await (new class Marvin {
 
     // unhandled rejection from promise
     process.on('unhandledRejection', (reason, promise) => {
-      this.logger.error('[Marvin.loadProcess]', 'unhandledRejection:', promise, 'reason:', reason);
+      logger.error('[Marvin.loadProcess]', 'unhandledRejection:', promise, 'reason:', reason);
       // TODO: decide if the rejection should trigger a shutdown
     });
 
     // uncaught exception
     process.on('uncaughtException', (err) => {
-      this.logger.error('[Marvin.loadProcess]', 'uncaughtException:', err);
+      logger.error('[Marvin.loadProcess]', 'uncaughtException:', err);
       // TODO: decide if the exception should trigger a shutdown
     });
   }  
 
   loadConfig(config?: Config | undefined) {
-    this.logger.debug('[Marvin.loadConfig]');
+    logger.debug('[Marvin.loadConfig]');
     if (config) {
       this.engine.config = mergeConfig(constants.DEFAULT_CONFIG as Config, config);
       return;
@@ -82,7 +81,7 @@ await (new class Marvin {
     // at this stage marvin.json MUST exist, but just in case
     const cpath = join(this.engine.work, 'marvin.json');
     if (!existsSync(cpath)) {
-      this.logger.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
+      logger.warn('[Marvin.loadConfig]', 'Config file not found:', cpath, 'using default config');
       return;
     }
 
@@ -139,14 +138,14 @@ await (new class Marvin {
   }
 
   async execCommand() {
-    this.logger.debug('[Marvin.execCommand]');
+    logger.debug('[Marvin.execCommand]');
 
     const args = process.argv.slice(2);
     let   cmd  = args[0] || 'help';
     const cmds = listCommands(this.engine);
 
     if (!cmds.includes(cmd)) {
-      this.logger.warn('[Marvin.execCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
+      logger.warn('[Marvin.execCommand]', 'unknown command:', cmd, 'available commands:', cmds.join(', '));
       cmd = 'help';
     }
 
@@ -155,7 +154,7 @@ await (new class Marvin {
       const Class = Module.default;
       // must be a Command class
       if (!Class || !(Class.prototype instanceof Command)) {
-        this.logger.warn('[Marvin.execCommand]', `${cmd} does not export a Command class, exiting`);
+        logger.warn('[Marvin.execCommand]', `${cmd} does not export a Command class, exiting`);
         return;
       }
       // create command and load/run it
@@ -169,12 +168,12 @@ await (new class Marvin {
       // if !deamon, exit
       if (!this.command.deamon) {
         await this.drop();
-        this.logger.debug('[Marvin.execCommand]', 'done');
+        logger.debug('[Marvin.execCommand]', 'done');
       } else {
-        this.logger.debug('[Marvin.execCommand]', 'deamon, keep running');
+        logger.debug('[Marvin.execCommand]', 'deamon, keep running');
       }
     } catch (err) {
-      this.logger.error('[Marvin.execCommand]', `failed to load ${cmd}:`, err);
+      logger.error('[Marvin.execCommand]', `failed to load ${cmd}:`, err);
     }
   }
 
@@ -183,7 +182,7 @@ await (new class Marvin {
       return;
     }
 
-    this.logger.debug('[Marvin.drop]');
+    logger.debug('[Marvin.drop]');
 
     await this.command.drop();
 

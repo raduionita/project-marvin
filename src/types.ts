@@ -60,21 +60,17 @@ export class Command {
   // shared logger (default-exported singleton from ./logger.js); see `setLoggerMode`
   // to flip the shared prefix/stripTags behavior, and `setDefaultOutput` to swap
   // the sink shared by every Logger (used by tests + the daemon).
-  public logger = logger;
-
   constructor(public engine: Engine, public args: string[], public readonly deamon: boolean = false) {
-    this.logger.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
+    logger.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
   }
 
-  async exec(): Promise<void> { this.logger.debug(`[${this.constructor.name||'Command'}.exec]`); }
-  async drop(): Promise<void> { this.logger.debug(`[${this.constructor.name||'Command'}.drop]`); }
+  async exec(): Promise<void> { logger.debug(`[${this.constructor.name||'Command'}.exec]`); }
+  async drop(): Promise<void> { logger.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 
 export abstract class System {
-  public logger = logger;
-
   constructor(public readonly engine: Engine) {
-    this.logger.debug(`[${this.constructor.name||'System'}.constructor]`);
+    logger.debug(`[${this.constructor.name||'System'}.constructor]`);
   }
 
   abstract load(): Promise<void>;
@@ -108,10 +104,8 @@ export type ToolMeta = {
 };
 
 export abstract class Tool {
-  public logger = logger;
-
   constructor(public engine: Engine) {
-    this.logger.debug(`[${this.constructor.name||'Tool'}.constructor]`);
+    logger.debug(`[${this.constructor.name||'Tool'}.constructor]`);
   }
 
   // there might be multiple tools that end the chat (end_chat, ask_question, etc.)
@@ -130,11 +124,8 @@ export interface ChannelMeta {
 // channel interface
 export abstract class Channel {
   abstract meta: ChannelMeta;
-
-  public logger = logger;
-
   constructor(public engine: Engine) {
-    this.logger.debug(`[${this.constructor.name||'Channel'}.constructor]`);
+    logger.debug(`[${this.constructor.name||'Channel'}.constructor]`);
   }
 
   abstract load(): Promise<void>;
@@ -183,11 +174,8 @@ export abstract class Integration {
   // static info about this integration type (type, title, description, tools, arguments).
   // used to build the ## Integrations system-prompt block and the wizard prompts.
   abstract meta: IntegrationMeta;
-
-  public logger = logger;
-
   constructor(public engine: Engine, public config: { [key: string]: any }) {
-    this.logger.debug(`[${this.constructor.name||'Integration'}.constructor]`);
+    logger.debug(`[${this.constructor.name||'Integration'}.constructor]`);
   }
 
   abstract load(): Promise<void>;
@@ -240,9 +228,6 @@ export abstract class Model {
   public n: number = 1;
   public userId: string = 'user-id';
   public reasoning: string = 'high';
-
-  public logger = logger;
-
   constructor(public readonly engine: Engine, config: { [key: string]: any }) {
     Object.assign(this, config);
   }

@@ -2,6 +2,7 @@ import { mkdirSync, renameSync } from 'fs';
 import { dirname } from 'path';
 import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, safeJoin } from '../helpers/index.js';
+import logger from '../logger.js';
 
 export default class MoveFileTool extends Tool {
   public meta: ToolMeta = {
@@ -28,7 +29,7 @@ export default class MoveFileTool extends Tool {
   }
 
   public async call(args: { path: string; newPath: string }) {
-    this.logger.debug('[MoveFileTool.call]', Object.keys(args));
+    logger.debug('[MoveFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'move_file: no path provided' };
@@ -54,7 +55,7 @@ export default class MoveFileTool extends Tool {
       renameSync(path, newPath);
       return { path: args.path, newPath: args.newPath, ok: true };
     } catch (err) {
-      this.logger.error('[MoveFileTool.call]', 'error:', err);
+      logger.error('[MoveFileTool.call]', 'error:', err);
       return { path: args.path, newPath: args.newPath, error: (err as Error).message };
     }
   }

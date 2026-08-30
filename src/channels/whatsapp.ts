@@ -1,4 +1,5 @@
 import { Channel, Message, ChannelMeta } from '../types.js';
+import logger from '../logger.js';
 
 export default class WhatsAppChannel extends Channel {
   public meta: ChannelMeta = {
@@ -9,15 +10,15 @@ export default class WhatsAppChannel extends Channel {
   }
 
   async load() : Promise<void> {
-    this.logger.debug('[WhatsAppChannel.load]', 'attached', this.engine.config.settings);
+    logger.debug('[WhatsAppChannel.load]', 'attached', this.engine.config.settings);
   }
 
   async drop() {
-    this.logger.debug('[WhatsAppChannel.drop]', 'detached');
+    logger.debug('[WhatsAppChannel.drop]', 'detached');
   }
 
   async sendMessage(message: Message) : Promise<any> {
-    this.logger.debug('[WhatsAppChannel.sendMessage]', JSON.stringify(message));
+    logger.debug('[WhatsAppChannel.sendMessage]', JSON.stringify(message));
   }
 
   async info(): Promise<{ groups: { [key: string]: string } }> {

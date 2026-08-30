@@ -4,6 +4,7 @@ import TurndownService from 'turndown';
 import { Tool, type ToolMeta } from '../types.js';
 import type Engine from '../engine.js';
 import * as constants from '../constants.js';
+import logger from '../logger.js';
 
 
 export default class WebFetchTool extends Tool {
@@ -59,7 +60,7 @@ export default class WebFetchTool extends Tool {
   }
 
   public async call(args: { url: string }) {
-    this.logger.debug('[WebFetchTool.call]', Object.keys(args));
+    logger.debug('[WebFetchTool.call]', Object.keys(args));
 
     // use fetch to fetch the page
     const response = await fetch(args.url);

@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, safeJoin } from '../helpers/index.js';
+import logger from '../logger.js';
 
 export default class AppendFileTool extends Tool {
   public meta: ToolMeta = {
@@ -28,7 +29,7 @@ export default class AppendFileTool extends Tool {
   }
 
   public async call(args: { path: string; content: string }) {
-    this.logger.debug('[AppendFileTool.call]', Object.keys(args));
+    logger.debug('[AppendFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'append_file: no path provided' };
@@ -49,7 +50,7 @@ export default class AppendFileTool extends Tool {
       appendFileSync(path, args.content, 'utf-8');
       return { path: args.path, ok: true };
     } catch (err) {
-      this.logger.error('[AppendFileTool.call]', 'error:', err);
+      logger.error('[AppendFileTool.call]', 'error:', err);
       return { path: args.path, error: (err as Error).message };
     }
   }

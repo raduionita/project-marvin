@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Tool, ToolMeta } from '../types.js';
 import { safeJoin } from '../helpers/index.js';
+import logger from '../logger.js';
 
 const DEFAULT_LINES = 20;
 
@@ -30,7 +31,7 @@ export default class ReadLogsTool extends Tool {
   }
 
   public async call(args: { file?: string; lines?: number }) {
-    this.logger.debug('[ReadLogsTool.call]', Object.keys(args));
+    logger.debug('[ReadLogsTool.call]', Object.keys(args));
 
     const file = args?.file || 'marvin.log';
     const lines = Math.min(Math.max(args?.lines || DEFAULT_LINES, 1), 200);
@@ -42,7 +43,7 @@ export default class ReadLogsTool extends Tool {
       const tail = all.slice(-lines);
       return { path: logPath, lines: tail.length, entries: tail };
     } catch (err) {
-      this.logger.error('[ReadLogsTool.call]', 'error:', err);
+      logger.error('[ReadLogsTool.call]', 'error:', err);
       return { path: logPath, error: (err as Error).message };
     }
   }

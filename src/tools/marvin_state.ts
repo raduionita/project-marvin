@@ -1,4 +1,5 @@
 import { Tool, ToolMeta } from '../types.js';
+import logger from '../logger.js';
 
 export default class MarvinStateTool extends Tool {
   public meta: ToolMeta = {
@@ -21,7 +22,7 @@ export default class MarvinStateTool extends Tool {
   }
 
   public async call(args: { area?: string }) {
-    this.logger.debug('[MarvinStateTool.call]', Object.keys(args));
+    logger.debug('[MarvinStateTool.call]', Object.keys(args));
 
     const agents: Record<string, any> = {};
     const tasks: Record<string, any> = {};

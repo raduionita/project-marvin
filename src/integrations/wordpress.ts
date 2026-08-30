@@ -1,5 +1,6 @@
 import { Integration, IntegrationMeta, Field } from '../types.js';
 import { tryJsonParse, withRetry } from '../helpers/index.js';
+import logger from '../logger.js';
 
 export type WordpressConfig = { enabled?: boolean, endpoint?: string, user?: string, appPassword?: string };
 
@@ -61,23 +62,23 @@ export default class WordpressIntegration extends Integration {
   }
 
   async load(): Promise<void> {
-    this.logger.debug('[WordpressIntegration.load]');
+    logger.debug('[WordpressIntegration.load]');
 
     if (!this.config.endpoint) {
-      this.logger.error('[WordpressIntegration.load]', 'no endpoint found, skipping');
+      logger.error('[WordpressIntegration.load]', 'no endpoint found, skipping');
     }
     
     if (!this.config.user || !this.config.appPassword) {
-      this.logger.warn('[WordpressIntegration.load]', 'no user/appPassword found, authenticated calls will fail with 401');
+      logger.warn('[WordpressIntegration.load]', 'no user/appPassword found, authenticated calls will fail with 401');
     }
   }
 
   async drop(): Promise<void> {
-    this.logger.debug('[WordpressIntegration.drop]');
+    logger.debug('[WordpressIntegration.drop]');
   }
 
   async call(args: { [key: string]: any }): Promise<{ [key: string]: any }> {
-    this.logger.debug('[WordpressIntegration.call]', JSON.stringify(args));
+    logger.debug('[WordpressIntegration.call]', JSON.stringify(args));
 
     const tool = args.tool || 'request';
     switch (tool) {
@@ -203,7 +204,7 @@ export default class WordpressIntegration extends Integration {
 
   // low-level generic request to the Wordpress REST API
   private async request(method: string, path: string, body?: { [key: string]: any }): Promise<{ [key: string]: any }> {
-    this.logger.debug('[WordpressIntegration.request]', method, path);
+    logger.debug('[WordpressIntegration.request]', method, path);
 
     const url = this.api(path);
 

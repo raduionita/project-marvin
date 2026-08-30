@@ -15,6 +15,7 @@ extends `Tool` (imported from `{MARVIN_ROOT}/src/types.js`):
 ```typescript
 // ~/.marvin/tools/my_tool.ts
 import { Tool, ToolMeta } from '{MARVIN_ROOT}/src/types.js';
+import logger from '{MARVIN_ROOT}/src/logger.js';
 
 export default class MyTool extends Tool {
   public meta: ToolMeta = {
@@ -54,7 +55,7 @@ literally in the import; the `marvin tools edit` command replaces it for you.
 - The `call(args)` method MUST:
   - validate the inputs and return `{ error: '...' }` on bad input
   - return a plain JSON object (never throw to the agent)
-- Log with `this.logger.debug('[ToolName.call]', args)`.
+- Log with `logger.debug('[ToolName.call]', args)`.
 - Respect the workspace: paths must stay inside `~/.marvin` (see
   `safeJoin` from `helpers/index.js` in `read_file.ts`/`edit_file.ts`).
 

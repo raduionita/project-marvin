@@ -1,10 +1,11 @@
 import { execSync } from "node:child_process";
 import { Command } from "../types";
+import logger from '../logger.js';
 
 // `marvin status [help]`
 export default class StatusCommand extends Command {
   async exec() {
-    this.logger.debug('[StatusCommand.exec]');
+    logger.debug('[StatusCommand.exec]');
 
     const cmd = this.args[1];
     switch (cmd) {
@@ -18,19 +19,19 @@ export default class StatusCommand extends Command {
   }
 
   async execHelp() {
-    this.logger.info('usage: marvin status [command]', 'check the daemon status');
-    this.logger.info('commands:');
-    this.logger.info('  help    ', 'show this help');
+    logger.info('usage: marvin status [command]', 'check the daemon status');
+    logger.info('commands:');
+    logger.info('  help    ', 'show this help');
   }
 
   async execStatus() {
-    this.logger.debug('[StatusCommand.execStatus]');
+    logger.debug('[StatusCommand.execStatus]');
     // service status
     try {
       const status = execSync(['systemctl', '--user', 'status', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
-      this.logger.info('service status:', status.trim());
+      logger.info('service status:', status.trim());
     } catch {
-      this.logger.info('service is not running.');
+      logger.info('service is not running.');
     }
 
     // TODO: replace health w/ GET status
@@ -48,12 +49,12 @@ export default class StatusCommand extends Command {
         },
       });
       if (response.ok) {
-        this.logger.info(`server is healthy (port ${port}).`);
+        logger.info(`server is healthy (port ${port}).`);
       } else {
-        this.logger.warn(`server responded with ${response.status}.`);
+        logger.warn(`server responded with ${response.status}.`);
       }
     } catch (err) {
-      this.logger.error('[StatusCommand.execStatus]', `cannot reach server at localhost:${port}.`);
+      logger.error('[StatusCommand.execStatus]', `cannot reach server at localhost:${port}.`);
     }
   }
 }

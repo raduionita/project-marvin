@@ -1,11 +1,12 @@
 import { Chat, Model, Provider, Reply, Message } from '../types.js';
+import logger from '../logger.js';
 
 export default class FallbackModel extends Model {
   provider: Provider = 'fallback';
   public baseUrl: string = 'http://localhost:1234';
 
   async execChat(chat: Chat) : Promise<Reply> {
-    this.logger.debug('[FallbackModel.sendChat]', 'chat:', JSON.stringify(chat));
+    logger.debug('[FallbackModel.sendChat]', 'chat:', JSON.stringify(chat));
 
     return {
       id: Date.now().toString(),

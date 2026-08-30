@@ -23,10 +23,8 @@ export class Mcp {
   }> = {};
 
   // shared logger (default-exported singleton from ./logger.js)
-  public logger = logger;
-
   constructor(public engine: Engine, public id: string, public config: Config['mcps'][string]) {
-    this.logger.debug(`[Mcp.constructor]`, this.id);
+    logger.debug(`[Mcp.constructor]`, this.id);
   }
 
   get isLoaded(): boolean {
@@ -35,7 +33,7 @@ export class Mcp {
 
   // spawn the server process and run the initialize handshake
   async load(): Promise<void> {
-    this.logger.debug(`[Mcp.load]`, this.id);
+    logger.debug(`[Mcp.load]`, this.id);
 
     if (this.client) return;
 
@@ -66,12 +64,12 @@ export class Mcp {
       },
     ]));
 
-    this.logger.info(`[Mcp.call]`, this.id, 'connected', 'tools:', Object.keys(this.tools));
+    logger.info(`[Mcp.call]`, this.id, 'connected', 'tools:', Object.keys(this.tools));
   }
 
   // close the connection and kill the server process
   async drop(): Promise<void> {
-    this.logger.debug(`[Mcp.drop]`, this.id);
+    logger.debug(`[Mcp.drop]`, this.id);
 
     const client = this.client;
     this.client = null;
@@ -79,7 +77,7 @@ export class Mcp {
       try {
         await client.close();
       } catch (err) {
-        this.logger.error(`[Mcp.drop]`, this.id, err);
+        logger.error(`[Mcp.drop]`, this.id, err);
       }
     }
 
@@ -90,17 +88,17 @@ export class Mcp {
       try {
         await transport.close();
       } catch (err) {
-        this.logger.error(`[Mcp.drop]`, this.id, err);
+        logger.error(`[Mcp.drop]`, this.id, err);
       }
     }
   }
 
   // call a tool by its sanitized name, returning the flattened result content.
   async call(name: string, args: { [key: string]: any } = {}): Promise<{ [key: string]: any }> {
-    this.logger.debug(`[Mcp.call]`, this.id, name, Object.keys(args).join(','));
+    logger.debug(`[Mcp.call]`, this.id, name, Object.keys(args).join(','));
 
     if (!this.client) {
-      this.logger.warn(`[Mcp.call]`, this.id, 'not connected, reconnecting');
+      logger.warn(`[Mcp.call]`, this.id, 'not connected, reconnecting');
       await this.load();
     }
 
@@ -123,16 +121,16 @@ export class Mcp {
   }
 
   private onStderr(chunk: Buffer) {
-    this.logger.debug(`[Mcp.onStderr]`, this.id, chunk.toString().trim());
+    logger.debug(`[Mcp.onStderr]`, this.id, chunk.toString().trim());
   }
 
   private onClose() {
-    this.logger.debug(`[Mcp.onClose]`, this.id);
+    logger.debug(`[Mcp.onClose]`, this.id);
     this.client = null;
   }
 
   private onError(err: Error) {
-    this.logger.error(`[Mcp.onError]`, this.id, err);
+    logger.error(`[Mcp.onError]`, this.id, err);
   }
 
   // marvin version from the app package.json (fallback "0.0.0")

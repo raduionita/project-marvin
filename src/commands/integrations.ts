@@ -5,6 +5,7 @@ import { writeFileSync } from 'fs';
 import { Command } from "../types";
 import { listIntegrations, loadIntegration } from '../integrations';
 import { Field } from '../types';
+import logger from '../logger.js';
 
 // flatten a Field tree into dotted paths (e.g. meta.keywords) so the wizard can
 // list and select sub-fields of object/array types individually
@@ -21,12 +22,12 @@ function flattenFields(fields: Field[], prefix = ''): { name: string, type: stri
 // `marvin integrations [command]` list, add, drop integrations
 export default class IntegrationsCommand extends Command {
   async exec() {
-    this.logger.debug('[IntegrationsCommand.exec]');
+    logger.debug('[IntegrationsCommand.exec]');
 
     const cmd = this.args[0] || 'help';
     switch (cmd) {
       default:
-        this.logger.warn('[IntegrationsCommand.exec]', 'unknown command: integrations', cmd);
+        logger.warn('[IntegrationsCommand.exec]', 'unknown command: integrations', cmd);
       case 'help':
         await this.execHelp();
       break;
@@ -55,39 +56,39 @@ export default class IntegrationsCommand extends Command {
 
   // `marvin integrations help`
   async execHelp() {
-    this.logger.log('usage: marvin integrations [command]');
-    this.logger.log('commands:');
-    this.logger.log('  help              ', 'show this help');
-    this.logger.log('  list              ', 'list configured integrations');
-    this.logger.log('  add <name> [type] ', 'add an integration (discovery wizard)');
-    this.logger.log('  info <name>       ', 'preview the config discovery would produce (no changes)');
-    this.logger.log('  edit <name>       ', 'edit the fields/meta of an integration');
-    this.logger.log('  drop <name>       ', 'drop an integration');
+    logger.log('usage: marvin integrations [command]');
+    logger.log('commands:');
+    logger.log('  help              ', 'show this help');
+    logger.log('  list              ', 'list configured integrations');
+    logger.log('  add <name> [type] ', 'add an integration (discovery wizard)');
+    logger.log('  info <name>       ', 'preview the config discovery would produce (no changes)');
+    logger.log('  edit <name>       ', 'edit the fields/meta of an integration');
+    logger.log('  drop <name>       ', 'drop an integration');
   }
 
   // `marvin integrations list`
   async execList() {
-    this.logger.debug('[IntegrationsCommand.execList]');
-    this.logger.log('integrations:');
+    logger.debug('[IntegrationsCommand.execList]');
+    logger.log('integrations:');
     const integrations = this.engine.config.integrations || {};
     const configured = Object.keys(integrations).length;
     if (configured === 0) {
-      this.logger.log('  (none)');
+      logger.log('  (none)');
     }
     for (const [id, config] of Object.entries(integrations)) {
-      this.logger.log(`  ${id}`);
-      this.logger.log('  - type:', config.type);
-      this.logger.log('  - enabled:', config.enabled);
+      logger.log(`  ${id}`);
+      logger.log('  - type:', config.type);
+      logger.log('  - enabled:', config.enabled);
       for (const [key, value] of Object.entries(config)) {
         if (key === 'type' || key === 'enabled') continue;
-        this.logger.log(`  - ${key}:`, value);
+        logger.log(`  - ${key}:`, value);
       }
     }
   }
 
   // `marvin integrations add [name] [type]`
   async execAdd() {
-    this.logger.debug('[IntegrationsCommand.execAdd]', 'adding an integration...');
+    logger.debug('[IntegrationsCommand.execAdd]', 'adding an integration...');
 
     // available integration types (files in src/integrations)
     const types = listIntegrations(this.engine);
@@ -100,13 +101,13 @@ export default class IntegrationsCommand extends Command {
       patternError: 'invalid name (use a-z, 0-9, _ and -)',
     });
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      this.logger.error('[IntegrationsCommand.execAdd]', 'invalid name (use a-z, 0-9, _ and -):', name);
+      logger.error('[IntegrationsCommand.execAdd]', 'invalid name (use a-z, 0-9, _ and -):', name);
       return;
     }
 
     // must NOT exist
     if (this.engine.config.integrations[name]) {
-      this.logger.error('[IntegrationsCommand.execAdd]', `integration "${name}" is already configured`);
+      logger.error('[IntegrationsCommand.execAdd]', `integration "${name}" is already configured`);
       return;
     }
 
@@ -116,13 +117,13 @@ export default class IntegrationsCommand extends Command {
       choices: types.map(t => ({ name: t, value: t })),
     });
     if (!type) {
-      this.logger.error('[IntegrationsCommand.execAdd]', 'no integration type selected');
+      logger.error('[IntegrationsCommand.execAdd]', 'no integration type selected');
       return;
     }
 
     // selected type is not available
     if (!types.includes(type)) {
-      this.logger.error('[IntegrationsCommand.execAdd]', `unknown type "${type}".`, 'available types:', types.join(', '));
+      logger.error('[IntegrationsCommand.execAdd]', `unknown type "${type}".`, 'available types:', types.join(', '));
       return;
     }
 
@@ -130,7 +131,7 @@ export default class IntegrationsCommand extends Command {
     const config: { [key: string]: any } = { type };
     const integration = await loadIntegration(this.engine, type, config);
     if (!integration) {
-      this.logger.error('[IntegrationsCommand.execAdd]', `integration type "${type}" did not load`);
+      logger.error('[IntegrationsCommand.execAdd]', `integration type "${type}" did not load`);
       return;
     }
 
@@ -150,7 +151,7 @@ export default class IntegrationsCommand extends Command {
     }));
 
     while (toolOptions.length) {
-      this.logger.log('');
+      logger.log('');
       const tool = await rawlist({
         message: `Select an tool for "${name}" (or finish to stop):`,
         choices: [...toolOptions, { name: 'finish (done adding tools)', value: '' }],
@@ -162,11 +163,11 @@ export default class IntegrationsCommand extends Command {
       try {
         fields = await integration.discover(tool);
       } catch (err) {
-        this.logger.error('[IntegrationsCommand.execAdd]', 'discovery failed for', tool, ':', (err as Error).message);
+        logger.error('[IntegrationsCommand.execAdd]', 'discovery failed for', tool, ':', (err as Error).message);
         return;
       }
       if (!fields.length) {
-        this.logger.error('[IntegrationsCommand.execAdd]', `no fields found for tool "${tool}"`);
+        logger.error('[IntegrationsCommand.execAdd]', `no fields found for tool "${tool}"`);
         return;
       }
 
@@ -216,8 +217,8 @@ export default class IntegrationsCommand extends Command {
 
     // ask for custom meta fields (site specific, not discoverable via OPTIONS)
     const metaFields: { [key: string]: any } = {};
-    this.logger.log('');
-    this.logger.info('optional: add custom meta fields (e.g. ACF fields on gloobeam)');
+    logger.log('');
+    logger.info('optional: add custom meta fields (e.g. ACF fields on gloobeam)');
     while (true) {
       const mname = await input({ message: 'Enter a custom meta field name (blank to stop):' });
       if (!mname.trim()) break;
@@ -245,7 +246,7 @@ export default class IntegrationsCommand extends Command {
       config.meta = { target: metaTarget, fields: metaFields };
     }
 
-    this.logger.log('');
+    logger.log('');
 
     // register the integration in config (tools now load lazily via load_tools)
     this.engine.config.integrations[name] = { enabled: true, type, ...config };
@@ -260,28 +261,28 @@ export default class IntegrationsCommand extends Command {
     // write to config file
     writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
-    this.logger.info('[IntegrationsCommand.execAdd]', `integration "${name}" (${type}) configured, config persisted to ${cpath}`);
+    logger.info('[IntegrationsCommand.execAdd]', `integration "${name}" (${type}) configured, config persisted to ${cpath}`);
   }
 
   // `marvin integrations info [name]`
   async execInfo() {
-    this.logger.debug('[IntegrationsCommand.execInfo]');
+    logger.debug('[IntegrationsCommand.execInfo]');
 
     const pname = this.args[1] || await input({ message: 'Enter integration name (e.g. mycoolsite):' });
     if (!pname) {
-      this.logger.warn('[IntegrationsCommand.execInfo]', 'usage: marvin integrations info <name>');
+      logger.warn('[IntegrationsCommand.execInfo]', 'usage: marvin integrations info <name>');
       return;
     }
 
     const config = this.engine.config.integrations[pname];
     if (!config) {
-      this.logger.error('[IntegrationsCommand.execInfo]', `integration "${pname}" not found in config`);
+      logger.error('[IntegrationsCommand.execInfo]', `integration "${pname}" not found in config`);
       return;
     }
 
     const integration = await loadIntegration(this.engine, config.type, config);
     if (!integration) {
-      this.logger.error('[IntegrationsCommand.execInfo]', `integration type "${config.type}" did not load`);
+      logger.error('[IntegrationsCommand.execInfo]', `integration type "${config.type}" did not load`);
       return;
     }
 
@@ -292,11 +293,11 @@ export default class IntegrationsCommand extends Command {
       try {
         fields = await integration.discover(name);
       } catch (err) {
-        this.logger.error('[IntegrationsCommand.execInfo]', 'discovery failed for', name, ':', (err as Error).message);
+        logger.error('[IntegrationsCommand.execInfo]', 'discovery failed for', name, ':', (err as Error).message);
         return;
       }
       if (!fields.length) {
-        this.logger.error('[IntegrationsCommand.execInfo]', `no fields found for tool "${name}"`);
+        logger.error('[IntegrationsCommand.execInfo]', `no fields found for tool "${name}"`);
         return;
       }
       const fieldsCfg: { [key: string]: any } = {};
@@ -311,13 +312,13 @@ export default class IntegrationsCommand extends Command {
       tools[name] = { enabled: true, fields: fieldsCfg };
     }
 
-    this.logger.info(`config preview for "${pname}" (not persisted):`);
-    this.logger.info(JSON.stringify({ ...config, tools: tools }, null, 2));
+    logger.info(`config preview for "${pname}" (not persisted):`);
+    logger.info(JSON.stringify({ ...config, tools: tools }, null, 2));
   }
 
   // `marvin integrations edit [name]`
   async execEdit() {
-    this.logger.debug('[IntegrationsCommand.execEdit]');
+    logger.debug('[IntegrationsCommand.execEdit]');
 
     // TODO: add ask here
     const pname = this.args[1] || await input({
@@ -327,20 +328,20 @@ export default class IntegrationsCommand extends Command {
       patternError: 'invalid name (use a-z, 0-9, _ and -)',
     });
     if (!/^[a-zA-Z0-9_-]+$/.test(pname)) {
-      this.logger.error('[IntegrationsCommand.execEdit]', 'invalid name (use a-z, 0-9, _ and -):', name);
+      logger.error('[IntegrationsCommand.execEdit]', 'invalid name (use a-z, 0-9, _ and -):', name);
       return;
     }
 
     // must exist
     const config = this.engine.config.integrations[pname];
     if (!config) {
-      this.logger.error('[IntegrationsCommand.execEdit]', `integration "${pname}" not found in config`);
+      logger.error('[IntegrationsCommand.execEdit]', `integration "${pname}" not found in config`);
       return;
     }
 
     const integration = await loadIntegration(this.engine, config.type, config);
     if (!integration) {
-      this.logger.error('[IntegrationsCommand.execEdit]', `integration type "${config.type}" did not load`);
+      logger.error('[IntegrationsCommand.execEdit]', `integration type "${config.type}" did not load`);
       return;
     }
 
@@ -360,11 +361,11 @@ export default class IntegrationsCommand extends Command {
     try {
       fields = await integration.discover(tool);
     } catch (err) {
-      this.logger.error('[IntegrationsCommand.execEdit]', 'discovery failed for', tool, ':', (err as Error).message);
+      logger.error('[IntegrationsCommand.execEdit]', 'discovery failed for', tool, ':', (err as Error).message);
       return;
     }
     if (!fields.length) {
-      this.logger.error('[IntegrationsCommand.execEdit]', `no fields found for tool "${tool}"`);
+      logger.error('[IntegrationsCommand.execEdit]', `no fields found for tool "${tool}"`);
       return;
     }
 
@@ -409,12 +410,12 @@ export default class IntegrationsCommand extends Command {
     const cpath = join(this.engine.work, 'marvin.json');
     writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
     
-    this.logger.info('[IntegrationsCommand.execEdit]', `integration "${pname}" updated, config persisted to ${cpath}`);
+    logger.info('[IntegrationsCommand.execEdit]', `integration "${pname}" updated, config persisted to ${cpath}`);
   }
 
   // `marvin integrations drop [name]`
   async execDrop() {
-    this.logger.info('[IntegrationsCommand.execDrop]', 'dropping an integration...');
+    logger.info('[IntegrationsCommand.execDrop]', 'dropping an integration...');
 
     // pick from args, the configured integrations (rawList)
     let pname = this.args[1] || await rawlist({
@@ -425,12 +426,12 @@ export default class IntegrationsCommand extends Command {
       ],
     });
     if (!pname) {
-      this.logger.warn('[IntegrationsCommand.execDrop]', 'no integration selected');
+      logger.warn('[IntegrationsCommand.execDrop]', 'no integration selected');
       return;
     }
 
     if (!this.engine.config.integrations[pname]) {
-      this.logger.error('[IntegrationsCommand.execDrop]', `integration "${pname}" not found in config`);
+      logger.error('[IntegrationsCommand.execDrop]', `integration "${pname}" not found in config`);
       return;
     }
 
@@ -443,6 +444,6 @@ export default class IntegrationsCommand extends Command {
     const cpath = join(this.engine.work, 'marvin.json');
     writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
 
-    this.logger.info(`integration "${pname}" dropped, config ${cpath} updated`);
+    logger.info(`integration "${pname}" dropped, config ${cpath} updated`);
   }
 }

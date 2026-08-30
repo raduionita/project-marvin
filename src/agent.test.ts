@@ -12,6 +12,7 @@ import WebSearchTool from './tools/web_search.js';
 import * as constants from './constants.js';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
+import logger from './logger.js';
 
 // --- helpers ---
 
@@ -86,7 +87,7 @@ class TestChannel extends Channel {
   async load(): Promise<void> {}
   async drop(): Promise<void> {}
   async sendMessage(message: Message): Promise<any> {
-    this.logger.debug('[TestChannel.sendMessage]', JSON.stringify(message));
+    logger.debug('[TestChannel.sendMessage]', JSON.stringify(message));
     return message;
   }
 

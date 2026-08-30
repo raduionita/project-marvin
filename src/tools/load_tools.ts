@@ -4,6 +4,7 @@ import type { Chat } from '../types.js';
 import { loadIntegrationTools } from '../integrations/index.js';
 import { loadMcpTools } from '../mcp.js';
 import { splitIntegrationToolName, splitMcpToolName } from '../helpers/index.js';
+import logger from '../logger.js';
 
 export default class LoadToolsTool extends Tool {
   public meta: ToolMeta = {
@@ -27,7 +28,7 @@ export default class LoadToolsTool extends Tool {
   }
 
   public async call(args: { names: string[] }, agent: Agent, chat: Chat): Promise<{ [key: string]: any }> {
-    this.logger.debug('[LoadToolsTool.call]', Object.keys(args));
+    logger.debug('[LoadToolsTool.call]', Object.keys(args));
 
     const names = Array.isArray(args?.names) ? args.names : [];
     if (!names.length) {

@@ -5,6 +5,7 @@ import type BrowserSystem from '../systems/browser.js';
 import type Engine from '../engine.js';
 import * as constants from '../constants.js';
 import { readError } from '../helpers/index.js';
+import logger from '../logger.js';
 
 export default class WebBrowseTool extends Tool {
   public meta: ToolMeta = {
@@ -59,7 +60,7 @@ export default class WebBrowseTool extends Tool {
   }
 
   public async call(args: { url: string }) {
-    this.logger.debug('[WebBrowseTool.call]', Object.keys(args));
+    logger.debug('[WebBrowseTool.call]', Object.keys(args));
 
     if (!this.engine.systems['browser']) {
       return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server engine' }
@@ -85,7 +86,7 @@ export default class WebBrowseTool extends Tool {
       title = await page.title();
       body  = this.turndown.turndown(body).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8);
     } catch (error) {
-      this.logger.error('[WebBrowseTool.call]', 'error:', readError(error), 'url:', url);
+      logger.error('[WebBrowseTool.call]', 'error:', readError(error), 'url:', url);
       title = 'error';
       error = 'web_browse: error';
     } finally {

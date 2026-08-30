@@ -4,22 +4,23 @@ import { join } from 'path';
 
 import { Command } from "../types";
 import * as constants from '../constants';
+import logger from '../logger.js';
 
 // `marvin agents [command]` list, add, bind, chat, drop agents
 export default class AgentsCommand extends Command {
   async exec() {
-    this.logger.debug('[AgentsCommand.exec]');
+    logger.debug('[AgentsCommand.exec]');
 
     const cmd = this.args[0] || 'help';
     switch (cmd) {
       default:
-        this.logger.warn('[AgentsCommand.exec]', 'unknown command: agents', cmd); 
+        logger.warn('[AgentsCommand.exec]', 'unknown command: agents', cmd); 
       case 'help':
-        this.logger.info('usage: marvin agents [command]');
-        this.logger.info('commands:');
-        this.logger.info('  help    ', 'show this help');
-        this.logger.info('  add     ', 'add an agent');
-        this.logger.info('  chat    ', 'send a chat message to the specified agent');
+        logger.info('usage: marvin agents [command]');
+        logger.info('commands:');
+        logger.info('  help    ', 'show this help');
+        logger.info('  add     ', 'add an agent');
+        logger.info('  chat    ', 'send a chat message to the specified agent');
       break;
       case 'add': // `marvin agents add [agentId]` // add an agent interactively
         await this.execAdd();
@@ -39,7 +40,7 @@ export default class AgentsCommand extends Command {
   }
 
   async execChat() {
-    this.logger.debug('[AgentsCommand.execChat]');
+    logger.debug('[AgentsCommand.execChat]');
 
     try {
       // default to orchestrator
@@ -53,7 +54,7 @@ export default class AgentsCommand extends Command {
 
       // if empty answer, exit
       if (!answer) {
-        this.logger.warn('[AgentsCommand.execChat]', 'empty message');
+        logger.warn('[AgentsCommand.execChat]', 'empty message');
         return;
       }
 
@@ -70,36 +71,36 @@ export default class AgentsCommand extends Command {
       }
 
       // call send chat
-      this.logger.log('LLM: ', result.content);
+      logger.log('LLM: ', result.content);
 
-      this.logger.debug('[AgentsCommand.execChat]', 'done');
+      logger.debug('[AgentsCommand.execChat]', 'done');
     } catch (error) {
-      this.logger.error('[AgentsCommand.execChat]', 'error:', error);
+      logger.error('[AgentsCommand.execChat]', 'error:', error);
     }
   }
 
   // `marvin agents add [agentId]` // add an agent interactively
   async execAdd() {
-    this.logger.debug('[AgentsCommand.execAdd]', 'adding an agent...');
+    logger.debug('[AgentsCommand.execAdd]', 'adding an agent...');
 
     try {
       // ask for agentId
       const agentId = this.args[1] || await input({ message: 'Enter agent name (e.g. my-agent):', required: true });
       if (!agentId || !/^[a-zA-Z0-9_-]+$/.test(agentId)) {
-        this.logger.error('[AgentsCommand.execAdd]', 'invalid agent name (use a-z, 0-9, _ and -):', agentId);
+        logger.error('[AgentsCommand.execAdd]', 'invalid agent name (use a-z, 0-9, _ and -):', agentId);
         return;
       }
   
       // check if agent is already configured
       if (this.engine.config.agents[agentId]) {
-        this.logger.warn('[AgentsCommand.execAdd]', `agent "${agentId}" is already configured`);
+        logger.warn('[AgentsCommand.execAdd]', `agent "${agentId}" is already configured`);
         return;
       }
   
       // ask for model (known/configured models)
       const modelIds = Object.keys(this.engine.config.models);
       if (modelIds.length === 0) {
-        this.logger.error('[AgentsCommand.execAdd]', 'no models configured, please run "marvin models add" first');
+        logger.error('[AgentsCommand.execAdd]', 'no models configured, please run "marvin models add" first');
         return;
       }
 
@@ -110,8 +111,8 @@ export default class AgentsCommand extends Command {
         default: defaultModel,
       });
       if (!modelIds.includes(modelId)) {
-        this.logger.error('[AgentsCommand.execAdd]', `unknown model "${modelId}"`);
-        this.logger.error('[AgentsCommand.execAdd]', 'available models:', modelIds.join(', '));
+        logger.error('[AgentsCommand.execAdd]', `unknown model "${modelId}"`);
+        logger.error('[AgentsCommand.execAdd]', 'available models:', modelIds.join(', '));
         return;
       }
   
@@ -124,7 +125,7 @@ export default class AgentsCommand extends Command {
       }) : [];
       for (const id of pickedChannelIds) {
         if (!channelIds.includes(id)) {
-          this.logger.warn('[AgentsCommand.execAdd]', `unknown channel "${id}", skipping`);
+          logger.warn('[AgentsCommand.execAdd]', `unknown channel "${id}", skipping`);
           continue;
         }
         // prefer the groups cached by "marvin channels info", fall back to free text
@@ -150,7 +151,7 @@ export default class AgentsCommand extends Command {
   
       // ask for identity, saved to agents/<agentId>/IDENTITY.md
       const identity = (await input({ message: 'Enter agent identity (or press enter for default):' })) || constants.IDENTITY_MD;
-      this.logger.log('');
+      logger.log('');
   
       // persist agent identity to ~/.marvin/agents/<agentId>/IDENTITY.md
       const apath = join(this.engine.work, 'agents', agentId);
@@ -165,9 +166,9 @@ export default class AgentsCommand extends Command {
       const cpath = join(this.engine.work, 'marvin.json');
       writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
   
-      this.logger.info(`[AgentsCommand.execAdd]`, `agent "${agentId}" configured (model: ${modelId}, channels: ${Object.keys(channels).join(', ') || 'none'}), config persisted to ${cpath}`);
+      logger.info(`[AgentsCommand.execAdd]`, `agent "${agentId}" configured (model: ${modelId}, channels: ${Object.keys(channels).join(', ') || 'none'}), config persisted to ${cpath}`);
     } catch (error) {
-      this.logger.error('[AgentsCommand.execAdd]', 'error:', error);
+      logger.error('[AgentsCommand.execAdd]', 'error:', error);
     }
   }
 }

@@ -5,18 +5,19 @@ import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { delay } from '../helpers';
 import InstallCommand from './install';
+import logger from '../logger.js';
 
 // `marvin enable` installs the workspace + systemd unit and starts the daemon
 export default class EnableCommand extends InstallCommand {
   async exec() {
-    this.logger.debug('[EnableCommand.exec]');
+    logger.debug('[EnableCommand.exec]');
 
     await this.makeProject();
     await this.execSystemd();
   }
 
   async execSystemd() {
-    this.logger.debug('[EnableCommand.execSystemd]');
+    logger.debug('[EnableCommand.execSystemd]');
 
     const hpath = this.engine.work;
 
@@ -29,9 +30,9 @@ export default class EnableCommand extends InstallCommand {
         '# MARVIN_LOG_LEVEL=debug',
         '',
       ].join('\n'));
-      this.logger.info('created .env file:', epath);
+      logger.info('created .env file:', epath);
     } else {
-      this.logger.info('enm file', epath, 'exists');
+      logger.info('enm file', epath, 'exists');
     }
 
     // ~/.bun/bin/bun
@@ -44,22 +45,22 @@ export default class EnableCommand extends InstallCommand {
     const wpath = join(homedir(), '.local', 'bin', 'marvin');
     mkdirSync(dirname(wpath), { recursive: true });
     writeFileSync(wpath, `#!/bin/sh\nexec "${bpath}" "${join(this.engine.root, 'src', 'marvin.ts')}" "$@"\n`, { mode: 0o755 });
-    this.logger.info('created wrapper:', wpath, 'bun =', bpath);
+    logger.info('created wrapper:', wpath, 'bun =', bpath);
 
     // ~/.config/systemd/user/marvin.service
     const spath = join(this.engine.root, 'marvin.service');
     const dpath = join(homedir(), '.config', 'systemd', 'user', 'marvin.service');
     if (!existsSync(spath)) {
-      this.logger.error('[EnableCommand.execSystemd]', 'service file missing:', spath);
+      logger.error('[EnableCommand.execSystemd]', 'service file missing:', spath);
     } else {
       // always refresh the unit so re-running enable picks up changes
       mkdirSync(dirname(dpath), { recursive: true });
       copyFileSync(spath, dpath);
-      this.logger.info('installed service file:', dpath);
+      logger.info('installed service file:', dpath);
     }
 
     // start service
-    this.logger.debug('[EnableCommand.execSystemd]', 'enabling service...');
+    logger.debug('[EnableCommand.execSystemd]', 'enabling service...');
     execSync(['systemctl', '--user', 'daemon-reload'].join(' '), { stdio: 'inherit' });
     // restart (not "enable --now"): also applies a refreshed unit file to an already-running daemon
     execSync(['systemctl', '--user', 'enable', 'marvin'].join(' '), { stdio: 'inherit' });
@@ -67,12 +68,12 @@ export default class EnableCommand extends InstallCommand {
     // wait for the service to start
     await this.waitForActive();
 
-    this.logger.info('marvin enabled!');
+    logger.info('marvin enabled!');
   }
 
   // poll the service until it settles, so we can diagnose a stuck "activating"
   async waitForActive(timeout = 15000) {
-    this.logger.debug('[EnableCommand.waitForActive]');
+    logger.debug('[EnableCommand.waitForActive]');
 
     for (let waited = 0; waited < timeout; waited += 1000) {
       let state = '';
@@ -86,13 +87,13 @@ export default class EnableCommand extends InstallCommand {
         await delay(1000);
         continue;
       } else if (state === 'active') {
-        this.logger.info('marvin service is:', state);
+        logger.info('marvin service is:', state);
       } else {
-        this.logger.error('[EnableCommand.waitForActive]', 'marvin service is stuck in state:', state, 'run "journalctl --user -u marvin -e" for details');
+        logger.error('[EnableCommand.waitForActive]', 'marvin service is stuck in state:', state, 'run "journalctl --user -u marvin -e" for details');
       }
       return;
     }
 
-    this.logger.error('[EnableCommand.waitForActive]', 'marvin service still "activating" after', timeout, 'ms,', 'run "journalctl --user -u marvin -e" for details');
+    logger.error('[EnableCommand.waitForActive]', 'marvin service still "activating" after', timeout, 'ms,', 'run "journalctl --user -u marvin -e" for details');
   }
 }

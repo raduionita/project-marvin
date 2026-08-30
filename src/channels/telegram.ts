@@ -1,4 +1,5 @@
 import { Channel, Message, ChannelMeta } from '../types.js';
+import logger from '../logger.js';
 
 export default class TelegramChannel extends Channel {
   public meta: ChannelMeta = {
@@ -9,15 +10,15 @@ export default class TelegramChannel extends Channel {
   }
 
   async load() : Promise<void> {
-    this.logger.debug('[TelegramChannel.load]', 'attached', this.engine.config.settings);
+    logger.debug('[TelegramChannel.load]', 'attached', this.engine.config.settings);
   }
   
   async drop() {
-    this.logger.debug('[TelegramChannel.drop]', 'detached');
+    logger.debug('[TelegramChannel.drop]', 'detached');
   }
   
   async sendMessage(message: Message) : Promise<any> {
-    this.logger.debug('[TelegramChannel.sendMessage]', 'submit:', JSON.stringify(message));
+    logger.debug('[TelegramChannel.sendMessage]', 'submit:', JSON.stringify(message));
   }
 
   async info(): Promise<{ groups: { [key: string]: string } }> {

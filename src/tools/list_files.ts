@@ -2,6 +2,7 @@ import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, safeJoin } from '../helpers/index.js';
+import logger from '../logger.js';
 
 export default class ListFilesTool extends Tool {
   public meta: ToolMeta = {
@@ -28,7 +29,7 @@ export default class ListFilesTool extends Tool {
   }
 
   public async call(args: { path?: string; pattern?: string }) {
-    this.logger.debug('[ListFilesTool.call]', Object.keys(args));
+    logger.debug('[ListFilesTool.call]', Object.keys(args));
 
     if (!isSafePath(args?.path || '.')) {
       return { error: `list_files: path "${args?.path || '.'}" is outside the workspace (~/.marvin/files)` };
@@ -67,7 +68,7 @@ export default class ListFilesTool extends Tool {
 
       return { path: args?.path || '.', count: entries.length, entries };
     } catch (err) {
-      this.logger.error('[ListFilesTool.call]', 'error:', err);
+      logger.error('[ListFilesTool.call]', 'error:', err);
       return { path: args?.path || '.', error: (err as Error).message };
     }
   }

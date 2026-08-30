@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, extname } from 'path';
 import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, safeJoin } from '../helpers/index.js';
+import logger from '../logger.js';
 
 const MAX_MATCHES = 100;
 const MAX_FILE_SIZE = 1024 * 1024; // skip files larger than 1MB
@@ -40,7 +41,7 @@ export default class GrepTool extends Tool {
   }
 
   public async call(args: { pattern: string; path?: string; caseSensitive?: boolean }) {
-    this.logger.debug('[GrepTool.call]', Object.keys(args));
+    logger.debug('[GrepTool.call]', Object.keys(args));
 
     if (!args?.pattern) {
       return { error: 'grep: no pattern provided' };

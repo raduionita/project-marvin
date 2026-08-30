@@ -2,11 +2,12 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
 import { Command } from "../types";
+import logger from '../logger.js';
 
 // `marvin reload` reloads the daemon
 export default class ReloadCommand extends Command {
   async exec() {
-    this.logger.debug('[ReloadCommand.exec]');
+    logger.debug('[ReloadCommand.exec]');
 
     // --logLevel (parsed by loadFlags in marvin.ts -> MARVIN_LOG_LEVEL) updates
     // ~/.marvin/.env so the systemd EnvironmentFile feeds it to the daemon
@@ -19,7 +20,7 @@ export default class ReloadCommand extends Command {
     // only re-read at process start, so reload cannot apply a new log level
     execSync(['systemctl', '--user', 'restart', 'marvin'].join(' '), { stdio: 'inherit' });
 
-    this.logger.info('marvin service reloaded');
+    logger.info('marvin service reloaded');
   }
 
   // set MARVIN_LOG_LEVEL in ~/.marvin/.env, keeping comments/other entries
@@ -38,6 +39,6 @@ export default class ReloadCommand extends Command {
     }
 
     writeFileSync(envPath, content);
-    this.logger.info('MARVIN_LOG_LEVEL set to:', level, 'in', envPath);
+    logger.info('MARVIN_LOG_LEVEL set to:', level, 'in', envPath);
   }
 }

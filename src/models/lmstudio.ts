@@ -1,11 +1,12 @@
 import { Chat, Model, Provider } from '../types.js';
+import logger from '../logger.js';
 
 export class LmstudioModel extends Model {
   provider: Provider = 'lmstudio';
   public baseUrl: string = 'http://localhost:1234';
 
   async execChat(chat: Chat) : Promise<any> {
-    this.logger.debug('[LmstudioModel.sendChat]', 'chat:', JSON.stringify(chat));
+    logger.debug('[LmstudioModel.sendChat]', 'chat:', JSON.stringify(chat));
 
     // role: system, user, assistant
 

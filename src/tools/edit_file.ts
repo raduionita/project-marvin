@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, readError, safeJoin } from '../helpers/index.js';
 import { dirname, join } from 'path';
+import logger from '../logger.js';
 
 export default class EditFileTool extends Tool {
   public meta: ToolMeta = {
@@ -32,7 +33,7 @@ export default class EditFileTool extends Tool {
   }
 
   public async call(args: { path: string; newString?: string; oldString?: string }) {
-    this.logger.debug('[EditFileTool.call]', Object.keys(args));
+    logger.debug('[EditFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'edit_file: no path provided' };
@@ -69,7 +70,7 @@ export default class EditFileTool extends Tool {
 
       return { path: path, ok: true };
     } catch (err) {
-      this.logger.error('[EditFileTool.call]', 'error:', readError(err), 'path:', args.path, '->', path);
+      logger.error('[EditFileTool.call]', 'error:', readError(err), 'path:', args.path, '->', path);
       return { path: path, error: (err as Error).message };
     }
   }

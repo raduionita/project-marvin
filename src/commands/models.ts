@@ -3,40 +3,41 @@ import { listModels } from "../models";
 import { Command, Config, Provider } from "../types";
 import { writeFileSync } from 'fs';
 import { join } from 'path';
+import logger from '../logger.js';
 
 export default class ModelsCommand extends Command {
   async exec() {
-    this.logger.debug('[ModelsCommand.exec]');
+    logger.debug('[ModelsCommand.exec]');
 
     const act = this.args[0] || 'help';
     switch (act) {
       default: 
-        this.logger.warn('[ModelsCommand.exec]', 'unknown action: models', act); 
+        logger.warn('[ModelsCommand.exec]', 'unknown action: models', act); 
       case ''       :  
       case 'help'   : // default = empty = help 
-        this.logger.info('usage: marvin models [action]');
-        this.logger.info('actions:');
-        this.logger.info('  help    ', 'show this help');
-        this.logger.info('  list    ', 'list available models, for each one, it\'s connected agents');
-        this.logger.info('  add     ', 'add a model');
-        this.logger.info('  bind    ', 'bind a model to an agent');
-        this.logger.info('  remove <modelId>', 'remove a model');
+        logger.info('usage: marvin models [action]');
+        logger.info('actions:');
+        logger.info('  help    ', 'show this help');
+        logger.info('  list    ', 'list available models, for each one, it\'s connected agents');
+        logger.info('  add     ', 'add a model');
+        logger.info('  bind    ', 'bind a model to an agent');
+        logger.info('  remove <modelId>', 'remove a model');
       break;
       case 'list' : { // list available models, for each one, it's connected agents
-        this.logger.info('list models:');
+        logger.info('list models:');
         // for each model, list enabled agents
         listModels(this.engine).forEach(modelId => {
-          this.logger.info(`  ${modelId}`);
+          logger.info(`  ${modelId}`);
           const config = this.engine.config.models[modelId];
           if (config) {
-            this.logger.info('  - enabled:', config.enabled);
+            logger.info('  - enabled:', config.enabled);
           }
         });
       } break;
       case 'add' : {
         const config = {} as Config['models'][string];
         
-        this.logger.log('');
+        logger.log('');
         config['provider'] = await select<Provider>({
           message: 'Select provider:',
           choices: [
@@ -50,7 +51,7 @@ export default class ModelsCommand extends Command {
         config['model']    = await input({ message: 'Enter model name (e.g. gpt-3.5-turbo):', required: true });
         config['baseUrl']  = await input({ message: 'Enter baseUrl (e.g. http://localhost:1234):' });
         config['apiKey']   = await password({ message: 'Enter apiKey (e.g. sk-1234):' });
-        this.logger.log('');
+        logger.log('');
         
         if (!config['baseUrl']) delete config['baseUrl'];
         config['enabled'] = true;
@@ -62,7 +63,7 @@ export default class ModelsCommand extends Command {
         const cpath = join(this.engine.work, 'marvin.json');
         // write to config file
         writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-        this.logger.info(`model "${modelId}" configured, config persisted to ${cpath}`);
+        logger.info(`model "${modelId}" configured, config persisted to ${cpath}`);
       } break;
     }
   }

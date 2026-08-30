@@ -6,6 +6,7 @@ import type Engine from '../engine.js';
 import { listCommands } from '../commands/index.js';
 import { setDefaultOutput } from '../logger.js';
 import * as constants from '../constants.js';
+import logger from '../logger.js';
 
 // commands that mutate/restart the daemon itself (or serve it) and are
 // therefore not callable from Slack
@@ -59,23 +60,23 @@ export default class SlackChannel extends Channel {
 
   async load() {
     try {
-      this.logger.debug('[SlackChannel.load]');
+      logger.debug('[SlackChannel.load]');
 
       const config = this.engine.config.channels.slack as SlackConfig | undefined;
       if (!config) {
-        this.logger.error('[SlackChannel.load]', 'no settings found, skipping');
+        logger.error('[SlackChannel.load]', 'no settings found, skipping');
         return;
       }
 
       const appToken = (config?.appToken || process.env.SLACK_APP_TOKEN);
       if (!appToken || !appToken.startsWith('xapp-')) {
-        this.logger.error('[SlackChannel.load]', 'no appToken found, skipping');
+        logger.error('[SlackChannel.load]', 'no appToken found, skipping');
         return;
       }
 
       const botToken = (config?.botToken || process.env.SLACK_BOT_TOKEN);
       if (!botToken || !botToken.startsWith('xoxb-')) {
-        this.logger.error('[SlackChannel.load]', 'no botToken found, skipping');
+        logger.error('[SlackChannel.load]', 'no botToken found, skipping');
         return;
       }
 
@@ -84,7 +85,7 @@ export default class SlackChannel extends Channel {
       // verify the bot token is valid, and capture the bot's user id
       const auth = await this.webClient.auth.test();
       if (!auth.ok || !auth.user_id) {
-        this.logger.error('[SlackChannel.load]', 'bot token invalid:', auth.error);
+        logger.error('[SlackChannel.load]', 'bot token invalid:', auth.error);
         return;
       }
     
@@ -110,28 +111,28 @@ export default class SlackChannel extends Channel {
 
       await this.socketClient.start();
 
-      this.logger.debug('[SlackChannel.load]','channel slack started');
+      logger.debug('[SlackChannel.load]','channel slack started');
     } catch (err) {
-      this.logger.warn('[SlackChannel.load]', 'error:', (err as Error).message);
+      logger.warn('[SlackChannel.load]', 'error:', (err as Error).message);
     }
   }
 
   async drop() {
-    this.logger.debug('[SlackChannel.drop]');
+    logger.debug('[SlackChannel.drop]');
     if (this.socketClient) {
       await this.socketClient.disconnect();
-      this.logger.debug('[SlackChannel.drop]','channel slack dropped');
+      logger.debug('[SlackChannel.drop]','channel slack dropped');
     }
   }
 
   async info() : Promise<{ groups: { [key: string]: string } }> {
-    this.logger.debug('[SlackChannel.info]');
+    logger.debug('[SlackChannel.info]');
     const response = await this.webClient.conversations.list({ 
       exclude_archived: true, 
       limit: 100,
     });
     if (!response || !response.ok || !response.channels) {
-      this.logger.error('[SlackChannel.info]', 'error:', response.error);
+      logger.error('[SlackChannel.info]', 'error:', response.error);
       return {
         groups: {},
       };
@@ -152,16 +153,16 @@ export default class SlackChannel extends Channel {
   // send a message to Slack, optionally as a thread reply
   public async sendMessage(message: Message) : Promise<SlackResponse> {
     try {
-      this.logger.debug('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'} agent=${message.agent || '(none)'}`);
+      logger.debug('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'} agent=${message.agent || '(none)'}`);
 
       // need web client
       if (!this.webClient) {
-        this.logger.error('[SlackChannel.sendMessage]', 'not attached, skipping submit');
+        logger.error('[SlackChannel.sendMessage]', 'not attached, skipping submit');
         return { ts: '', ok: false, error: 'web client not attached', message: '(slack not attached)' };
       }
 
       if (!message.group) {
-        this.logger.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
+        logger.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
         return { ts: '', ok: false, error: 'no channel provided', message: '(no channel)' };
       }
 
@@ -188,13 +189,13 @@ export default class SlackChannel extends Channel {
       // check if response is ok
       if (!response.ok) {
         const hint = this.errorToHint(response.error);
-        this.logger.error('[SlackChannel.sendMessage]', 'response NOT ok:', response.error, hint);
+        logger.error('[SlackChannel.sendMessage]', 'response NOT ok:', response.error, hint);
         return { ts: '', ok: false, error: response.error, message: hint || '(slack response not ok)' };
       }
 
       // we should know if there is a mismatch between the channel in the message and the response
       if (response.channel !== message.group) {
-        this.logger.warn('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.group}, got ${response.channel}`);
+        logger.warn('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.group}, got ${response.channel}`);
         response.error = '(slack channel mismatch)';
       }
 
@@ -206,7 +207,7 @@ export default class SlackChannel extends Channel {
         channel: response.channel || message.group || '',
       }
     } catch (error) {
-      this.logger.error('[SlackChannel.sendMessage]', 'failed to send message:', error);
+      logger.error('[SlackChannel.sendMessage]', 'failed to send message:', error);
       return { ts: '', ok: false, error: (error as Error).message, message: '(slack sendMessage failed)' };
     }
   }
@@ -233,12 +234,12 @@ export default class SlackChannel extends Channel {
   protected async onMessage({ event, body, ack }: HandlerParams) {
     const thread = event.thread_ts || event.ts || event.event_ts;
     try {
-      this.logger.debug('[SlackChannel.onMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      logger.debug('[SlackChannel.onMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
 
       // extract the actual message text (strip @marvin mention)
       const text = this.cleanText(event.text || '');
       if (!text) {
-        this.logger.warn('[SlackChannel.onMessage]', 'no text content');
+        logger.warn('[SlackChannel.onMessage]', 'no text content');
         return await ack({ text: '(no text content)' });
       }
 
@@ -251,22 +252,22 @@ export default class SlackChannel extends Channel {
       const modelId = agent.model?.model;
       const chatId = `slack-${event.channel}-${thread}`;
 
-      this.logger.info('[SlackChannel.onMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      logger.info('[SlackChannel.onMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await agent.sendChat(chatId, text);
       if (result.error) {
-        this.logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
+        logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
         result.content = `(AI loop error: ${result.error})`;
       }
 
       // reply to user // send the result to the user
       const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, usage: result.usage });
       if (!res.ok) {
-        this.logger.warn('[SlackChannel.onMessage]', 'failed to post reply:', res.error, res.message);
+        logger.warn('[SlackChannel.onMessage]', 'failed to post reply:', res.error, res.message);
       }
     } catch (error) {
-      this.logger.error('[SlackChannel.onMessage]', error);
+      logger.error('[SlackChannel.onMessage]', error);
     }
   }
 
@@ -289,19 +290,19 @@ export default class SlackChannel extends Channel {
       let output = '';
       if (!cmds.includes(name)) {
         const hint = SLASH_BLOCKED_COMMANDS.includes(name) ? `${name} cannot be run from slack` : `unknown command: ${name}`;
-        this.logger.info('[SlackChannel.onSlashCommand]', hint, '(available:', cmds.join(', '), ')');
+        logger.info('[SlackChannel.onSlashCommand]', hint, '(available:', cmds.join(', '), ')');
         output = `${hint}\navailable commands: ${cmds.join(', ')}`;
       } else {
         output = await this.runCommand(name, args);
-        this.logger.info('[SlackChannel.onSlashCommand]', `command ${name} output:\n${output}`);
+        logger.info('[SlackChannel.onSlashCommand]', `command ${name} output:\n${output}`);
       }
 
       const res = await this.sendMessage({ role: 'assistant', content: output || '(no output)', group: channelId });
       if (!res.ok) {
-        this.logger.warn('[SlackChannel.onSlashCommand]', 'failed to post reply:', res.error, res.message);
+        logger.warn('[SlackChannel.onSlashCommand]', 'failed to post reply:', res.error, res.message);
       }
     } catch (error) {
-      this.logger.error('[SlackChannel.onSlashCommand]', error);
+      logger.error('[SlackChannel.onSlashCommand]', error);
     }
   }
 
@@ -315,32 +316,32 @@ export default class SlackChannel extends Channel {
       }
       await this.onMessage({ event, body, ack });
     } catch (error) {
-      this.logger.error('[SlackChannel.onSocketMessage]', error);
+      logger.error('[SlackChannel.onSocketMessage]', error);
     }
   }
 
   protected async onError(error: Error) {
-    this.logger.error('[SlackChannel.onError]', error);
+    logger.error('[SlackChannel.onError]', error);
   }
 
   protected async onConnecting() {
-    this.logger.info('[SlackChannel.onConnecting]', 'connecting?');
+    logger.info('[SlackChannel.onConnecting]', 'connecting?');
   }
 
   protected async onConnected() {
-    this.logger.info('[SlackChannel.onConnected]', 'connected!');
+    logger.info('[SlackChannel.onConnected]', 'connected!');
   }
 
   protected async onReconnecting(attemptNumber: number) {
-    this.logger.warn('[SlackChannel.onReconnecting]', `reconnecting... (${attemptNumber})`);
+    logger.warn('[SlackChannel.onReconnecting]', `reconnecting... (${attemptNumber})`);
   }
 
   protected async onReconnected() {
-    this.logger.warn('[SlackChannel.onReconnected]', 'reconnected!');
+    logger.warn('[SlackChannel.onReconnected]', 'reconnected!');
   }
 
   protected async onDisconnected(error: Error) {
-    this.logger.warn('[SlackChannel.onDisconnected]', 'disconnected!', error);
+    logger.warn('[SlackChannel.onDisconnected]', 'disconnected!', error);
   }
 
 // dynamically load a command class (mirrors marvin.ts execCommand), execute it
@@ -386,7 +387,7 @@ export default class SlackChannel extends Channel {
 
   // find agent using event.channel or fallback to default "marvin"
   protected findAgent(channel?: string): Agent {
-    this.logger.debug('[SlackChannel.findAgent]', channel ? `channel=${channel}` : 'marvin');
+    logger.debug('[SlackChannel.findAgent]', channel ? `channel=${channel}` : 'marvin');
 
     // diretly use marvin/orchestrator agent
     if (!channel) {

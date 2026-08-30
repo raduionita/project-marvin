@@ -2,6 +2,7 @@ import { appendFileSync, writeFileSync } from 'fs';
 import { tryJsonParse } from '../helpers/index.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
 import { join } from 'path';
+import logger from '../logger.js';
 
 export interface Choice {
   // [stop, length, content_filter, tool_calls, insufficient_system_resources]
@@ -117,7 +118,7 @@ export default class DeepseekModel extends Model {
     appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
 
     // TODO: remove this
-    this.logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
+    logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
 
     // ! call the model api
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
@@ -131,7 +132,7 @@ export default class DeepseekModel extends Model {
 
     // check if response is ok
     if (!response.ok) {
-      this.logger.error('[DeepseekModel.sendChat]', 'response NOT ok:', response);
+      logger.error('[DeepseekModel.sendChat]', 'response NOT ok:', response);
       const body = await response.json();
       throw new Error(`[DeepseekModel.sendChat] ERROR ${body.error?.message || body.message || response.statusText}`);
     }
@@ -144,7 +145,7 @@ export default class DeepseekModel extends Model {
 
     // no choices, no reply
     if (!json.choices || json.choices.length === 0) {
-      this.logger.warn('[DeepseekModel.sendChat]', 'no choices, no reply');
+      logger.warn('[DeepseekModel.sendChat]', 'no choices, no reply');
       return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
     }
 
@@ -173,7 +174,7 @@ export default class DeepseekModel extends Model {
       }
     } as Reply;
 
-    this.logger.debug('[DeepseekModel.sendChat]', 'response', `id=${json.id} finish=${choice.finish_reason} tokens=${json.usage?.completion_tokens}`);
+    logger.debug('[DeepseekModel.sendChat]', 'response', `id=${json.id} finish=${choice.finish_reason} tokens=${json.usage?.completion_tokens}`);
 
     return reply;
   }

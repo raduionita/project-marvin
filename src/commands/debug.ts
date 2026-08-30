@@ -1,14 +1,15 @@
 import { Command } from "../types";
+import logger from '../logger.js';
 
 export default class DebugCommand extends Command {
   async exec() {
-    this.logger.debug('[DebugCommand.exec]');
+    logger.debug('[DebugCommand.exec]');
 
     // await this.engine.load();
   }
 
   async drop() {
-    this.logger.debug('[DebugCommand.drop]');
+    logger.debug('[DebugCommand.drop]');
 
     // await this.engine.drop();
   }

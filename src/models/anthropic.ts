@@ -1,11 +1,12 @@
 import { Chat, Model, Provider, Reply } from '../types.js';
+import logger from '../logger.js';
 
 export default class AnthropicModel extends Model {
   provider: Provider = 'anthropic';
   public baseUrl: string = 'https://api.anthropic.com';
 
   async execChat(chat: Chat): Promise<Reply> {
-    this.logger.debug('[AnthropicModel.sendChat]', 'chat:', JSON.stringify(chat));
+    logger.debug('[AnthropicModel.sendChat]', 'chat:', JSON.stringify(chat));
 
     const body: { [key: string]: any } = {
       model: this.model,
@@ -58,7 +59,7 @@ export default class AnthropicModel extends Model {
 
     // check if response is ok
     if (!response.ok) {
-      this.logger.error('[AnthropicModel.sendChat]', 'response NOT ok:', response);
+      logger.error('[AnthropicModel.sendChat]', 'response NOT ok:', response);
       const errBody = await response.json();
       throw new Error(`[AnthropicModel.sendChat] ERROR ${errBody?.error?.message || errBody?.message || response.statusText}`);
     }
@@ -67,7 +68,7 @@ export default class AnthropicModel extends Model {
 
     // no content blocks, no reply
     if (!json.content || json.content.length === 0) {
-      this.logger.warn('[AnthropicModel.sendChat]', 'no content, no reply');
+      logger.warn('[AnthropicModel.sendChat]', 'no content, no reply');
       return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
     }
 

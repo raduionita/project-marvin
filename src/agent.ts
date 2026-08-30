@@ -29,17 +29,15 @@ export class Agent {
   public cache: Record<string, Chat> = {};
 
   // shared logger (default-exported singleton from ./logger.js)
-  public logger = logger;
-
   constructor(public engine: Engine, config: { [key: string]: any } = {}) {
     Object.assign(this, config);
-    this.logger.debug(`[${this.constructor.name || 'Agent'}.constructor]`);
+    logger.debug(`[${this.constructor.name || 'Agent'}.constructor]`);
   }
 
   // get a chat for this id: reuse the cached/persisted one, or create a new
   // chat seeded with the system prompt (identity + integrations + memory)
   loadChat(chatId: string | undefined): Chat {
-    this.logger.debug('[Agent.loadChat]');
+    logger.debug('[Agent.loadChat]');
 
     try {
       // try from cache or disk
@@ -60,7 +58,7 @@ export class Agent {
         }
       }
     } catch (err) {
-      this.logger.debug('[Agent.makeChat]', 'failed to load chat from disk:', err);
+      logger.debug('[Agent.makeChat]', 'failed to load chat from disk:', err);
     }
 
     // or make a new chat
@@ -69,7 +67,7 @@ export class Agent {
 
   // make new chat seeded with the system prompt (identity + integrations + memory)
   makeChat(chatId: string | undefined): Chat {
-    this.logger.debug('[Agent.makeChat]');
+    logger.debug('[Agent.makeChat]');
 
     let system: string = this.identity;
 
@@ -112,7 +110,7 @@ export class Agent {
           system += '## Memory\n';
           system += memory + '\n';
           system += 'Use the memory tool (remember/recall) to read and update these notes.';
-          this.logger.debug('[Agent.makeChat]', 'memory:', memory);
+          logger.debug('[Agent.makeChat]', 'memory:', memory);
         }
       }
     } // memories
@@ -155,7 +153,7 @@ export class Agent {
 
   // save chat to cache (and persist it to ~/.marvin/chats/<chatId>.json)
   saveChat(chatId: string | undefined, chat: Chat): void {
-    this.logger.debug('[Agent.saveChat]', `chatId=${chatId}`);
+    logger.debug('[Agent.saveChat]', `chatId=${chatId}`);
 
     if (!chatId) return;
     chat.updated = Date.now();
@@ -165,7 +163,7 @@ export class Agent {
       mkdirSync(join(this.engine.work, 'chats'), { recursive: true });
       writeFileSync(join(this.engine.work, 'chats', `${chatId}.json`), JSON.stringify(chat), 'utf-8');
     } catch (err) {
-      this.logger.error('[Agent.saveChat]', 'failed to persist chat:', err);
+      logger.error('[Agent.saveChat]', 'failed to persist chat:', err);
     }
   }
 
@@ -197,7 +195,7 @@ export class Agent {
 
   // tool call
   async execTool(tool: string, args: {[key:string]:any}, chat: Chat) : Promise<{[key:string]:any}> {
-    this.logger.debug('[Agent.execTool]', tool);
+    logger.debug('[Agent.execTool]', tool);
     try {
       // internal tools
       const instance = this.engine.tools[tool];
@@ -220,18 +218,18 @@ export class Agent {
         return await mcp.call(mcpSplit!.name, args);
       }
     } catch (err) {
-      this.logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
+      logger.error('[Agent.execTool]', `tool ${tool} failed:`, err);
       return {tool: tool, error: (err as Error).message};
     }
     // not found
-    this.logger.error('[Agent.execTool]', `tool ${tool} not found`);
+    logger.error('[Agent.execTool]', `tool ${tool} not found`);
     return {tool: tool, error: `tool ${tool} does NOT exist`};
   }
 
   // exec chat // agent loop
   async sendChat(chatId: string | undefined, message: string) : Promise<Result> {
     try {
-      this.logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
+      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
 
       // get chat from cache/store, or create a new one seeded with the system prompt
       const chat = this.loadChat(chatId);
@@ -258,12 +256,12 @@ export class Agent {
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
         // trim result, this can be really big
-        this.logger.debug('[Agent.sendChat]', `ended=${ended}`, `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
+        logger.debug('[Agent.sendChat]', `ended=${ended}`, `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
 
         ended = reply.stop || ended;
         // execute any tool calls (engine tools, integration __ tools, mcp __ tools via execTool)
         for (const call of reply.message.tools || []) {
-          this.logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, Object.keys(call.arguments));
+          logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, Object.keys(call.arguments));
           const tool = this.engine.tools[call.name];
           if (tool?.stop) {
             ended = true;
@@ -282,7 +280,7 @@ export class Agent {
 
       // warn if max steps reached
       if (steps >= constants.DEFAULT_MAX_STEPS) {
-        this.logger.warn('[Agent.sendChat]', `max steps reached for ${this.id}`);
+        logger.warn('[Agent.sendChat]', `max steps reached for ${this.id}`);
       }
 
       // track usage
@@ -293,7 +291,7 @@ export class Agent {
 
       return { content: (reply?.message?.content || '').trim(), steps: steps, usage: usage };
     } catch (error) {
-      this.logger.error('[Agent.sendChat]', error);
+      logger.error('[Agent.sendChat]', error);
       return { content: '', steps: 0, error: (error as Error).message };
     } 
   }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, safeJoin } from '../helpers/index.js';
+import logger from '../logger.js';
 
 export default class ReadFileTool extends Tool {
   public meta: ToolMeta = {
@@ -23,7 +24,7 @@ export default class ReadFileTool extends Tool {
   }
 
   public async call(args: { path: string }) {
-    this.logger.debug('[ReadFileTool.call]', Object.keys(args));
+    logger.debug('[ReadFileTool.call]', Object.keys(args));
 
     if (!args?.path) {
       return { error: 'read_file: no path provided' };
@@ -39,7 +40,7 @@ export default class ReadFileTool extends Tool {
       const content = readFileSync(path, 'utf-8');
       return { path: args.path, content };
     } catch (err) {
-      this.logger.error('[ReadFileTool.call]', 'error:', err);
+      logger.error('[ReadFileTool.call]', 'error:', err);
       return { path: args.path, error: (err as Error).message };
     }
   }

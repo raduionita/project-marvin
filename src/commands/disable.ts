@@ -1,10 +1,11 @@
 import { execSync } from "node:child_process";
 import { Command } from "../types";
+import logger from '../logger.js';
 
 // `marvin disable` stops the daemon and disables it from starting at boot
 export default class DisableCommand extends Command {
   async exec() {
-    this.logger.debug('[DisableCommand.exec]');
+    logger.debug('[DisableCommand.exec]');
     switch (this.args[0]) {
       case 'help':
         this.execHelp();
@@ -19,29 +20,29 @@ export default class DisableCommand extends Command {
   }
 
   execHelp() {
-    this.logger.info('usage: marvin disable [command]');
-    this.logger.info('commands:');
-    this.logger.info('  help  ', 'show this help');
-    this.logger.info('        ', 'stop the daemon and disable it from starting at boot');
+    logger.info('usage: marvin disable [command]');
+    logger.info('commands:');
+    logger.info('  help  ', 'show this help');
+    logger.info('        ', 'stop the daemon and disable it from starting at boot');
   }
 
   async execDisable() {
-    this.logger.debug('[DisableCommand.execDisable]');
+    logger.debug('[DisableCommand.execDisable]');
     
     try {
       // stop service
-      this.logger.debug('[DisableCommand.execDisable]', 'stopping service...');
+      logger.debug('[DisableCommand.execDisable]', 'stopping service...');
       // stop and disable
       execSync(['systemctl', '--user', 'stop', 'marvin'].join(' '), { stdio: 'inherit' });
       execSync(['systemctl', '--user', 'disable', 'marvin'].join(' '), { stdio: 'inherit' });
       // check
       const state = execSync(['systemctl', '--user', 'is-active', 'marvin'].join(' '), { encoding: 'utf8' }).trim();
       // output
-      this.logger.info('marvin is', state);
+      logger.info('marvin is', state);
     } catch (err) {
-      this.logger.info('marvin is now inactive');
+      logger.info('marvin is now inactive');
     }
 
-    this.logger.info('marvin disabled');
+    logger.info('marvin disabled');
   }
 }

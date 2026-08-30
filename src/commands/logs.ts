@@ -2,12 +2,13 @@ import { existsSync, readFileSync, statSync, openSync, readSync, closeSync, writ
 import { join } from 'path';
 import { Command } from "../types";
 import { delay } from '../helpers';
+import logger from '../logger.js';
 
 // `marvin logs [-f|--follow] [-n|--lines <n>]` tail the daemon log file
 // `marvin logs clear` clears the log file, `marvin logs help` shows help
 export default class LogsCommand extends Command {
   async exec() {
-    this.logger.debug('[LogsCommand.exec]', this.args);
+    logger.debug('[LogsCommand.exec]', this.args);
 
     const cmd = this.args[0] || '';
     switch (cmd) {
@@ -26,45 +27,45 @@ export default class LogsCommand extends Command {
           await this.execLog();
           break;
         }
-        this.logger.warn('[LogsCommand.exec]', 'unknown command: logs', cmd);
+        logger.warn('[LogsCommand.exec]', 'unknown command: logs', cmd);
         await this.execHelp();
         break;
     }
   }
 
   async execHelp() {
-    this.logger.info('usage: marvin logs [command] [-f|--follow] [-n|--lines <n>]');
-    this.logger.info('commands:');
-    this.logger.info('  help                 ', 'show this help');
-    this.logger.info('  clear                ', 'clear the daemon log file');
-    this.logger.info('  (default)            ', 'tail the daemon log file [-f|--follow] [-n|--lines <n>]');
+    logger.info('usage: marvin logs [command] [-f|--follow] [-n|--lines <n>]');
+    logger.info('commands:');
+    logger.info('  help                 ', 'show this help');
+    logger.info('  clear                ', 'clear the daemon log file');
+    logger.info('  (default)            ', 'tail the daemon log file [-f|--follow] [-n|--lines <n>]');
   }
 
   async execClear() {
-    this.logger.debug('[LogsCommand.execClear]');
+    logger.debug('[LogsCommand.execClear]');
 
     const lpath = join(this.engine.work, 'logs', 'marvin.log');
     if (!existsSync(lpath)) {
-      this.logger.warn('[LogsCommand.execClear]', 'no log file found at', lpath);
+      logger.warn('[LogsCommand.execClear]', 'no log file found at', lpath);
       return;
     }
 
     writeFileSync(lpath, '');
-    this.logger.info('log file cleared:', lpath);
+    logger.info('log file cleared:', lpath);
   }
 
   async execLog() {
-    this.logger.debug('[LogsCommand.execLog]');
+    logger.debug('[LogsCommand.execLog]');
 
     const lpath = join(this.engine.work, 'logs', 'marvin.log');
     if (!existsSync(lpath)) {
-      this.logger.error('[LogsCommand.execLog]', 'no log file found at', lpath, 'run "marvin enable" first');
+      logger.error('[LogsCommand.execLog]', 'no log file found at', lpath, 'run "marvin enable" first');
       return;
     }
 
     const follow = this.args.includes('-f') || this.args.includes('--follow');
     if (follow) {
-      this.logger.warn('following', lpath, '(ctrl+c to stop)');
+      logger.warn('following', lpath, '(ctrl+c to stop)');
     }
 
     const lines = this.parseLines();
@@ -72,7 +73,7 @@ export default class LogsCommand extends Command {
     // print the last `lines` lines of the file
     const tail = this.readTail(lpath, lines);
     for (const line of tail) {
-      this.logger.log(line);
+      logger.log(line);
     }
 
     if (!follow) {

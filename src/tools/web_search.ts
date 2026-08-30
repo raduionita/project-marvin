@@ -4,6 +4,7 @@ import { delay, rand, readError, tryJsonParse } from '../helpers/index.js';
 import type BrowserSystem from '../systems/browser.js';
 import TurndownService from 'turndown';
 import Engine from '../engine.js';
+import logger from '../logger.js';
 
 const SEARCH_START_TAG = "DDG.pageLayout.load('d',";
 const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
@@ -61,7 +62,7 @@ export default class WebSearchTool extends Tool {
   }
 
   public async call(args: { query: string }) {
-    this.logger.debug('[WebSearchTool.call]', Object.keys(args));
+    logger.debug('[WebSearchTool.call]', Object.keys(args));
 
     if (!this.engine.systems['browser']) {
       throw new Error('[WebSearchTool.call] ERROR - Browser is not loaded in the server engine');
@@ -79,13 +80,13 @@ export default class WebSearchTool extends Tool {
         const type = request.resourceType();
         const url = request.url();
         if (type === 'script' && !url.includes('links.duckduckgo.com/d.js')) {
-          // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+          // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
           return request.abort();
         } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
-          // this.logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+          // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
           return request.abort();
         } else {
-          this.logger.debug('[WebSearchTool.newPage]', 'allowing', type, url);
+          logger.debug('[WebSearchTool.newPage]', 'allowing', type, url);
           return request.continue();
         }
       });
@@ -116,13 +117,13 @@ export default class WebSearchTool extends Tool {
     } catch (error) {
       // distinguish "search failed" from "no results", so the LLM does not
       // conclude nothing exists when the scrape/parse simply failed
-      this.logger.error('[WebSearchTool.call]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw?.substring(0,100));
+      logger.error('[WebSearchTool.call]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw?.substring(0,100));
       return { 
         results: [], 
         error: `web_search failed: ${(error as Error).message}` 
       };
     } finally {
-      this.logger.debug('[WebSearchTool.call]', 'closing page');
+      logger.debug('[WebSearchTool.call]', 'closing page');
       if (page && !page.isClosed()) {
         await page.close();
       }

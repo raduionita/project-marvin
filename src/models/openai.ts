@@ -1,12 +1,13 @@
 import { tryJsonParse } from '../helpers/index.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
+import logger from '../logger.js';
 
 export class OpenaiModel extends Model {
   provider: Provider = 'openai';
   public baseUrl: string = 'https://api.openai.com';
 
   async execChat(chat: Chat): Promise<Reply> {
-    this.logger.debug('[OpenaiModel.sendChat]', 'chat:', JSON.stringify(chat));
+    logger.debug('[OpenaiModel.sendChat]', 'chat:', JSON.stringify(chat));
 
     const body: { [key: string]: any } = {
       model: this.model,
@@ -47,7 +48,7 @@ export class OpenaiModel extends Model {
 
     // check if response is ok
     if (!response.ok) {
-      this.logger.error('[OpenaiModel.sendChat]', 'response NOT ok:', response);
+      logger.error('[OpenaiModel.sendChat]', 'response NOT ok:', response);
       const errBody = await response.json();
       throw new Error(`[OpenaiModel.sendChat] ERROR ${errBody?.error?.message || errBody?.message || response.statusText}`);
     }
@@ -56,7 +57,7 @@ export class OpenaiModel extends Model {
 
     // no choices, no reply
     if (!json.choices || json.choices.length === 0) {
-      this.logger.warn('[OpenaiModel.sendChat]', 'no choices, no reply');
+      logger.warn('[OpenaiModel.sendChat]', 'no choices, no reply');
       return { id: json.id, stop: true, finish: 'empty', message: { role: 'assistant', content: '' } } as Reply;
     }
 
