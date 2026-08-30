@@ -1,6 +1,6 @@
 import type Engine from "./engine";
 import type { Agent } from './agent.js';
-import type { Logger } from "./logger.js";
+import logger from "./logger.js";
 
 export type Mode = 'client' | 'server';
 
@@ -61,7 +61,12 @@ export interface Config {
 }
 
 export class Command {
-  constructor(public engine: Engine, public logger: Logger, public args: string[], public readonly deamon: boolean = false) {
+  // shared logger (default-exported singleton from ./logger.js); see `setLoggerMode`
+  // to flip the shared prefix/stripTags behavior, and `setDefaultOutput` to swap
+  // the sink shared by every Logger (used by tests + the daemon).
+  public logger = logger;
+
+  constructor(public engine: Engine, public args: string[], public readonly deamon: boolean = false) {
     this.logger.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
   }
 
@@ -70,7 +75,9 @@ export class Command {
 }
 
 export abstract class System {
-  constructor(public readonly engine: Engine, public readonly logger: Logger) {
+  public logger = logger;
+
+  constructor(public readonly engine: Engine) {
     this.logger.debug(`[${this.constructor.name||'System'}.constructor]`);
   }
 
@@ -105,7 +112,9 @@ export type ToolMeta = {
 };
 
 export abstract class Tool {
-  constructor(public engine: Engine, public logger: Logger) {
+  public logger = logger;
+
+  constructor(public engine: Engine) {
     this.logger.debug(`[${this.constructor.name||'Tool'}.constructor]`);
   }
 
@@ -126,7 +135,9 @@ export interface ChannelMeta {
 export abstract class Channel {
   abstract meta: ChannelMeta;
 
-  constructor(public engine: Engine, public logger: Logger) {
+  public logger = logger;
+
+  constructor(public engine: Engine) {
     this.logger.debug(`[${this.constructor.name||'Channel'}.constructor]`);
   }
 
@@ -177,7 +188,9 @@ export abstract class Integration {
   // used to build the ## Integrations system-prompt block and the wizard prompts.
   abstract meta: IntegrationMeta;
 
-  constructor(public engine: Engine, public logger: Logger, public config: { [key: string]: any }) {
+  public logger = logger;
+
+  constructor(public engine: Engine, public config: { [key: string]: any }) {
     this.logger.debug(`[${this.constructor.name||'Integration'}.constructor]`);
   }
 
@@ -232,7 +245,9 @@ export abstract class Model {
   public userId: string = 'user-id';
   public reasoning: string = 'high';
 
-  constructor(public readonly engine: Engine, public readonly logger: Logger, config: { [key: string]: any }) {
+  public logger = logger;
+
+  constructor(public readonly engine: Engine, config: { [key: string]: any }) {
     Object.assign(this, config);
   }
 

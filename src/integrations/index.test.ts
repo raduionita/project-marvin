@@ -6,7 +6,7 @@ import { splitIntegrationToolName } from '../helpers.js';
 import { Config, Integration, IntegrationMeta, Field } from '../types.js';
 
 function mockEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.config = {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
@@ -84,7 +84,7 @@ test('integrationToolName round-trips through splitIntegrationToolName', () => {
 
 test('builds a tool per configured action with its fields and required list', async () => {
   const engine = mockEngine();
-  engine.integrations['site'] = new MockIntegration(engine, new Logger(), {
+  engine.integrations['site'] = new MockIntegration(engine, {
     type: 'mock',
     actions: {
       create_post: {
@@ -110,7 +110,7 @@ test('builds a tool per configured action with its fields and required list', as
 
 test('exposes only configured actions once any action is configured', async () => {
   const engine = mockEngine();
-  engine.integrations['site'] = new MockIntegration(engine, new Logger(), {
+  engine.integrations['site'] = new MockIntegration(engine, {
     type: 'mock',
     actions: { create_post: { enabled: true, fields: {} } },
   });
@@ -122,7 +122,7 @@ test('exposes only configured actions once any action is configured', async () =
 
 test('adds custom meta fields to every action tool', async () => {
   const engine = mockEngine();
-  engine.integrations['site'] = new MockIntegration(engine, new Logger(), {
+  engine.integrations['site'] = new MockIntegration(engine, {
     type: 'mock',
     meta: { target: 'meta', fields: { byline: { type: 'string', required: true, description: 'Byline' } } },
   });
@@ -137,7 +137,7 @@ test('adds custom meta fields to every action tool', async () => {
 
 test('falls back to live discovery when an action has no configured fields', async () => {
   const engine = mockEngine();
-  const integration = new MockIntegration(engine, new Logger(), { type: 'mock' });
+  const integration = new MockIntegration(engine, { type: 'mock' });
   integration.discoverResults['create_post'] = [{ name: 'content', type: 'string', required: false, description: 'Body' }];
   engine.integrations['site'] = integration;
 

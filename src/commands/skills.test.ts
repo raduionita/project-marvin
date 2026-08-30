@@ -16,7 +16,7 @@ mock.module('@inquirer/prompts', () => promptMocks);
 import SkillsCommand from './skills.js';
 
 function mockEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = join(tmpdir(), 'marvin-skills-cmd-' + Date.now() + Math.random().toString(36).slice(2, 8));
   mkdirSync(join(engine.work, 'skills'), { recursive: true });
   engine.config = {
@@ -44,7 +44,7 @@ function mockEngine(): Engine {
   engine.load = async () => { engine.state = 'load'; };
 
   // stub agent whose sendChat is scripted per-test
-  const agent = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
   agent.sendChat = async () => ({ content: '', steps: 0 });
   engine.agents['marvin'] = agent;
   return engine;
@@ -52,7 +52,7 @@ function mockEngine(): Engine {
 
 test('skills add writes a custom skill file to ~/.marvin/skills', async () => {
   const engine = mockEngine();
-  const cmd = new SkillsCommand(engine, new Logger(), ['add', 'release-notes', 'write release notes']);
+  const cmd = new SkillsCommand(engine, ['add', 'release-notes', 'write release notes']);
   answers = [];
 
   // stub the LLM call to return generated skill content
@@ -70,7 +70,7 @@ test('skills add writes a custom skill file to ~/.marvin/skills', async () => {
 
 test('skills add prompts for name and description when missing', async () => {
   const engine = mockEngine();
-  const cmd = new SkillsCommand(engine, new Logger(), []);
+  const cmd = new SkillsCommand(engine, []);
   answers = ['my-skill', 'does something useful'];
   engine.agents['marvin']!.sendChat = async () => ({ content: '# My Skill\n\nDoes something useful.', steps: 1 });
 
@@ -84,13 +84,14 @@ test('skills add prompts for name and description when missing', async () => {
 test('skills add refuses an existing skill', async () => {
   const engine = mockEngine();
   writeFileSync(join(engine.work, 'skills', 'existing.md'), '# Existing\n\nAlready here.');
-  const { logger, lines } = captureLogger();
-  const cmd = new SkillsCommand(engine, logger, ['add', 'existing', 'desc']);
+  const { lines, restore } = captureLogger();
+  const cmd = new SkillsCommand(engine, ['add', 'existing', 'desc']);
   answers = [];
 
   await cmd.execAdd();
 
   expect(lines.join('\n')).toContain('already exists');
+  restore();
 });
 
 test('skills list prints default and custom skills', async () => {
@@ -100,8 +101,8 @@ test('skills list prints default and custom skills', async () => {
   writeFileSync(join(engine.work, 'skills', 'my-skill.md'), '# My Skill\n\nDoes something.');
   await engine.loadSkills();
 
-  const { logger, lines } = captureLogger();
-  const cmd = new SkillsCommand(engine, logger, ['list']);
+  const { lines, restore } = captureLogger();
+  const cmd = new SkillsCommand(engine, ['list']);
 
   await cmd.exec();
 
@@ -110,6 +111,7 @@ test('skills list prints default and custom skills', async () => {
   expect(out).toContain('TOOLS-CREATE (default)');
   expect(out).toContain('TOOLS-EDIT (default)');
   expect(out).toContain('my-skill (custom)');
+  restore();
 });
 
 // register the "TOOLS-CREATE" skill (the one used by `skills use`) like the meta skill
@@ -129,8 +131,8 @@ function addToolsSkill(engine: Engine): Skill {
 test('skills use runs the TOOLS-CREATE skill and saves the generated tool', async () => {
   const engine = mockEngine();
   addToolsSkill(engine);
-  const { logger, lines } = captureLogger();
-  const cmd = new SkillsCommand(engine, logger, ['use', 'TOOLS-CREATE', 'web_fetch']);
+  const { lines, restore } = captureLogger();
+  const cmd = new SkillsCommand(engine, ['use', 'TOOLS-CREATE', 'web_fetch']);
   answers = ['fetch a URL and return the text'];
 
   // stub the LLM call to return generated tool source
@@ -147,12 +149,13 @@ test('skills use runs the TOOLS-CREATE skill and saves the generated tool', asyn
   expect(engine.skills['TOOLS-CREATE']).toBeDefined();
   expect(lines.join('\n')).toContain('tool "web_fetch" created');
   expect(lines.join('\n')).toContain('used skill "TOOLS-CREATE"');
+  restore();
 });
 
 test('skills use prompts for the skill and info when missing', async () => {
   const engine = mockEngine();
   addToolsSkill(engine);
-  const cmd = new SkillsCommand(engine, new Logger(), ['use']);
+  const cmd = new SkillsCommand(engine, ['use']);
   // answers: skill pick, tool name, tool purpose
   answers = ['TOOLS-CREATE', 'my_tool', 'does something'];
 
@@ -167,13 +170,14 @@ test('skills use prompts for the skill and info when missing', async () => {
 
 test('skills use errors on unknown skill', async () => {
   const engine = mockEngine();
-  const { logger, lines } = captureLogger();
-  const cmd = new SkillsCommand(engine, logger, ['use', 'nope']);
+  const { lines, restore } = captureLogger();
+  const cmd = new SkillsCommand(engine, ['use', 'nope']);
   answers = [];
 
   await cmd.execUse();
 
   expect(lines.join('\n')).toContain('unknown skill');
+  restore();
 });
 
 test('skills use edits an existing tool with the tools-edit skill', async () => {
@@ -192,7 +196,7 @@ test('skills use edits an existing tool with the tools-edit skill', async () => 
   mkdirSync(join(engine.work, 'tools'), { recursive: true });
   writeFileSync(tpath, 'old code');
 
-  const cmd = new SkillsCommand(engine, new Logger(), ['use', 'tools-edit', 'my_tool']);
+  const cmd = new SkillsCommand(engine, ['use', 'tools-edit', 'my_tool']);
   answers = ['make it return more data'];
 
   engine.agents['marvin']!.sendChat = async () => ({ content: 'new code', steps: 1 });

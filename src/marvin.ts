@@ -8,12 +8,14 @@ import {  Command, Config } from './types.js';
 import * as constants from './constants.js';
 import { mergeConfig, tryJsonParse } from './helpers.js';
 import { listCommands } from './commands/index.js';
-import { Logger, setLoggerMode } from './logger.js';
+import logger, { setLoggerMode } from './logger.js';
 import Engine from './engine.js';
 
 await (new class Marvin {
-  logger: Logger = new Logger();
-  engine : Engine = new Engine(this.logger);
+  // shared logger (default-exported singleton from ./logger.js); see
+  // `setLoggerMode` for the daemon prefix/stripTags mode
+  logger = logger;
+  engine : Engine = new Engine();
   command: Command | undefined = undefined;
 
   async exec() {
@@ -157,7 +159,7 @@ await (new class Marvin {
         return;
       }
       // create command and load/run it
-      this.command = new Class(this.engine, this.logger, args.slice(1));
+      this.command = new Class(this.engine, args.slice(1));
       if (!this.command) {
         process.exit(1);
       }

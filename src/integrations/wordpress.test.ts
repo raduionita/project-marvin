@@ -4,7 +4,7 @@ import { Logger } from '../logger.js';
 import WordpressIntegration from './wordpress.js';
 
 function buildEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'exec';
   return engine;
 }
@@ -27,7 +27,7 @@ function mockFetch(data: { [key: string]: any }, status = 200): { calls: [string
 
 test('create_post sends a POST to wp/v2/posts with draft status', async () => {
   const fetchMock = mockFetch({ id: 12, title: 'Hello' });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'create_post', title: 'Hello', content: 'World' });
 
@@ -40,7 +40,7 @@ test('create_post sends a POST to wp/v2/posts with draft status', async () => {
 });
 
 test('create_post returns an error when title is missing', async () => {
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'create_post' });
 
@@ -49,7 +49,7 @@ test('create_post returns an error when title is missing', async () => {
 
 test('publish_post sends a request that sets status publish', async () => {
   const fetchMock = mockFetch({ id: 12, status: 'publish' });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'publish_post', id: 12 });
 
@@ -61,7 +61,7 @@ test('publish_post sends a request that sets status publish', async () => {
 
 test('list_posts GETs wp/v2/posts with per_page', async () => {
   const fetchMock = mockFetch([{ id: 1 }, { id: 2 }]);
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'list_posts', per_page: 5 });
 
@@ -72,7 +72,7 @@ test('list_posts GETs wp/v2/posts with per_page', async () => {
 
 test('list_posts supports standard REST global params', async () => {
   const fetchMock = mockFetch([]);
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   await integration.call({ action: 'list_posts', per_page: 3, page: 2, search: 'hello world', status: 'publish', _fields: 'id,title' });
 
@@ -86,7 +86,7 @@ test('list_posts supports standard REST global params', async () => {
 
 test('list_posts builds a query only from provided params', async () => {
   const fetchMock = mockFetch([]);
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   await integration.call({ action: 'list_posts' });
 
@@ -97,7 +97,7 @@ test('list_posts builds a query only from provided params', async () => {
 
 test('builds the REST base from a site root endpoint', async () => {
   const fetchMock = mockFetch({ id: 1 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'create_post', title: 'Hi' });
 
@@ -108,7 +108,7 @@ test('builds the REST base from a site root endpoint', async () => {
 
 test('accepts an endpoint ending in /wp-json', async () => {
   const fetchMock = mockFetch({ id: 1 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com/wp-json' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com/wp-json' });
 
   await integration.call({ action: 'create_post', title: 'Hi' });
 
@@ -118,7 +118,7 @@ test('accepts an endpoint ending in /wp-json', async () => {
 
 test('accepts a full wp-json/wp/v2 endpoint unchanged', async () => {
   const fetchMock = mockFetch({ id: 1 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com/wp-json/wp/v2/' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com/wp-json/wp/v2/' });
 
   await integration.call({ action: 'get_post', id: 3 });
 
@@ -128,7 +128,7 @@ test('accepts a full wp-json/wp/v2 endpoint unchanged', async () => {
 
 test('discover fetches the REST discovery index', async () => {
   const fetchMock = mockFetch({ namespaces: ['wp/v2'], routes: {} });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'discover' });
 
@@ -140,7 +140,7 @@ test('discover fetches the REST discovery index', async () => {
 
 test('create_post supports standard REST post fields when configured', async () => {
   const fetchMock = mockFetch({ id: 12 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+  const integration = new WordpressIntegration(buildEngine(), {
     type: 'wordpress', endpoint: 'https://example.com',
     actions: { create_post: { enabled: true, fields: { title: { type: 'string' }, content: { type: 'string' }, status: { type: 'string' }, slug: { type: 'string' }, featured_media: { type: 'integer' }, categories: { type: 'array' } } } },
   });
@@ -154,7 +154,7 @@ test('create_post supports standard REST post fields when configured', async () 
 
 test('request action allows a generic path/method/body', async () => {
   const fetchMock = mockFetch({ success: true });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com/' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com/' });
 
   const result = await integration.call({ action: 'request', method: 'delete', path: '/pages/5', body: {} });
 
@@ -167,7 +167,7 @@ test('request action allows a generic path/method/body', async () => {
 
 test('request returns a normalized error on non-ok response', async () => {
   mockFetch({ message: 'forbidden' }, 401);
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'get_post', id: 5 });
 
@@ -176,7 +176,7 @@ test('request returns a normalized error on non-ok response', async () => {
 });
 
 test('unknown action returns an error', async () => {
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'explode' });
 
@@ -185,7 +185,7 @@ test('unknown action returns an error', async () => {
 
 test('sends Basic auth when user and appPassword are configured', async () => {
   const fetchMock = mockFetch({ id: 1 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com', user: 'admin', appPassword: 'abcd efgh' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com', user: 'admin', appPassword: 'abcd efgh' });
 
   await integration.call({ action: 'create_post', title: 'Hi' });
 
@@ -196,7 +196,7 @@ test('sends Basic auth when user and appPassword are configured', async () => {
 
 test('create_post with publish: true posts with status publish', async () => {
   const fetchMock = mockFetch({ id: 12 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   await integration.call({ action: 'create_post', title: 'Hello', content: 'World', publish: true });
 
@@ -210,7 +210,7 @@ test('request includes the raw body in the error on non-JSON 4xx responses', asy
     text: () => Promise.resolve('<html>forbidden</html>'),
     json: () => Promise.resolve({}),
   } as Response)) as typeof fetch;
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'get_post', id: 5 });
 
@@ -228,7 +228,7 @@ test('request retries transient 5xx failures then reports the failure', async ()
       json: () => Promise.resolve({}),
     } as Response);
   }) as typeof fetch;
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'get_post', id: 5 });
 
@@ -247,7 +247,7 @@ test('request does not retry permanent 4xx errors', async () => {
       json: () => Promise.resolve({}),
     } as Response);
   }) as typeof fetch;
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const result = await integration.call({ action: 'get_post', id: 5 });
 
@@ -258,7 +258,7 @@ test('request does not retry permanent 4xx errors', async () => {
 // --- meta ---
 
 test('meta lists the wordpress actions', async () => {
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const info = integration.meta;
 
@@ -285,7 +285,7 @@ const OPTIONS_PAYLOAD = {
 
 test('discover parses the OPTIONS endpoint args into FieldDefs', async () => {
   const fetchMock = mockFetch(OPTIONS_PAYLOAD);
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const fields = await integration.discover('create_post');
 
@@ -318,7 +318,7 @@ test('discover keeps array and object types with their sub-properties', async ()
       },
     ],
   });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const fields = await integration.discover('create_post');
 
@@ -333,27 +333,27 @@ test('discover keeps array and object types with their sub-properties', async ()
 
 test('discover throws when the OPTIONS payload has no POST endpoint', async () => {
   mockFetch({ endpoints: [{ methods: ['GET'], args: {} }] });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   await expect(integration.discover('create_post')).rejects.toThrow('no POST schema');
 });
 
 test('discover throws when the fetch fails', async () => {
   globalThis.fetch = (() => Promise.reject(new Error('network down'))) as typeof fetch;
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   await expect(integration.discover('create_post')).rejects.toThrow('network down');
 });
 
 test('discover throws for actions without a resource', async () => {
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   await expect(integration.discover('explode')).rejects.toThrow('no REST resource');
 });
 
 test('discover injects a required id for single-resource actions', async () => {
   mockFetch(OPTIONS_PAYLOAD);
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), { type: 'wordpress', endpoint: 'https://example.com' });
+  const integration = new WordpressIntegration(buildEngine(), { type: 'wordpress', endpoint: 'https://example.com' });
 
   const fields = await integration.discover('publish_post');
 
@@ -366,7 +366,7 @@ test('discover injects a required id for single-resource actions', async () => {
 
 test('update_post never sends the id in the request body', async () => {
   const fetchMock = mockFetch({ id: 7 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+  const integration = new WordpressIntegration(buildEngine(), {
     type: 'wordpress', endpoint: 'https://example.com',
     actions: { update_post: { enabled: true, fields: { id: { type: 'integer', required: true }, content: { type: 'string' } } } },
   });
@@ -382,7 +382,7 @@ test('update_post never sends the id in the request body', async () => {
 
 test('create_post sends only the configured fields (drops invented params)', async () => {
   const fetchMock = mockFetch({ id: 12 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+  const integration = new WordpressIntegration(buildEngine(), {
     type: 'wordpress', endpoint: 'https://example.com',
     actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true }, content: { type: 'string' } } } },
   });
@@ -395,7 +395,7 @@ test('create_post sends only the configured fields (drops invented params)', asy
 
 test('create_post sends custom meta fields under the meta object', async () => {
   const fetchMock = mockFetch({ id: 12 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+  const integration = new WordpressIntegration(buildEngine(), {
     type: 'wordpress', endpoint: 'https://example.com',
     actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true } } } },
     meta: { target: 'meta', fields: { custom_author: { type: 'string', required: true }, featured: { type: 'boolean' } } },
@@ -409,7 +409,7 @@ test('create_post sends custom meta fields under the meta object', async () => {
 
 test('create_post nests dotted configured fields under their parent object', async () => {
   const fetchMock = mockFetch({ id: 12 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+  const integration = new WordpressIntegration(buildEngine(), {
     type: 'wordpress', endpoint: 'https://example.com',
     actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true }, 'meta.keywords': { type: 'array' } } } },
   });
@@ -422,7 +422,7 @@ test('create_post nests dotted configured fields under their parent object', asy
 
 test('create_post sends custom fields under acf when target is acf', async () => {
   const fetchMock = mockFetch({ id: 12 });
-  const integration = new WordpressIntegration(buildEngine(), new Logger(), {
+  const integration = new WordpressIntegration(buildEngine(), {
     type: 'wordpress', endpoint: 'https://example.com',
     actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true } } } },
     meta: { target: 'acf', fields: { custom_author: { type: 'string' } } },

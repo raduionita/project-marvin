@@ -9,7 +9,7 @@ import ReadFileTool from './read_file.js';
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
   mkdirSync(join(home, 'files'), { recursive: true });
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = home;
   return { engine, home };
 }
@@ -27,7 +27,7 @@ function mockFile(home: string, name: string, contents: string): string {
 
 test('readFile tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
+  const tool = new ReadFileTool(engine);
   const meta = tool.meta;
   expect(meta.function.name).toBe('read_file');
   expect(meta.function.description).toContain('Read the contents of a file');
@@ -36,7 +36,7 @@ test('readFile tool metadata', () => {
 
 test('readFile returns the contents of a file inside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
+  const tool = new ReadFileTool(engine);
   mockFile(home, 'sample.txt', 'hello world');
 
   const result = await tool.call({ path: 'sample.txt' });
@@ -50,7 +50,7 @@ test('readFile returns the contents of a file inside the workspace', async () =>
 
 test('readFile reads relative paths inside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
+  const tool = new ReadFileTool(engine);
   mockFile(home, 'relative.txt', 'relative works');
 
   const result = await tool.call({ path: 'relative.txt' });
@@ -62,7 +62,7 @@ test('readFile reads relative paths inside the workspace', async () => {
 
 test('readFile rejects absolute paths outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
+  const tool = new ReadFileTool(engine);
 
   const result = await tool.call({ path: '/etc/hosts' });
 
@@ -74,7 +74,7 @@ test('readFile rejects absolute paths outside the workspace', async () => {
 
 test('readFile rejects paths that escape via ..', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
+  const tool = new ReadFileTool(engine);
 
   const result = await tool.call({ path: join(home, '..', '..', 'etc', 'hosts') });
 
@@ -86,7 +86,7 @@ test('readFile rejects paths that escape via ..', async () => {
 
 test('readFile returns an error for a missing file', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
+  const tool = new ReadFileTool(engine);
 
   const result = await tool.call({ path: 'does-not-exist.txt' });
 
@@ -99,7 +99,7 @@ test('readFile returns an error for a missing file', async () => {
 
 test('readFile returns an error when no path is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadFileTool(engine, new Logger());
+  const tool = new ReadFileTool(engine);
 
   const result = await tool.call({} as { path: string });
 

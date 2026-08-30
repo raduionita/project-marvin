@@ -9,7 +9,7 @@ import AppendFileTool from './append_file.js';
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
   mkdirSync(join(home, 'files'), { recursive: true });
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = home;
   return { engine, home };
 }
@@ -20,7 +20,7 @@ function cleanup(home: string) {
 
 test('appendFile tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
   expect(tool.meta.function.name).toBe('append_file');
   expect(tool.meta.function.parameters.required).toContain('path');
   expect(tool.meta.function.parameters.required).toContain('content');
@@ -29,7 +29,7 @@ test('appendFile tool metadata', () => {
 
 test('appendFile appends to an existing file', async () => {
   const { engine, home } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
   writeFileSync(join(home, 'files', 'notes.txt'), 'line one\n');
 
   const result = await tool.call({ path: 'notes.txt', content: 'line two\n' });
@@ -41,7 +41,7 @@ test('appendFile appends to an existing file', async () => {
 
 test('appendFile creates a new file when it does not exist', async () => {
   const { engine, home } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
 
   const result = await tool.call({ path: 'created.txt', content: 'hello' });
 
@@ -52,7 +52,7 @@ test('appendFile creates a new file when it does not exist', async () => {
 
 test('appendFile creates parent folders when missing', async () => {
   const { engine, home } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
 
   const result = await tool.call({ path: 'journal/2026/aug.txt', content: 'entry' });
 
@@ -63,7 +63,7 @@ test('appendFile creates parent folders when missing', async () => {
 
 test('appendFile rejects absolute paths outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
 
   const result = await tool.call({ path: '/etc/hosts', content: 'nope' });
 
@@ -74,7 +74,7 @@ test('appendFile rejects absolute paths outside the workspace', async () => {
 
 test('appendFile rejects paths that escape via ..', async () => {
   const { engine, home } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
 
   const result = await tool.call({ path: join(home, '..', 'escaped.txt'), content: 'nope' });
 
@@ -85,7 +85,7 @@ test('appendFile rejects paths that escape via ..', async () => {
 
 test('appendFile returns an error when no path is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
 
   const result = await tool.call({ path: '', content: 'nope' });
 
@@ -95,7 +95,7 @@ test('appendFile returns an error when no path is provided', async () => {
 
 test('appendFile returns an error when no content is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new AppendFileTool(engine, new Logger());
+  const tool = new AppendFileTool(engine);
 
   const result = await tool.call({ path: 'x.txt' } as { path: string; content: string });
 

@@ -1,13 +1,12 @@
 
 import type Engine from '../engine.js';
 import { Command } from '../types.js';
-import type { Logger } from '../logger.js';
 import { setLoggerMode } from '../logger.js';
 
 // `marvin serve [help]`
 export default class ServeCommand extends Command {
-  constructor(engine: Engine, logger: Logger, args: string[], deamon: boolean = true) {
-    super(engine, logger, args, deamon);
+  constructor(engine: Engine, args: string[], deamon: boolean = true) {
+    super(engine, args, deamon);
   }
 
   // load the app/server and its internal systems

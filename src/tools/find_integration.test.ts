@@ -12,9 +12,9 @@ class WordpressLikeIntegration extends Integration {
 }
 
 function mockEngine(config: { [key: string]: any } = {}): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'exec';
-  const integration = new WordpressLikeIntegration(engine, new Logger(), { type: 'wordpress', endpoint: 'https://gloobeam.com', ...config });
+  const integration = new WordpressLikeIntegration(engine, { type: 'wordpress', endpoint: 'https://gloobeam.com', ...config });
   engine.integrations = { gloobeam: integration };
   engine.config.integrations = { gloobeam: { type: 'wordpress', ...config } };
   return engine;
@@ -24,7 +24,7 @@ test('find_integration returns the configured field schema for an action', async
   const engine = mockEngine({
     actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true, description: 'Post title' }, content: { type: 'string', required: false, description: 'Post body' } } } },
   });
-  const tool = new FindIntegrationTool(engine, new Logger());
+  const tool = new FindIntegrationTool(engine);
 
   const result = (await tool.call({ integration: 'gloobeam', action: 'create_post' })) as { id: string, type: string, action: string, fields: { name: string }[], required_fields: string[] };
 
@@ -37,7 +37,7 @@ test('find_integration returns the configured field schema for an action', async
 
 test('find_integration returns no fields when none are configured', async () => {
   const engine = mockEngine();
-  const tool = new FindIntegrationTool(engine, new Logger());
+  const tool = new FindIntegrationTool(engine);
 
   const result = (await tool.call({ integration: 'gloobeam', action: 'create_post' })) as { fields: { name: string }[], required_fields: string[] };
 
@@ -49,7 +49,7 @@ test('find_integration prefers the curated config schema over defaults', async (
   const engine = mockEngine({
     actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true, description: 'Title' }, meta_author: { type: 'string', required: true, description: 'Byline' } } } },
   });
-  const tool = new FindIntegrationTool(engine, new Logger());
+  const tool = new FindIntegrationTool(engine);
 
   const result = (await tool.call({ integration: 'gloobeam', action: 'create_post' })) as { fields: { name: string }[], required_fields: string[] };
 
@@ -62,7 +62,7 @@ test('find_integration includes meta fields with their target', async () => {
     actions: { create_post: { enabled: true, fields: { title: { type: 'string', required: true } } } },
     meta: { target: 'acf', fields: { custom_author: { type: 'string', required: true, description: 'Byline' } } },
   });
-  const tool = new FindIntegrationTool(engine, new Logger());
+  const tool = new FindIntegrationTool(engine);
 
   const result = (await tool.call({ integration: 'gloobeam', action: 'create_post' })) as { fields: { name: string, meta?: string }[], required_fields: string[] };
 
@@ -72,7 +72,7 @@ test('find_integration includes meta fields with their target', async () => {
 
 test('find_integration errors for an unknown integration', async () => {
   const engine = mockEngine();
-  const tool = new FindIntegrationTool(engine, new Logger());
+  const tool = new FindIntegrationTool(engine);
 
   const result = await tool.call({ integration: 'nope', action: 'create_post' });
 
@@ -81,7 +81,7 @@ test('find_integration errors for an unknown integration', async () => {
 
 test('find_integration errors for an unknown action', async () => {
   const engine = mockEngine();
-  const tool = new FindIntegrationTool(engine, new Logger());
+  const tool = new FindIntegrationTool(engine);
 
   const result = await tool.call({ integration: 'gloobeam', action: 'explode' });
 

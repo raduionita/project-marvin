@@ -48,12 +48,13 @@ let defaultOutput: LogOutput = (level, args) => {
 };
 
 // swap the default sink for every Logger (existing and future instances),
-// like setLoggerMode does for prefix/stripTags. returns the previous sink so
-// callers can save and restore it.
-export function setDefaultOutput(output: LogOutput): LogOutput {
+// like setLoggerMode does for prefix/stripTags. returns a no-arg `restore`
+// thunk that puts the previous sink back, so tests + the daemon capture lines
+// without leaking the swap to other tests.
+export function setDefaultOutput(output: LogOutput): () => void {
   const prev = defaultOutput;
   defaultOutput = output;
-  return prev;
+  return () => { defaultOutput = prev; };
 }
 
 // would a message at `level` be emitted when the logger is at `current`?

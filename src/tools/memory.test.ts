@@ -10,13 +10,13 @@ import { safeJoin } from '../helpers.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = home;
   return { engine, home };
 }
 
 function mockAgent(engine: Engine): Agent {
-  return new Agent(engine, new Logger(), { id: 'test-agent' });
+  return new Agent(engine, { id: 'test-agent' });
 }
 
 function cleanup(home: string) {
@@ -25,7 +25,7 @@ function cleanup(home: string) {
 
 test('memory tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   expect(tool.meta.function.name).toBe('memory');
   expect(tool.meta.function.parameters.required).toContain('operation');
   cleanup(engine.work);
@@ -33,7 +33,7 @@ test('memory tool metadata', () => {
 
 test('memory remembers and recalls a note', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const saved = await tool.call({ operation: 'remember', key: 'user-preferences', content: 'Prefers concise answers' }, agent);
@@ -46,7 +46,7 @@ test('memory remembers and recalls a note', async () => {
 
 test('memory stores notes as files under ~/.marvin/memories/<agent-id>', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   await tool.call({ operation: 'remember', key: 'facts', content: 'Earth is round' }, agent);
@@ -57,9 +57,9 @@ test('memory stores notes as files under ~/.marvin/memories/<agent-id>', async (
 
 test('memory scopes notes to the calling agent', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
-  const alice = new Agent(engine, new Logger(), { id: 'alice' });
-  const bob = new Agent(engine, new Logger(), { id: 'bob' });
+  const tool = new MemoryTool(engine);
+  const alice = new Agent(engine, { id: 'alice' });
+  const bob = new Agent(engine, { id: 'bob' });
 
   await tool.call({ operation: 'remember', key: 'facts', content: 'alice note' }, alice);
 
@@ -76,7 +76,7 @@ test('memory scopes notes to the calling agent', async () => {
 
 test('memory sanitizes keys into safe file names', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const saved = await tool.call({ operation: 'remember', key: '../escape', content: 'nope' }, agent);
@@ -90,7 +90,7 @@ test('memory sanitizes keys into safe file names', async () => {
 
 test('memory recall returns an error for a missing note', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({ operation: 'recall', key: 'missing' }, agent);
@@ -101,7 +101,7 @@ test('memory recall returns an error for a missing note', async () => {
 
 test('memory forget deletes a note', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
   await tool.call({ operation: 'remember', key: 'temp', content: 'x' }, agent);
 
@@ -114,7 +114,7 @@ test('memory forget deletes a note', async () => {
 
 test('memory forget returns an error for a missing note', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({ operation: 'forget', key: 'missing' }, agent);
@@ -125,7 +125,7 @@ test('memory forget returns an error for a missing note', async () => {
 
 test('memory list shows all notes with previews', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
   await tool.call({ operation: 'remember', key: 'alpha', content: 'First note' }, agent);
   await tool.call({ operation: 'remember', key: 'beta', content: 'Second note' }, agent);
@@ -141,7 +141,7 @@ test('memory list shows all notes with previews', async () => {
 
 test('memory list returns an empty array when no notes exist', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({ operation: 'list' }, agent);
@@ -152,7 +152,7 @@ test('memory list returns an empty array when no notes exist', async () => {
 
 test('memory without an agent context falls back to the orchestrator', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
 
   await tool.call({ operation: 'remember', key: 'facts', content: 'orchestrator note' });
 
@@ -162,7 +162,7 @@ test('memory without an agent context falls back to the orchestrator', async () 
 
 test('memory returns an error when no operation is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({} as { operation: string }, agent);
@@ -173,7 +173,7 @@ test('memory returns an error when no operation is provided', async () => {
 
 test('memory returns an error for an unknown operation', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({ operation: 'bogus' }, agent);
@@ -184,7 +184,7 @@ test('memory returns an error for an unknown operation', async () => {
 
 test('memory remember requires a key', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({ operation: 'remember', content: 'x' }, agent);
@@ -195,7 +195,7 @@ test('memory remember requires a key', async () => {
 
 test('memory remember requires content', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({ operation: 'remember', key: 'x' }, agent);
@@ -206,7 +206,7 @@ test('memory remember requires content', async () => {
 
 test('memory recall requires a key', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
 
   const result = await tool.call({ operation: 'recall' }, agent);
@@ -217,7 +217,7 @@ test('memory recall requires a key', async () => {
 
 test('memory overwrites an existing note on remember', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
   await tool.call({ operation: 'remember', key: 'facts', content: 'old' }, agent);
 
@@ -230,7 +230,7 @@ test('memory overwrites an existing note on remember', async () => {
 
 test('memory ignores existing files outside the memory dir', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MemoryTool(engine, new Logger());
+  const tool = new MemoryTool(engine);
   const agent = mockAgent(engine);
   writeFileSync(join(home, 'notes.md'), 'not memory');
 

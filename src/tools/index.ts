@@ -55,5 +55,5 @@ export async function loadTool(engine: Engine, name: string): Promise<Tool> {
   if (!Class || !(Class.prototype instanceof Tool)) {
     throw new Error(`${name} does not export a Tool class`);
   }
-  return new Class(engine, engine.logger);
+  return new Class(engine);
 }

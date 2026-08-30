@@ -4,7 +4,6 @@ import { delay, rand, readError, tryJsonParse } from '../helpers.js';
 import type BrowserSystem from '../systems/browser.js';
 import TurndownService from 'turndown';
 import Engine from '../engine.js';
-import { Logger } from '../logger.js';
 
 const SEARCH_START_TAG = "DDG.pageLayout.load('d',";
 const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
@@ -31,8 +30,8 @@ export default class WebSearchTool extends Tool {
 
   private turndown: TurndownService = new TurndownService({ headingStyle: 'atx', hr: '---', codeBlockStyle: 'fenced' });
 
-  constructor(engine: Engine, logger: Logger) {
-    super(engine, logger);
+  constructor(engine: Engine) {
+    super(engine);
     this.turndown.remove([
       'script',
       'style',

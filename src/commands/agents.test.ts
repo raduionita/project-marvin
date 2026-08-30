@@ -28,14 +28,14 @@ function mockConfig(models: Config['models'], channels: Config['channels']): Con
 }
 
 test('agents add writes IDENTITY.md and persists config', async () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     { slack: { enabled: true } },
   );
 
-  const cmd = new AgentsCommand(engine, new Logger(), []);
+  const cmd = new AgentsCommand(engine, []);
   answers = ['my-agent', '', '1', 'general', 'I am a test agent'];
   await cmd.execAdd();
 
@@ -57,7 +57,7 @@ test('agents add writes IDENTITY.md and persists config', async () => {
 });
 
 test('agents add refuses existing agent', async () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
@@ -65,7 +65,7 @@ test('agents add refuses existing agent', async () => {
   );
   engine.config.agents['my-agent'] = { enabled: true, model: 'deepseek/deepseek-chat', channels: {} };
 
-  const cmd = new AgentsCommand(engine, new Logger(), []);
+  const cmd = new AgentsCommand(engine, []);
   answers = ['my-agent'];
   await cmd.execAdd();
 
@@ -75,14 +75,14 @@ test('agents add refuses existing agent', async () => {
 });
 
 test('agents add uses default identity when blank', async () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     {},
   );
 
-  const cmd = new AgentsCommand(engine, new Logger(), []);
+  const cmd = new AgentsCommand(engine, []);
   answers = ['my-agent', '', '', ''];
   await cmd.execAdd();
 
@@ -91,14 +91,14 @@ test('agents add uses default identity when blank', async () => {
 });
 
 test('agents add picks the group from cached channel info', async () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     { slack: { enabled: true, groups: { C1: 'general', C2: 'random' } } },
   );
 
-  const cmd = new AgentsCommand(engine, new Logger(), []);
+  const cmd = new AgentsCommand(engine, []);
   answers = ['my-agent', '', '', 'C2', 'I am a test agent'];
   await cmd.execAdd();
 
@@ -110,14 +110,14 @@ test('agents add picks the group from cached channel info', async () => {
 });
 
 test('agents add falls back to manual group entry via the (type manually) choice', async () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     { slack: { enabled: true, groups: { C1: 'general' } } },
   );
 
-  const cmd = new AgentsCommand(engine, new Logger(), []);
+  const cmd = new AgentsCommand(engine, []);
   answers = ['my-agent', '', '', '__manual__', 'C9', 'I am a test agent'];
   await cmd.execAdd();
 

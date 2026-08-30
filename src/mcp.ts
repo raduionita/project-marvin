@@ -5,7 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import type Engine from './engine.js';
-import type { Logger } from './logger.js';
+import logger from './logger.js';
 import type { ToolMeta, Config } from './types.js';
 import * as constants from './constants.js';
 import { sanitizeToolName, flattenContent } from './helpers.js';
@@ -22,7 +22,10 @@ export class Mcp {
     inputSchema: { [key: string]: any };
   }> = {};
 
-  constructor(public engine: Engine, public logger: Logger, public id: string, public config: Config['mcps'][string]) {
+  // shared logger (default-exported singleton from ./logger.js)
+  public logger = logger;
+
+  constructor(public engine: Engine, public id: string, public config: Config['mcps'][string]) {
     this.logger.debug(`[Mcp.constructor]`, this.id);
   }
 
@@ -159,14 +162,14 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
   for (const id of mcps || []) {
     const client = engine.mcps[id];
     if (!client) {
-      engine.logger.warn('[loadMcpTools]', `mcp "${id}" not loaded, skipping`);
+      logger.warn('[loadMcpTools]', `mcp "${id}" not loaded, skipping`);
       continue;
     }
 
     try {
       if (!client.isLoaded) await client.load();
     } catch (err) {
-      engine.logger.warn('[loadMcpTools]', `mcp "${id}" failed to connect:`, (err as Error).message);
+      logger.warn('[loadMcpTools]', `mcp "${id}" failed to connect:`, (err as Error).message);
       continue;
     }
 
@@ -191,7 +194,7 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
 }
 
 export async function testMcp(engine: Engine, name: string, config: Config['mcps'][string]): Promise<boolean> {
-  const mcp = new Mcp(engine, engine.logger, name, config);
+  const mcp = new Mcp(engine, name, config);
   try {
     await mcp.load();
     return true;

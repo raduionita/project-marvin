@@ -7,7 +7,7 @@ import { Logger } from '../logger.js';
 import ReloadCommand from './reload.js';
 
 function buildEngine(envContent?: string): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   if (envContent !== undefined) {
     writeFileSync(join(engine.work, '.env'), envContent);
@@ -17,7 +17,7 @@ function buildEngine(envContent?: string): Engine {
 
 test('setLogLevel replaces a commented MARVIN_LOG_LEVEL line', () => {
   const engine = buildEngine('# marvin environment variables (systemd EnvironmentFile)\n# MARVIN_LOG_LEVEL=debug\n');
-  const cmd = new ReloadCommand(engine, new Logger(), []);
+  const cmd = new ReloadCommand(engine, []);
 
   cmd.setLogLevel('warn');
 
@@ -28,7 +28,7 @@ test('setLogLevel replaces a commented MARVIN_LOG_LEVEL line', () => {
 
 test('setLogLevel appends MARVIN_LOG_LEVEL when missing', () => {
   const engine = buildEngine('# just a comment\n');
-  const cmd = new ReloadCommand(engine, new Logger(), []);
+  const cmd = new ReloadCommand(engine, []);
 
   cmd.setLogLevel('debug');
 
@@ -39,7 +39,7 @@ test('setLogLevel appends MARVIN_LOG_LEVEL when missing', () => {
 
 test('setLogLevel creates the .env file when missing', () => {
   const engine = buildEngine();
-  const cmd = new ReloadCommand(engine, new Logger(), []);
+  const cmd = new ReloadCommand(engine, []);
 
   cmd.setLogLevel('info');
 

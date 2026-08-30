@@ -253,7 +253,7 @@ export default class ToolsCommand extends Command {
           continue;
         }
         // register instance of System
-        const instance = new Class(this.engine, this.logger);
+        const instance = new Class(this.engine);
         await instance.load();
         this.engine.systems[name] = instance;
         this.logger.debug('[ToolCommand.loadSystems]', `system [${name}] loaded`);

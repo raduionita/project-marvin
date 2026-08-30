@@ -3,7 +3,6 @@ import TurndownService from 'turndown';
 import { Tool, type ToolMeta } from '../types.js';
 import type BrowserSystem from '../systems/browser.js';
 import type Engine from '../engine.js';
-import { type Logger } from '../logger.js';
 import * as constants from '../constants.js';
 import { readError } from '../helpers.js';
 
@@ -29,8 +28,8 @@ export default class WebBrowseTool extends Tool {
 
   private turndown: TurndownService = new TurndownService({ headingStyle: 'atx', hr: '---', codeBlockStyle: 'fenced' });
 
-  constructor(engine: Engine, logger: Logger) {
-    super(engine, logger);
+  constructor(engine: Engine) {
+    super(engine);
     this.turndown.remove([
       'script',
       'style',

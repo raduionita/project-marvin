@@ -17,7 +17,7 @@ mock.module('@inquirer/prompts', () => promptMocks);
 import IntegrationsCommand from './integrations.js';
 
 function buildEngine(...integrations: [string, { [key: string]: any }][]): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   const config = {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
@@ -39,18 +39,19 @@ function readConfig(engine: Engine): { [key: string]: any } {
 
 test('execList lists configured integrations', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, type: 'wordpress', endpoint: 'https://example.com' }]);
-  const { logger, lines } = captureLogger();
-  const cmd = new IntegrationsCommand(engine, logger, ['list']);
+  const { lines, restore } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, ['list']);
 
   await cmd.exec();
 
   expect(lines.join('\n')).toContain('gloobeam');
   expect(lines.join('\n')).toContain('wordpress');
+  restore();
 });
 
 test('execDrop removes an integration and persists to marvin.json', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, type: 'wordpress', endpoint: 'https://example.com' }]);
-  const cmd = new IntegrationsCommand(engine, new Logger(), ['drop', 'gloobeam']);
+  const cmd = new IntegrationsCommand(engine, ['drop', 'gloobeam']);
 
   await cmd.exec();
 
@@ -63,7 +64,7 @@ test('execDrop prompts via rawList when no <name> arg is given', async () => {
     ['gloobeam', { enabled: true, type: 'wordpress' }],
     ['hubspot', { enabled: true, type: 'wordpress' }],
   );
-  const cmd = new IntegrationsCommand(engine, new Logger(), ['drop']);
+  const cmd = new IntegrationsCommand(engine, ['drop']);
 
   // 3 choices (gloobeam, hubspot, cancel) -> pick "1"=gloobeam
   answers = ['1'];
@@ -76,8 +77,8 @@ test('execDrop prompts via rawList when no <name> arg is given', async () => {
 
 test('execDrop bails when the user picks "cancel" from rawList', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, type: 'wordpress' }]);
-  const { logger, lines } = captureLogger();
-  const cmd = new IntegrationsCommand(engine, logger, ['drop']);
+  const { lines, restore } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, ['drop']);
 
   // 2 choices (gloobeam, cancel) -> pick "2"=cancel
   answers = ['2'];
@@ -86,17 +87,19 @@ test('execDrop bails when the user picks "cancel" from rawList', async () => {
 
   expect(lines.join('\n')).toContain('no integration selected');
   expect(readConfig(engine).integrations['gloobeam']).toBeDefined();
+  restore();
 });
 
 test('execDrop warns for unknown integration', async () => {
   const engine = buildEngine();
-  const { logger, lines } = captureLogger();
-  const cmd = new IntegrationsCommand(engine, logger, ['drop', 'nope']);
+  const { lines, restore } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, ['drop', 'nope']);
 
   await cmd.exec();
 
   expect(lines.join('\n')).toContain('not found');
   expect(readConfig(engine).integrations).toEqual({});
+  restore();
 });
 
 // --- discovery-driven add wizard ---
@@ -128,8 +131,8 @@ function mockWordpressDiscovery() {
 test('execAdd configures an integration via the discovery wizard', async () => {
   mockWordpressDiscovery();
   const engine = buildEngine();
-  const { logger, lines } = captureLogger();
-  const cmd = new IntegrationsCommand(engine, logger, ['add']);
+  const { lines, restore } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, ['add']);
 
   // scripted answers: name -> type ("1"=wordpress) -> endpoint -> user ->
   // appPassword -> action ("1"=list_posts) -> fields ("1,2") -> required
@@ -148,12 +151,13 @@ test('execAdd configures an integration via the discovery wizard', async () => {
   expect(integration.actions.list_posts).toBeDefined();
   expect(integration.actions.list_posts.fields.title).toBeDefined();
   expect(lines.join('\n')).toContain('configured');
+  restore();
 });
 
 test('execAdd registers meta fields from the wizard', async () => {
   mockWordpressDiscovery();
   const engine = buildEngine();
-  const cmd = new IntegrationsCommand(engine, new Logger(), ['add', 'gloobeam', 'wordpress']);
+  const cmd = new IntegrationsCommand(engine, ['add', 'gloobeam', 'wordpress']);
 
   // name+type given via args: endpoint -> user -> appPassword -> action ("1")
   // -> field select ("1,2") -> required (blank) -> finish -> meta name
@@ -170,8 +174,8 @@ test('execAdd registers meta fields from the wizard', async () => {
 test('execInfo previews the discovered config without persisting', async () => {
   mockWordpressDiscovery();
   const engine = buildEngine(['gloobeam', { enabled: true, type: 'wordpress', endpoint: 'https://gloobeam.com' }]);
-  const { logger, lines } = captureLogger();
-  const cmd = new IntegrationsCommand(engine, logger, ['info', 'gloobeam']);
+  const { lines, restore } = captureLogger();
+  const cmd = new IntegrationsCommand(engine, ['info', 'gloobeam']);
 
   await cmd.exec();
 
@@ -182,6 +186,7 @@ test('execInfo previews the discovered config without persisting', async () => {
   expect(out).toContain('not persisted');
   // nothing written to marvin.json beyond the original config
   expect(readConfig(engine).integrations['gloobeam'].actions).toBeUndefined();
+  restore();
 });
 
 test('execAdd links the integration to selected tasks', async () => {
@@ -191,7 +196,7 @@ test('execAdd links the integration to selected tasks', async () => {
     post: { enabled: true, agent: 'journalist', schedule: 3600, maxSteps: 5 },
     digest: { enabled: true, agent: 'journalist', schedule: 60, maxSteps: 5 },
   } as Config['tasks'];
-  const cmd = new IntegrationsCommand(engine, new Logger(), ['add', 'gloobeam', 'wordpress']);
+  const cmd = new IntegrationsCommand(engine, ['add', 'gloobeam', 'wordpress']);
 
   // name+type via args: endpoint -> user -> appPassword -> action ("1") ->
   // fields ("1,2") -> required (blank) -> finish -> meta blank -> task ("1"=post)
@@ -236,7 +241,7 @@ test('execAdd lists nested sub-fields with dotted paths in the required prompt',
   }) as typeof fetch;
 
   const engine = buildEngine();
-  const cmd = new IntegrationsCommand(engine, new Logger(), ['add']);
+  const cmd = new IntegrationsCommand(engine, ['add']);
 
   // name -> type ("1"=wordpress) -> endpoint -> user -> appPassword ->
   // action ("1"=list_posts) -> fields ("1,2"=slug,meta) -> required (blank =

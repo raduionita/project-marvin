@@ -16,7 +16,7 @@ mock.module('@inquirer/prompts', () => promptMocks);
 import ToolsCommand from './tools.js';
 
 function mockEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = join(tmpdir(), 'marvin-tools-cmd-' + Date.now() + Math.random().toString(36).slice(2, 8));
   mkdirSync(join(engine.work, 'skills'), { recursive: true });
   mkdirSync(join(engine.work, 'tools'), { recursive: true });
@@ -56,7 +56,7 @@ function mockEngine(): Engine {
   engine.loadTools = async () => {};
 
   // stub agent whose sendChat is scripted per-test
-  const agent = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
   agent.sendChat = async () => ({ content: '', steps: 0 });
   engine.agents['marvin'] = agent;
   return engine;
@@ -64,7 +64,7 @@ function mockEngine(): Engine {
 
 test('tools add writes a custom tool to ~/.marvin/tools', async () => {
   const engine = mockEngine();
-  const cmd = new ToolsCommand(engine, new Logger(), ['add', 'my_tool', 'does something']);
+  const cmd = new ToolsCommand(engine, ['add', 'my_tool', 'does something']);
   answers = [];
 
   // stub the LLM call to return generated tool source
@@ -79,7 +79,7 @@ test('tools add writes a custom tool to ~/.marvin/tools', async () => {
 
 test('tools add prompts for tool name and description when missing', async () => {
   const engine = mockEngine();
-  const cmd = new ToolsCommand(engine, new Logger(), []);
+  const cmd = new ToolsCommand(engine, []);
   answers = ['prompted_tool', 'prompted purpose'];
   engine.agents['marvin']!.sendChat = async () => ({ content: 'export default class PromptedTool extends Tool {}', steps: 1 });
 
@@ -91,18 +91,19 @@ test('tools add prompts for tool name and description when missing', async () =>
 test('tools add refuses an existing tool', async () => {
   const engine = mockEngine();
   writeFileSync(join(engine.work, 'tools', 'existing.ts'), '# Existing\n\nAlready here.');
-  const { logger, lines } = captureLogger();
-  const cmd = new ToolsCommand(engine, logger, ['add', 'existing', 'desc']);
+  const { lines, restore } = captureLogger();
+  const cmd = new ToolsCommand(engine, ['add', 'existing', 'desc']);
   answers = [];
 
   await cmd.execAdd();
 
   expect(lines.join('\n')).toContain('already exists');
+  restore();
 });
 
 test('tools add replaces the MARVIN_ROOT placeholder in generated code', async () => {
   const engine = mockEngine();
-  const cmd = new ToolsCommand(engine, new Logger(), ['add', 'rooted_tool', 'desc']);
+  const cmd = new ToolsCommand(engine, ['add', 'rooted_tool', 'desc']);
   answers = [];
   engine.agents['marvin']!.sendChat = async () => ({ content: "import { Tool } from '{MARVIN_ROOT}/src/types.js';\nexport default class RootedTool extends Tool {}", steps: 1 });
 
@@ -118,7 +119,7 @@ test('tools edit rewrites an existing custom tool', async () => {
   const tpath = join(engine.work, 'tools', 'my_tool.ts');
   writeFileSync(tpath, "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = false }");
 
-  const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'add a ping parameter']);
+  const cmd = new ToolsCommand(engine, ['edit', 'my_tool', 'add a ping parameter']);
   answers = [];
   engine.agents['marvin']!.sendChat = async () => ({ content: "import { Tool } from 'x';\nexport default class MyTool extends Tool { pong = true }", steps: 1 });
 
@@ -132,7 +133,7 @@ test('tools edit sends the current tool code to the LLM', async () => {
   const tpath = join(engine.work, 'tools', 'my_tool.ts');
   writeFileSync(tpath, 'export default class MyTool extends Tool { original = true }');
 
-  const cmd = new ToolsCommand(engine, new Logger(), ['edit', 'my_tool', 'make it better']);
+  const cmd = new ToolsCommand(engine, ['edit', 'my_tool', 'make it better']);
   answers = [];
   let prompt = '';
   engine.agents['marvin']!.sendChat = async (_chatId: any, p: string) => { prompt = p; return { content: 'updated', steps: 1 }; };
@@ -145,11 +146,12 @@ test('tools edit sends the current tool code to the LLM', async () => {
 
 test('tools edit errors when the tool does not exist', async () => {
   const engine = mockEngine();
-  const { logger, lines } = captureLogger();
-  const cmd = new ToolsCommand(engine, logger, ['edit', 'nope', 'change']);
+  const { lines, restore } = captureLogger();
+  const cmd = new ToolsCommand(engine, ['edit', 'nope', 'change']);
   answers = [];
 
   await cmd.execEdit();
 
   expect(lines.join('\n')).toContain('not found');
+  restore();
 });

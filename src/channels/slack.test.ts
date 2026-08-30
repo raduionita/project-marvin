@@ -1,7 +1,6 @@
 import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import Engine from '../engine.js';
-import { Logger } from '../logger.js';
 import { captureLogger } from '../tests.js';
 import { Config, Message, Model, Chat, Reply } from '../types.js';
 import { Agent } from '../agent.js';
@@ -95,8 +94,8 @@ class MockSlackChannel extends SlackChannel {
   public mockSok: MockSocketModeClient;
   public mockWeb: MockWebClient;
 
-  constructor(engine: Engine, logger?: Logger) {
-    super(engine, logger);
+  constructor(engine: Engine) {
+    super(engine);
     this.mockSok = new MockSocketModeClient();
     this.mockWeb = new MockWebClient();
   }
@@ -156,7 +155,7 @@ class MockModel extends Model {
   private replies: Reply[];
 
   constructor(engine: Engine, replies: Reply[] = []) {
-    super(engine, new Logger(), {});
+    super(engine, {});
     this.replies = replies;
   }
 
@@ -207,9 +206,9 @@ function mockConfig(options: {
 }
 
 function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine: Engine; model: MockModel; channel: MockSlackChannel } {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'exec';
-  engine.tools['get_date'] = new GetDateTool(engine, new Logger());
+  engine.tools['get_date'] = new GetDateTool(engine);
 
   engine.config = mockConfig({
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xoxb-test' } },
@@ -220,7 +219,7 @@ function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine
   model.fail = !!opts.fail;
   engine.models['mock.model'] = model;
 
-  engine.agents['marvin'] = new Agent(engine, new Logger(), {
+  engine.agents['marvin'] = new Agent(engine, {
     id: 'marvin',
     enabled: true,
     identity: 'You are Marvin.',
@@ -232,13 +231,13 @@ function buildEngine(opts: { replies?: Reply[]; fail?: boolean } = {}): { engine
   return { engine, model, channel };
 }
 
-// build a channel wired to the mock Slack SDK clients with an injected logger
-function buildChannel(logger: Logger = new Logger()): MockSlackChannel {
-  const engine = new Engine(new Logger());
+// build a channel wired to the mock Slack SDK clients
+function buildChannel(): MockSlackChannel {
+  const engine = new Engine();
   engine.config = mockConfig({
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xoxb-test' } },
   });
-  const channel = new MockSlackChannel(engine, logger);
+  const channel = new MockSlackChannel(engine);
   return channel;
 }
 
@@ -307,37 +306,37 @@ test('extractText preserves links and formatting', () => {
 // ============================================================================
 
 test('findAgent returns agent whose channels.slack matches the passed channel', () => {
-  const engine = new Engine(new Logger());
-  engine.agents['agent-1'] = new Agent(engine, new Logger(), { id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, model: {} as never });
-  engine.agents['agent-2'] = new Agent(engine, new Logger(), { id: 'agent-2', enabled: true, identity: '', channels: { slack: 'C456' }, model: {} as never });
+  const engine = new Engine();
+  engine.agents['agent-1'] = new Agent(engine, { id: 'agent-1', enabled: true, identity: '', channels: { slack: 'C123' }, model: {} as never });
+  engine.agents['agent-2'] = new Agent(engine, { id: 'agent-2', enabled: true, identity: '', channels: { slack: 'C456' }, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent('C123')!.id).toBe('agent-1');
 });
 
 test('findAgent returns default agent when no channel is passed', () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.config = mockConfig();
-  engine.agents['marvin'] = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
+  engine.agents['marvin'] = new Agent(engine, { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent()!.id).toBe('marvin');
 });
 
 test('findAgent skips disabled agents', () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.config = mockConfig();
-  engine.agents['disabled-agent'] = new Agent(engine, new Logger(), { id: 'disabled-agent', enabled: false, identity: '', channels: { slack: 'C999' }, model: {} as never });
-  engine.agents['active-agent'] = new Agent(engine, new Logger(), { id: 'active-agent', enabled: true, identity: '', channels: { slack: 'C789' }, model: {} as never });
+  engine.agents['disabled-agent'] = new Agent(engine, { id: 'disabled-agent', enabled: false, identity: '', channels: { slack: 'C999' }, model: {} as never });
+  engine.agents['active-agent'] = new Agent(engine, { id: 'active-agent', enabled: true, identity: '', channels: { slack: 'C789' }, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent('C789')!.id).toBe('active-agent');
 });
 
 test('findAgent falls back to the default agent when no channel matches', () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.config = mockConfig();
-  engine.agents['marvin'] = new Agent(engine, new Logger(), { id: 'marvin', enabled: true, identity: '', channels: { slack: 'CDEFAULT' }, model: {} as never });
+  engine.agents['marvin'] = new Agent(engine, { id: 'marvin', enabled: true, identity: '', channels: { slack: 'CDEFAULT' }, model: {} as never });
 
   const channel = new MockSlackChannel(engine);
   expect(channel.findAgent('CUNKNOWN')!.id).toBe('marvin');
@@ -699,7 +698,7 @@ test('E2E: empty AI content posts the (no response) placeholder', async () => {
 });
 
 test('E2E: missing agent does not crash', async () => {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'exec';
   engine.config = mockConfig({
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xoxb-test' } },
@@ -840,43 +839,47 @@ test('onSlashCommand does not expose blocked commands', async () => {
 });
 
 test('onError logs error to its logger', async () => {
-  const { logger, lines } = captureLogger();
-  const channel = buildChannel(logger);
+  const { lines, restore } = captureLogger();
+  const channel = buildChannel();
   await channel.load();
 
   await channel.onError(new Error('test error'));
 
   expect(lines.length).toBe(1);
   expect(lines[0]).toContain('test error');
+  restore();
 });
 
 test('onConnected logs connected message', async () => {
-  const { logger, lines } = captureLogger();
-  const channel = buildChannel(logger);
+  const { lines, restore } = captureLogger();
+  const channel = buildChannel();
   await channel.load();
 
   await channel.onConnected();
 
   expect(lines[0]).toContain('connected');
+  restore();
 });
 
 test('onReconnecting logs warning with attempt number', async () => {
-  const { logger, lines } = captureLogger();
-  const channel = buildChannel(logger);
+  const { lines, restore } = captureLogger();
+  const channel = buildChannel();
   await channel.load();
 
   await channel.onReconnecting(3);
 
   expect(lines[0]).toContain('reconnecting');
   expect(lines[0]).toContain('3');
+  restore();
 });
 
 test('onDisconnected logs warning with error', async () => {
-  const { logger, lines } = captureLogger();
-  const channel = buildChannel(logger);
+  const { lines, restore } = captureLogger();
+  const channel = buildChannel();
   await channel.load();
 
   await channel.onDisconnected(new Error('network error'));
 
   expect(lines[0]).toContain('disconnected');
+  restore();
 });

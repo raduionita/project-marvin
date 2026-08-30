@@ -31,7 +31,7 @@ export async function loadSystem(engine: Engine, name: string): Promise<System> 
     if (!Class || !(Class.prototype instanceof System)) {
       throw new Error(`"${name}" does not export a System class`);
     }
-    return new Class(engine, engine.logger);
+    return new Class(engine);
   } catch (err) {
     throw new Error(`failed to load system "${name}"`, { cause: err });
   }

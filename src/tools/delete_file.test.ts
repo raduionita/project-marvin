@@ -10,7 +10,7 @@ import MoveFileTool from './move_file.js';
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
   mkdirSync(join(home, 'files'), { recursive: true });
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = home;
   return { engine, home };
 }
@@ -21,7 +21,7 @@ function cleanup(home: string) {
 
 test('deleteFile tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new DeleteFileTool(engine, new Logger());
+  const tool = new DeleteFileTool(engine);
   expect(tool.meta.function.name).toBe('delete_file');
   expect(tool.meta.function.parameters.required).toContain('path');
   cleanup(engine.work);
@@ -29,7 +29,7 @@ test('deleteFile tool metadata', () => {
 
 test('deleteFile deletes a file inside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new DeleteFileTool(engine, new Logger());
+  const tool = new DeleteFileTool(engine);
   writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt' });
@@ -41,7 +41,7 @@ test('deleteFile deletes a file inside the workspace', async () => {
 
 test('deleteFile rejects absolute paths outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new DeleteFileTool(engine, new Logger());
+  const tool = new DeleteFileTool(engine);
 
   const result = await tool.call({ path: '/etc/hosts' });
 
@@ -52,7 +52,7 @@ test('deleteFile rejects absolute paths outside the workspace', async () => {
 
 test('deleteFile rejects paths that escape via ..', async () => {
   const { engine, home } = mockEngine();
-  const tool = new DeleteFileTool(engine, new Logger());
+  const tool = new DeleteFileTool(engine);
 
   const result = await tool.call({ path: join(home, '..', 'escaped.txt') });
 
@@ -63,7 +63,7 @@ test('deleteFile rejects paths that escape via ..', async () => {
 
 test('deleteFile returns an error when no path is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new DeleteFileTool(engine, new Logger());
+  const tool = new DeleteFileTool(engine);
 
   const result = await tool.call({ path: '' });
 
@@ -73,7 +73,7 @@ test('deleteFile returns an error when no path is provided', async () => {
 
 test('deleteFile returns an error for a missing file', async () => {
   const { engine, home } = mockEngine();
-  const tool = new DeleteFileTool(engine, new Logger());
+  const tool = new DeleteFileTool(engine);
 
   const result = await tool.call({ path: 'does-not-exist.txt' });
 
@@ -83,7 +83,7 @@ test('deleteFile returns an error for a missing file', async () => {
 
 test('moveFile tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new MoveFileTool(engine, new Logger());
+  const tool = new MoveFileTool(engine);
   expect(tool.meta.function.name).toBe('move_file');
   expect(tool.meta.function.parameters.required).toContain('path');
   expect(tool.meta.function.parameters.required).toContain('newPath');
@@ -92,7 +92,7 @@ test('moveFile tool metadata', () => {
 
 test('moveFile renames a file inside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MoveFileTool(engine, new Logger());
+  const tool = new MoveFileTool(engine);
   writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt', newPath: 'renamed.txt' });
@@ -105,7 +105,7 @@ test('moveFile renames a file inside the workspace', async () => {
 
 test('moveFile moves a file into a subfolder', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MoveFileTool(engine, new Logger());
+  const tool = new MoveFileTool(engine);
   writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt', newPath: 'archive/notes.txt' });
@@ -117,7 +117,7 @@ test('moveFile moves a file into a subfolder', async () => {
 
 test('moveFile rejects a destination outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MoveFileTool(engine, new Logger());
+  const tool = new MoveFileTool(engine);
   writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
 
   const result = await tool.call({ path: 'notes.txt', newPath: '/etc/notes.txt' });
@@ -130,7 +130,7 @@ test('moveFile rejects a destination outside the workspace', async () => {
 
 test('moveFile rejects a source outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MoveFileTool(engine, new Logger());
+  const tool = new MoveFileTool(engine);
 
   const result = await tool.call({ path: '/etc/hosts', newPath: 'hosts.txt' });
 
@@ -141,7 +141,7 @@ test('moveFile rejects a source outside the workspace', async () => {
 
 test('moveFile returns an error when no path is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MoveFileTool(engine, new Logger());
+  const tool = new MoveFileTool(engine);
 
   const result = await tool.call({ path: '', newPath: 'x.txt' });
 
@@ -151,7 +151,7 @@ test('moveFile returns an error when no path is provided', async () => {
 
 test('moveFile returns an error when no newPath is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new MoveFileTool(engine, new Logger());
+  const tool = new MoveFileTool(engine);
 
   const result = await tool.call({ path: 'x.txt' } as { path: string; newPath: string });
 

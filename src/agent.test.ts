@@ -29,7 +29,7 @@ function mockConfig(channels: Config['channels'] = {}, models: Config['models'] 
 }
 
 function mockEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'exec';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-agent-'));
   engine.config = mockConfig();
@@ -58,7 +58,7 @@ class MockModel extends Model {
   private _reply: Reply;
 
   constructor(engine: Engine, reply: Reply) {
-    super(engine, new Logger(), {});
+    super(engine, {});
     this._reply = reply;
   }
 
@@ -147,7 +147,7 @@ function buildTestEngine(opts?: {
 
   // Install a mock agent with proper identity
   const identity = 'You are Marvin.';
-  engine.agents[agentId] = new Agent(engine, new Logger(), {
+  engine.agents[agentId] = new Agent(engine, {
     id: agentId,
     enabled: true,
     identity,
@@ -157,14 +157,14 @@ function buildTestEngine(opts?: {
 
   // Install a mock channel
   if (channelEnabled) {
-    const ch = new TestChannel(engine, new Logger());
+    const ch = new TestChannel(engine);
     engine.channels[channelName] = ch;
   }
 
   // Install a mock tool (needed if tool calls are sent)
-  engine.tools['mock_tool'] = new MockTool(engine, new Logger());
+  engine.tools['mock_tool'] = new MockTool(engine);
   // end_chat stops the AI loop via its Tool.stop flag
-  engine.tools['end_chat'] = new EndChatTool(engine, new Logger());
+  engine.tools['end_chat'] = new EndChatTool(engine);
 
   return engine;
 }
@@ -426,7 +426,7 @@ test('sendChat truncates oversized tool results', async () => {
       return { result: 'x'.repeat(constants.MAX_TOOL_RESULT_CHARS * 3) };
     }
   }
-  engine.tools['mock_tool'] = new BigTool(engine, new Logger());
+  engine.tools['mock_tool'] = new BigTool(engine);
 
   (engine.models['mock.model'] as MockModel).setReply({
     id: 'reply-big',
@@ -477,7 +477,7 @@ test('sendChat returns an error when the agent has no model', async () => {
 
   // sendChat swallows internal errors and returns an error field when the
   // agent cannot run (e.g. no model attached)
-  const agent = new Agent(engine, new Logger(), { id: 'nonexistent', enabled: true, identity: '', channels: {}, model: undefined as any });
+  const agent = new Agent(engine, { id: 'nonexistent', enabled: true, identity: '', channels: {}, model: undefined as any });
   const result = await agent.sendChat('chat-1', 'hello');
 
   expect(result.content).toBe('');
@@ -550,7 +550,7 @@ class MockIntegration extends Integration {
 
 test('execTool routes integration tools to the linked integration', async () => {
   const engine = buildTestEngine();
-  const integration = new MockIntegration(engine, new Logger(), { type: 'mock' });
+  const integration = new MockIntegration(engine, { type: 'mock' });
   engine.integrations['gloobeam'] = integration;
 
   const result = await engine.agents['marvin']!.execTool('gloobeam__create_post', { title: 'Hello' });
@@ -573,7 +573,7 @@ test('execTool returns an error for unknown integration tools', async () => {
 
 test('packChat keeps only the system message + the last N messages', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   const chat = chatWith([
     { role: 'system', content: 'sys' },
     ...Array.from({ length: 30 }, (_, i) => ({ role: 'user' as const, content: `msg-${i}` })),
@@ -588,7 +588,7 @@ test('packChat keeps only the system message + the last N messages', () => {
 
 test('packChat leaves short histories untouched', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   const chat = chatWith([
     { role: 'system', content: 'sys' },
     { role: 'user', content: 'hi' },
@@ -601,7 +601,7 @@ test('packChat leaves short histories untouched', () => {
 
 test('packChat drops oldest messages when there is no system message', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   const chat = chatWith(Array.from({ length: 30 }, (_, i) => ({ role: 'user' as const, content: `msg-${i}` })));
 
   agent.packChat(chat);
@@ -612,7 +612,7 @@ test('packChat drops oldest messages when there is no system message', () => {
 
 test('packChat drops leading tool messages orphaned by the trim', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
 
   const messages: Chat['messages'] = [
     { role: 'system', content: 'sys' },
@@ -640,7 +640,7 @@ test('packChat drops leading tool messages orphaned by the trim', () => {
 
 test('saveChat/loadChat track last use time', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   const chat = chatWith([{ role: 'user', content: 'hi' }]);
   agent.saveChat('x', chat);
 
@@ -653,13 +653,13 @@ test('saveChat/loadChat track last use time', () => {
 test('engine drop clears the agent chat cache but chats survive on disk', async () => {
   const engine = mockEngine();
   engine.state = 'load';
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   agent.saveChat('x', chatWith([{ role: 'user', content: 'hi' }]));
 
   await engine.drop();
 
   // cache is cleared (agents dropped), but the persisted copy is reloaded on demand
-  const fresh = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const fresh = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   expect(fresh.loadChat('x')).not.toBeNull();
   expect(fresh.loadChat('x')?.messages[0]).toEqual({ role: 'user', content: 'hi' });
   rmSync(engine.work, { recursive: true, force: true });
@@ -667,11 +667,11 @@ test('engine drop clears the agent chat cache but chats survive on disk', async 
 
 test('saveChat persists chats to disk and loadChat reloads them in a fresh agent', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   agent.saveChat('persist-1', chatWith([{ role: 'user', content: 'persisted' }]));
 
   // a brand new agent over the same workspace reloads the chat from disk
-  const fresh = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+  const fresh = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   const loaded = fresh.loadChat('persist-1');
 
   expect(loaded).not.toBeNull();
@@ -681,7 +681,7 @@ test('saveChat persists chats to disk and loadChat reloads them in a fresh agent
 
 test('makeChat creates a fresh chat (with system prompt) when none was saved', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { id: 'a', enabled: true, identity: 'my identity', channels: {}, model: {} as never });
+  const agent = new Agent(engine, { id: 'a', enabled: true, identity: 'my identity', channels: {}, model: {} as never });
 
   const chat = agent.loadChat('never-saved');
 
@@ -706,9 +706,9 @@ test('makeChat seeds a system prompt with an integrations block for loaded integ
     async load() {}
     async drop() {}
     async call() { return {}; }
-  }(engine, new Logger(), { type: 'wordpress', endpoint: 'https://gloobeam.com' });
+  }(engine, { type: 'wordpress', endpoint: 'https://gloobeam.com' });
 
-  const agent = new Agent(engine, new Logger(), { memory: true, identity: '' });
+  const agent = new Agent(engine, { memory: true, identity: '' });
 
   const chat = agent.loadChat('chat-1');
   const prompt = chat.messages[0]!.content as string;
@@ -722,7 +722,7 @@ test('makeChat seeds a system prompt with an integrations block for loaded integ
 test('makeChat falls back to config when integrations are not loaded', () => {
   const engine = mockEngine();
   engine.config.integrations = { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://gloobeam.com' } };
-  const agent = new Agent(engine, new Logger(), { memory: true, identity: '' });
+  const agent = new Agent(engine, { memory: true, identity: '' });
 
   const chat = agent.loadChat('chat-1');
   const prompt = chat.messages[0]!.content as string;
@@ -733,7 +733,7 @@ test('makeChat falls back to config when integrations are not loaded', () => {
 
 test('makeChat seeds only the identity when there are no integrations', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { memory: false, identity: 'my identity' });
+  const agent = new Agent(engine, { memory: false, identity: 'my identity' });
 
   expect(agent.loadChat('chat-1').messages[0]!.content).toBe('my identity');
 });
@@ -745,7 +745,7 @@ test('makeChat renders a memory block when memory notes exist', () => {
   writeFileSync(join(mem, 'prefs.md'), 'Prefers concise answers');
   writeFileSync(join(mem, 'goals.md'), 'Ship marvin 1.0');
 
-  const agent = new Agent(engine, new Logger(), { id: 'marvin', memory: true, identity: '' });
+  const agent = new Agent(engine, { id: 'marvin', memory: true, identity: '' });
 
   const chat = agent.loadChat('chat-1');
   const prompt = chat.messages[0]!.content as string;
@@ -758,7 +758,7 @@ test('makeChat renders a memory block when memory notes exist', () => {
 
 test('makeChat omits the memory block when memory is disabled', () => {
   const engine = mockEngine();
-  const agent = new Agent(engine, new Logger(), { memory: false, identity: 'my identity' });
+  const agent = new Agent(engine, { memory: false, identity: 'my identity' });
 
   expect(agent.loadChat('chat-1').messages[0]!.content).toBe('my identity');
   rmSync(engine.work, { recursive: true, force: true });
@@ -768,11 +768,11 @@ test('makeChat omits the memory block when memory is disabled', () => {
 
 // install a representative set of tools so makeChat has something to summarize
 function installSampleTools(engine: Engine) {
-  engine.tools['read_file'] = new ReadFileTool(engine, new Logger());
-  engine.tools['web_search'] = new WebSearchTool(engine, new Logger());
-  engine.tools['get_date'] = new GetDateTool(engine, new Logger());
-  engine.tools['end_chat'] = new EndChatTool(engine, new Logger());
-  engine.tools['load_tools'] = new LoadToolsTool(engine, new Logger());
+  engine.tools['read_file'] = new ReadFileTool(engine);
+  engine.tools['web_search'] = new WebSearchTool(engine);
+  engine.tools['get_date'] = new GetDateTool(engine);
+  engine.tools['end_chat'] = new EndChatTool(engine);
+  engine.tools['load_tools'] = new LoadToolsTool(engine);
 }
 
 test('makeChat seeds the system prompt with a grouped "## Available Tools" block', () => {
@@ -852,7 +852,7 @@ test('loadTools tool is always present in chat.tools even when the tool itself i
   // mirrors the real engine: load_tools is loaded from disk by Engine.loadTools
   // and makeChat picks it up via the always-known filter
   const engine = buildTestEngine();
-  engine.tools['load_tools'] = new LoadToolsTool(engine, new Logger());
+  engine.tools['load_tools'] = new LoadToolsTool(engine);
   const agent = engine.agents['marvin']!;
   rmSync(engine.work, { recursive: true, force: true });
 

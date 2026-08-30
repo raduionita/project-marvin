@@ -8,7 +8,7 @@ import GrepTool from './grep.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = realpathSync(home);
   return { engine, home };
 }
@@ -19,7 +19,7 @@ function cleanup(home: string) {
 
 test('grep tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
   expect(tool.meta.function.name).toBe('grep');
   expect(tool.meta.function.parameters.required).toContain('pattern');
   cleanup(engine.work);
@@ -27,7 +27,7 @@ test('grep tool metadata', () => {
 
 test('grep finds matches with line numbers', async () => {
   const { engine, home } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
   writeFileSync(join(home, 'notes.txt'), 'hello world\nsecond line\nhello again');
 
   const result = await tool.call({ pattern: 'hello' });
@@ -44,7 +44,7 @@ test('grep finds matches with line numbers', async () => {
 
 test('grep searches a subdirectory recursively', async () => {
   const { engine, home } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
   mkdirSync(join(home, 'agents', 'agent-1'), { recursive: true });
   writeFileSync(join(home, 'agents', 'agent-1', 'IDENTITY.md'), 'You are the assistant');
   writeFileSync(join(home, 'readme.txt'), 'no match here');
@@ -59,7 +59,7 @@ test('grep searches a subdirectory recursively', async () => {
 
 test('grep supports case-insensitive matching', async () => {
   const { engine, home } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
   writeFileSync(join(home, 'notes.txt'), 'HELLO world');
 
   const strict = await tool.call({ pattern: 'hello' });
@@ -72,7 +72,7 @@ test('grep supports case-insensitive matching', async () => {
 
 test('grep rejects an invalid pattern', async () => {
   const { engine, home } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
 
   const result = await tool.call({ pattern: '[' });
 
@@ -82,7 +82,7 @@ test('grep rejects an invalid pattern', async () => {
 
 test('grep returns an error when no pattern is provided', async () => {
   const { engine, home } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
 
   const result = await tool.call({ pattern: '' });
 
@@ -92,7 +92,7 @@ test('grep returns an error when no pattern is provided', async () => {
 
 test('grep rejects absolute paths outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
 
   const result = await tool.call({ pattern: 'x', path: '/etc' });
 
@@ -102,7 +102,7 @@ test('grep rejects absolute paths outside the workspace', async () => {
 
 test('grep rejects paths that escape via ..', async () => {
   const { engine, home } = mockEngine();
-  const tool = new GrepTool(engine, new Logger());
+  const tool = new GrepTool(engine);
 
   const result = await tool.call({ pattern: 'x', path: join(home, '..', 'etc') });
 

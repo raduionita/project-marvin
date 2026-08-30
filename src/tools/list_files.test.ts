@@ -9,7 +9,7 @@ import ListFilesTool from './list_files.js';
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
   mkdirSync(join(home, 'files'), { recursive: true });
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = home;
   return { engine, home };
 }
@@ -20,7 +20,7 @@ function cleanup(home: string) {
 
 test('listFiles tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
   expect(tool.meta.function.name).toBe('list_files');
   expect(tool.meta.function.parameters.properties.path).toBeDefined();
   cleanup(engine.work);
@@ -28,7 +28,7 @@ test('listFiles tool metadata', () => {
 
 test('listFiles lists the workspace root by default', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
   mkdirSync(join(home, 'files', 'agents'));
   writeFileSync(join(home, 'files', 'notes.txt'), 'hello');
   writeFileSync(join(home, 'files', 'marvin.json'), '{}');
@@ -47,7 +47,7 @@ test('listFiles lists the workspace root by default', async () => {
 
 test('listFiles lists a subdirectory via relative path', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
   mkdirSync(join(home, 'files', 'agents', 'agent-1'), { recursive: true });
   writeFileSync(join(home, 'files', 'agents', 'agent-1', 'IDENTITY.md'), 'id');
 
@@ -62,7 +62,7 @@ test('listFiles lists a subdirectory via relative path', async () => {
 
 test('listFiles reports file sizes', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
   writeFileSync(join(home, 'files', 'notes.txt'), 'hello world');
 
   const result = await tool.call({});
@@ -75,7 +75,7 @@ test('listFiles reports file sizes', async () => {
 
 test('listFiles filters entries by pattern', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
   writeFileSync(join(home, 'files', 'notes.txt'), 'a');
   writeFileSync(join(home, 'files', 'ideas.md'), 'b');
   writeFileSync(join(home, 'files', 'config.json'), 'c');
@@ -90,7 +90,7 @@ test('listFiles filters entries by pattern', async () => {
 
 test('listFiles rejects an invalid pattern', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
 
   const result = await tool.call({ pattern: '[' });
 
@@ -100,7 +100,7 @@ test('listFiles rejects an invalid pattern', async () => {
 
 test('listFiles rejects absolute paths outside the workspace', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
 
   const result = await tool.call({ path: '/etc' });
 
@@ -110,7 +110,7 @@ test('listFiles rejects absolute paths outside the workspace', async () => {
 
 test('listFiles rejects paths that escape via ..', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
 
   const result = await tool.call({ path: join(home, '..', 'etc') });
 
@@ -120,7 +120,7 @@ test('listFiles rejects paths that escape via ..', async () => {
 
 test('listFiles returns an error for a missing directory', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ListFilesTool(engine, new Logger());
+  const tool = new ListFilesTool(engine);
 
   const result = await tool.call({ path: 'does-not-exist' });
 

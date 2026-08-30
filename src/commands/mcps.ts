@@ -220,7 +220,7 @@ export default class McpsCommand extends Command {
       return;
     }
 
-    const client = new Mcp(this.engine, this.logger, pname, config);
+    const client = new Mcp(this.engine, pname, config);
     try {
       await client.load();
 

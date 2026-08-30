@@ -4,7 +4,7 @@ import { Channel, Command, Message, ChannelMeta } from '../types.js';
 import { Agent } from '../agent.js';
 import type Engine from '../engine.js';
 import { listCommands } from '../commands/index.js';
-import { Logger } from '../logger.js';
+import { setDefaultOutput } from '../logger.js';
 import * as constants from '../constants.js';
 
 // commands that mutate/restart the daemon itself (or serve it) and are
@@ -45,10 +45,10 @@ export default class SlackChannel extends Channel {
     },
   }
 
-  // slack uses its own logger, not the shared one passed down from the engine.
-  // a logger can be injected for tests (captures output instead of the console).
-  constructor(engine: Engine, logger: Logger = new Logger()) {
-    super(engine, logger);
+  // slack uses the shared default logger from ./logger.js; per-command capture is
+// built inline in `runCommand` (a fresh `new Logger({...})` with its own sink).
+  constructor(engine: Engine) {
+    super(engine);
   }
 
   protected socketClient!: ISocketModeClient;
@@ -380,9 +380,9 @@ export default class SlackChannel extends Channel {
     this.logger.warn('[SlackChannel.onDisconnected]', 'disconnected!', error);
   }
 
-  // dynamically load a command class (mirrors marvin.ts execCommand), execute it
-  // capturing its logger output, then drop it. each command gets its own logger
-  // with an output override, so nothing is written to the global console
+// dynamically load a command class (mirrors marvin.ts execCommand), execute it
+// capturing its logger output, then drop it. swaps the shared default output
+// for the duration of the command so nothing leaks to the global console
   protected async runCommand(name: string, args: string[]): Promise<string> {
     const Module = await import(`../commands/${name}.ts`);
     const Class = Module.default;
@@ -391,20 +391,18 @@ export default class SlackChannel extends Channel {
     }
 
     const lines: string[] = [];
-    const capture = new Logger({
-      // skip debug chatter, keep everything that would reach the user
-      output: (level, line) => {
-        if (level !== 'debug') {
-          lines.push(line.map(String).join(' '));
-        }
-      },
+    // skip debug chatter, keep everything that would reach the user
+    const restore = setDefaultOutput((level, line) => {
+      if (level === 'debug') return;
+      lines.push(line.map(String).join(' '));
     });
 
-    const command = new Class(this.engine, capture, args);
+    const command = new Class(this.engine, args);
     try {
       await command.exec();
     } finally {
       await command.drop();
+      restore();
     }
 
     return lines.join('\n');

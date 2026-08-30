@@ -10,7 +10,7 @@ function mockEngine(config: object): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
   mkdirSync(home, { recursive: true });
   writeFileSync(join(home, 'marvin.json'), JSON.stringify(config, null, 2));
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = home;
   return { engine, home };
 }
@@ -28,13 +28,13 @@ const sample = {
 
 test('marvinConfig tool metadata', () => {
   const { engine } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
   expect(tool.meta.function.name).toBe('marvin_config');
 });
 
 test('marvinConfig reads the whole config', async () => {
   const { engine, home } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   const result: { [key: string]: any } = await tool.call({});
 
@@ -46,7 +46,7 @@ test('marvinConfig reads the whole config', async () => {
 
 test('marvinConfig reads a dotted key', async () => {
   const { engine, home } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   const result = await tool.call({ key: 'models.llm.model' });
   expect(result.value).toBe('deepseek-chat');
@@ -58,7 +58,7 @@ test('marvinConfig reads a dotted key', async () => {
 
 test('marvinConfig sets a string value', async () => {
   const { engine, home } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   const result = await tool.call({ operation: 'set', key: 'settings.name', value: 'hitchhiker' });
 
@@ -70,7 +70,7 @@ test('marvinConfig sets a string value', async () => {
 
 test('marvinConfig sets a JSON value', async () => {
   const { engine, home } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   await tool.call({ operation: 'set', key: 'settings.port', value: '9000' });
   expect(JSON.parse(readFileSync(join(home, 'marvin.json'), 'utf-8')).settings.port).toBe(9000);
@@ -79,7 +79,7 @@ test('marvinConfig sets a JSON value', async () => {
 
 test('marvinConfig creates nested keys on set', async () => {
   const { engine, home } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   const result = await tool.call({ operation: 'set', key: 'agents.monitor.enabled', value: 'true' });
 
@@ -91,7 +91,7 @@ test('marvinConfig creates nested keys on set', async () => {
 
 test('marvinConfig requires a key for set', async () => {
   const { engine, home } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   const result = await tool.call({ operation: 'set', value: 'x' });
   expect(result.ok).toBeUndefined();
@@ -101,7 +101,7 @@ test('marvinConfig requires a key for set', async () => {
 
 test('marvinConfig rejects an invalid key', async () => {
   const { engine, home } = mockEngine(sample);
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   const result = await tool.call({ operation: 'set', key: 'settings.', value: 'x' });
   expect(result.ok).toBeUndefined();
@@ -112,7 +112,7 @@ test('marvinConfig rejects an invalid key', async () => {
 test('marvinConfig reports an error when marvin.json is missing', async () => {
   const { engine, home } = mockEngine(sample);
   rmSync(join(home, 'marvin.json'));
-  const tool = new MarvinConfigTool(engine, new Logger());
+  const tool = new MarvinConfigTool(engine);
 
   const result = await tool.call({});
   expect(result.config).toBeUndefined();

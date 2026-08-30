@@ -8,7 +8,7 @@ import ReadLogsTool from './read_logs.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = home;
   return { engine, home };
 }
@@ -27,14 +27,14 @@ function mockLog(home: string, lines: string[]): string {
 
 test('readLogs tool metadata', () => {
   const { engine } = mockEngine();
-  const tool = new ReadLogsTool(engine, new Logger());
+  const tool = new ReadLogsTool(engine);
   expect(tool.meta.function.name).toBe('read_logs');
   cleanup(engine.work);
 });
 
 test('readLogs returns the last 20 lines by default', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadLogsTool(engine, new Logger());
+  const tool = new ReadLogsTool(engine);
   const lines = Array.from({ length: 30 }, (_, i) => `line-${i}`);
   const path = mockLog(home, lines);
 
@@ -51,7 +51,7 @@ test('readLogs returns the last 20 lines by default', async () => {
 
 test('readLogs returns all lines when the log is shorter than the default', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadLogsTool(engine, new Logger());
+  const tool = new ReadLogsTool(engine);
   mockLog(home, ['a', 'b', 'c']);
 
   const result = await tool.call({});
@@ -63,7 +63,7 @@ test('readLogs returns all lines when the log is shorter than the default', asyn
 
 test('readLogs honors a custom line count', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadLogsTool(engine, new Logger());
+  const tool = new ReadLogsTool(engine);
   mockLog(home, Array.from({ length: 50 }, (_, i) => `line-${i}`));
 
   const result = await tool.call({ lines: 5 });
@@ -75,7 +75,7 @@ test('readLogs honors a custom line count', async () => {
 
 test('readLogs caps the requested lines at 200', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadLogsTool(engine, new Logger());
+  const tool = new ReadLogsTool(engine);
   mockLog(home, Array.from({ length: 300 }, (_, i) => `line-${i}`));
 
   const result = await tool.call({ lines: 500 });
@@ -86,7 +86,7 @@ test('readLogs caps the requested lines at 200', async () => {
 
 test('readLogs returns an error when the log file does not exist', async () => {
   const { engine, home } = mockEngine();
-  const tool = new ReadLogsTool(engine, new Logger());
+  const tool = new ReadLogsTool(engine);
 
   const result = await tool.call({});
 

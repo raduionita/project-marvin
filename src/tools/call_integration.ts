@@ -1,5 +1,4 @@
 import type Engine from '../engine.js';
-import type { Logger } from '../logger.js';
 import { Tool, ToolMeta } from '../types.js';
 
 export default class CallIntegrationTool extends Tool {
@@ -8,8 +7,8 @@ export default class CallIntegrationTool extends Tool {
   // once the integration instances are loaded (see Engine.loadIntegrations).
   public meta: ToolMeta;
 
-  constructor(engine: Engine, logger: Logger) {
-    super(engine, logger);
+  constructor(engine: Engine) {
+    super(engine);
     this.meta = this.buildMeta();
   }
 

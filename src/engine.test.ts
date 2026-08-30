@@ -9,7 +9,7 @@ import { Agent } from './agent.js';
 import * as constants from './constants.js';
 
 function buildEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'load';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-engine-'));
   engine.config = {
@@ -31,7 +31,7 @@ function chatWith(messages: Chat['messages']): Chat {
 test('execSweep removes chats idle longer than the TTL and reschedules', async () => {
   const engine = buildEngine();
   engine.state = 'exec';
-  engine.agents['marvin'] = new Agent(engine, new Logger(), {
+  engine.agents['marvin'] = new Agent(engine, {
     id: 'marvin',
     enabled: true,
     identity: '',

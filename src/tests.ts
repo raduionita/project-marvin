@@ -1,16 +1,22 @@
 import { mock } from 'bun:test';
 
-import { Logger } from './logger.js';
+import { setDefaultOutput } from './logger.js';
 
 // shared test helpers: a capturing logger and @inquirer/prompts mocks used
 // across *.test.ts files.
 
-// a logger that captures every emitted line (info-level and up), so tests can
-// assert on command output without patching console.*
-export function captureLogger(): { logger: Logger; lines: string[] } {
+// a capture sink for every Logger (existing + future). the helper returns the
+// captured lines AND a restore() function the test MUST call (typically in
+// afterEach) to put the original console sink back. uses the shared default
+// output so every Logger in the system writes here without needing to be
+// constructed with a custom sink.
+export function captureLogger(): { lines: string[]; restore: () => void } {
   const lines: string[] = [];
-  const logger = new Logger({ level: 'info', output: (_level, args) => lines.push(args.map(String).join(' ')) });
-  return { logger, lines };
+  const restore = setDefaultOutput((level, args) => {
+    if (level === 'debug') return;
+    lines.push(args.map(String).join(' '));
+  });
+  return { lines, restore };
 }
 
 // A set of mock prompt functions that consume a shared queue of scripted

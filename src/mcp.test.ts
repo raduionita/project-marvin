@@ -13,13 +13,13 @@ import { sanitizeToolName } from './helpers.js';
 const MOCK_SERVER = join(import.meta.dirname, 'mcp.mock.ts');
 
 function buildEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   return engine;
 }
 
 function buildClient(engine: Engine, env?: Record<string, string>): Mcp {
-  return new Mcp(engine, engine.logger, 'mock', {
+  return new Mcp(engine, 'mock', {
     enabled: true,
     command: process.execPath,
     args: [MOCK_SERVER],
@@ -111,7 +111,7 @@ test('callTool reconnects after drop', async () => {
 test('loadMcpTools builds metas from the server tool list', async () => {
   const engine = buildEngine();
 
-  const client = new Mcp(engine, engine.logger, 'mock', {
+  const client = new Mcp(engine, 'mock', {
     enabled: true,
     command: process.execPath,
     args: [MOCK_SERVER],

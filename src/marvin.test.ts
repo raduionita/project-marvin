@@ -203,15 +203,15 @@ function mentionEvent(overrides: { [key: string]: any } = {}): { event: any; bod
 }
 
 function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChannel; browser: FakeBrowserSystem; wpCalls: { url: string; init: any }[] } {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'exec';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-flow-'));
   engine.config = mockConfig();
 
-  const model = new FlowModel(engine, new Logger(), {});
+  const model = new FlowModel(engine, {});
   engine.models['flow.model'] = model;
 
-  engine.agents['marvin'] = new Agent(engine, new Logger(), {
+  engine.agents['marvin'] = new Agent(engine, {
     id: 'marvin',
     enabled: true,
     identity: 'You are Marvin, a helpful assistant.',
@@ -220,12 +220,12 @@ function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChan
   });
 
   // real tools
-  engine.tools['web_search'] = new WebSearchTool(engine, new Logger());
-  engine.tools['call_integration'] = new CallIntegrationTool(engine, new Logger());
-  engine.tools['find_integration'] = new FindIntegrationTool(engine, new Logger());
+  engine.tools['web_search'] = new WebSearchTool(engine);
+  engine.tools['call_integration'] = new CallIntegrationTool(engine);
+  engine.tools['find_integration'] = new FindIntegrationTool(engine);
 
   // fake browser so the real web_search tool runs end-to-end
-  const browser = new FakeBrowserSystem(engine, new Logger());
+  const browser = new FakeBrowserSystem(engine);
   engine.systems['browser'] = browser;
 
   // real wordpress integration, with fetch mocked
@@ -240,7 +240,7 @@ function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChan
     } as Response;
   }) as typeof fetch;
 
-  engine.integrations['gloobeam'] = new WordpressIntegration(engine, new Logger(), {
+  engine.integrations['gloobeam'] = new WordpressIntegration(engine, {
     type: 'wordpress',
     endpoint: 'https://wp.example.com',
     user: 'admin',

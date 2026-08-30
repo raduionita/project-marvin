@@ -27,5 +27,5 @@ export async function loadChannel(engine: Engine, channelId: string) : Promise<C
   if (!Class || !(Class.prototype instanceof Channel)) {
     return null;
   }
-  return new Class(engine, engine.logger);
+  return new Class(engine);
 }

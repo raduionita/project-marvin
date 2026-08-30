@@ -23,7 +23,7 @@ function mockConfig(channels: Config['channels'] = {}, models: Config['models'] 
 }
 
 function mockEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.state = 'exec';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-serve-'));
   return engine;
@@ -51,7 +51,7 @@ class MockModel extends Model {
   private _reply: Reply;
 
   constructor(engine: Engine, reply: Reply) {
-    super(engine, new Logger(), {});
+    super(engine, {});
     this._reply = reply;
   }
 
@@ -140,7 +140,7 @@ function buildTestEngine(opts?: {
 
   // Install a mock agent with proper identity
   const identity = 'You are Marvin.';
-  engine.agents[agentId] = new Agent(engine, new Logger(), {
+  engine.agents[agentId] = new Agent(engine, {
     id: agentId,
     enabled: true,
     identity,
@@ -150,12 +150,12 @@ function buildTestEngine(opts?: {
 
   // Install a mock channel
   if (channelEnabled) {
-    const ch = new TestChannel(engine, new Logger());
+    const ch = new TestChannel(engine);
     engine.channels[channelName] = ch;
   }
 
   // Install a mock tool (needed if tool calls are sent)
-  engine.tools['mock_tool'] = new MockTool(engine, new Logger());
+  engine.tools['mock_tool'] = new MockTool(engine);
 
   return engine;
 }
@@ -493,7 +493,7 @@ test('execReload drops and re-executes the engine, ending in the exec state', as
       message: { role: 'assistant', content: '' },
     } as Reply);
     engine.models['mock.model'] = mockModelInstance;
-    engine.agents['marvin'] = new Agent(engine, new Logger(), {
+    engine.agents['marvin'] = new Agent(engine, {
       id: 'marvin',
       enabled: true,
       identity: 'You are Marvin.',
@@ -597,7 +597,7 @@ class MockIntegration extends Integration {
 
 test('execTask merges task integration tools into chat.tools', async () => {
   const engine = buildTestEngine();
-  engine.integrations['gloobeam'] = new MockIntegration(engine, new Logger(), { type: 'mock' });
+  engine.integrations['gloobeam'] = new MockIntegration(engine, { type: 'mock' });
 
   engine.tasks['test-task'] = {
     id: 'test-task',

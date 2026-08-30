@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { readdirSync } from 'fs';
 
 import type Engine from '../engine.js';
+import logger from '../logger.js';
 import { Field, Integration, ToolMeta } from '../types.js';
 
 const tdir = join(dirname(fileURLToPath(import.meta.url)));
@@ -27,7 +28,7 @@ export async function loadIntegration(engine: Engine, type: string, config: { [k
     if (!Class || !(Class.prototype instanceof Integration)) {
       return null;
     }
-    return new Class(engine, engine.logger, config);
+    return new Class(engine, config);
   } catch {
     return null;
   }
@@ -40,7 +41,7 @@ export async function loadIntegrationTools(engine: Engine, integrations: string[
   for (const id of integrations || []) {
     const integration = engine.integrations[id];
     if (!integration) {
-      engine.logger.warn('[buildIntegrationTools]', `integration "${id}" not loaded, skipping`);
+      logger.warn('[buildIntegrationTools]', `integration "${id}" not loaded, skipping`);
       continue;
     }
 
@@ -61,7 +62,7 @@ export async function loadIntegrationTools(engine: Engine, integrations: string[
           const discovered = await integration.discover(action);
           fields = Object.fromEntries(discovered.map(f => [f.name, f]));
         } catch (err) {
-          engine.logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${action}":`, (err as Error).message);
+          logger.warn('[buildIntegrationTools]', `discovery failed for "${id}" "${action}":`, (err as Error).message);
         }
       }
 

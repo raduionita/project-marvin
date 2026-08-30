@@ -7,7 +7,7 @@ import MarvinStateTool from './marvin_state.js';
 
 class FakeModel extends Model {
   constructor(engine: Engine, config: { [key: string]: any }) {
-    super(engine, new Logger(), config);
+    super(engine, config);
   }
   async execChat(_chat: Chat): Promise<Reply> {
     return { id: 'fake', stop: true, message: { role: 'assistant', content: 'hi' }, usage: { prompt: 0, completion: 0 } };
@@ -15,7 +15,7 @@ class FakeModel extends Model {
 }
 
 function mockEngine(): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },
     channels: { slack: { enabled: true }, telegram: { enabled: false } },
@@ -28,7 +28,7 @@ function mockEngine(): Engine {
 
   engine.models['llm'] = new FakeModel(engine, { enabled: true, provider: 'deepseek', model: 'deepseek-chat' });
 
-  engine.agents['marvin'] = new Agent(engine, new Logger(), {
+  engine.agents['marvin'] = new Agent(engine, {
     id: 'marvin',
     enabled: true,
     identity: 'orchestrator',
@@ -52,14 +52,14 @@ function mockEngine(): Engine {
 
 test('marvinState tool metadata', () => {
   const engine = mockEngine();
-  const tool = new MarvinStateTool(engine, new Logger());
+  const tool = new MarvinStateTool(engine);
   expect(tool.meta.function.name).toBe('marvin_state');
   expect(tool.meta.function.description).toContain('runtime state');
 });
 
 test('marvinState returns a full summary', async () => {
   const engine = mockEngine();
-  const tool = new MarvinStateTool(engine, new Logger());
+  const tool = new MarvinStateTool(engine);
 
   const result = await tool.call({});
 
@@ -74,7 +74,7 @@ test('marvinState returns a full summary', async () => {
 
 test('marvinState filters by area', async () => {
   const engine = mockEngine();
-  const tool = new MarvinStateTool(engine, new Logger());
+  const tool = new MarvinStateTool(engine);
 
   const agents = await tool.call({ area: 'agents' });
   expect(agents.agents).toBeDefined();
@@ -87,15 +87,15 @@ test('marvinState filters by area', async () => {
 
 test('marvinState reports an unknown area', async () => {
   const engine = mockEngine();
-  const tool = new MarvinStateTool(engine, new Logger());
+  const tool = new MarvinStateTool(engine);
 
   const result = await tool.call({ area: 'bogus' });
   expect(result.error).toContain('unknown area');
 });
 
 test('marvinState handles an empty engine', async () => {
-  const engine = new Engine(new Logger());
-  const tool = new MarvinStateTool(engine, new Logger());
+  const engine = new Engine();
+  const tool = new MarvinStateTool(engine);
 
   const result = await tool.call({});
   expect(result.agents).toEqual({});

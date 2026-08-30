@@ -7,12 +7,12 @@ import WebSearchTool from './web_search.js';
 import type { Chat } from '../types.js';
 
 function mockEngine(): Engine {
-  return new Engine(new Logger());
+  return new Engine();
 }
 
 test('loadTools tool metadata', () => {
   const engine = mockEngine();
-  const tool = new LoadToolsTool(engine, new Logger());
+  const tool = new LoadToolsTool(engine);
   expect(tool.meta.function.name).toBe('load_tools');
   expect(tool.meta.function.description).toContain('Load one or more callable tools');
   expect(tool.meta.function.parameters.required).toContain('names');
@@ -22,23 +22,23 @@ test('loadTools tool metadata', () => {
 
 test('loadTools returns an error when no names are provided', async () => {
   const engine = mockEngine();
-  const tool = new LoadToolsTool(engine, new Logger());
+  const tool = new LoadToolsTool(engine);
   const result = await tool.call({ names: [] });
   expect(result.error).toContain('no tool names');
 });
 
 test('loadTools returns an error when names is missing', async () => {
   const engine = mockEngine();
-  const tool = new LoadToolsTool(engine, new Logger());
+  const tool = new LoadToolsTool(engine);
   const result = await tool.call({} as any);
   expect(result.error).toContain('no tool names');
 });
 
 test('loadTools adds the requested tool meta to chat.tools', async () => {
   const engine = mockEngine();
-  engine.tools['read_file'] = new ReadFileTool(engine, new Logger());
-  engine.tools['web_search'] = new WebSearchTool(engine, new Logger());
-  const tool = new LoadToolsTool(engine, new Logger());
+  engine.tools['read_file'] = new ReadFileTool(engine);
+  engine.tools['web_search'] = new WebSearchTool(engine);
+  const tool = new LoadToolsTool(engine);
   const chat: Chat = { id: 'c1', thinking: false, messages: [], tools: [] };
 
   const result = await tool.call({ names: ['read_file'] }, undefined, chat);
@@ -52,9 +52,9 @@ test('loadTools adds the requested tool meta to chat.tools', async () => {
 
 test('loadTools adds multiple tool metas and reports missing ones', async () => {
   const engine = mockEngine();
-  engine.tools['read_file'] = new ReadFileTool(engine, new Logger());
-  engine.tools['web_search'] = new WebSearchTool(engine, new Logger());
-  const tool = new LoadToolsTool(engine, new Logger());
+  engine.tools['read_file'] = new ReadFileTool(engine);
+  engine.tools['web_search'] = new WebSearchTool(engine);
+  const tool = new LoadToolsTool(engine);
   const chat: Chat = { id: 'c1', thinking: false, messages: [], tools: [] };
 
   const result = await tool.call({ names: ['read_file', 'web_search', 'nope'] }, undefined, chat);
@@ -66,8 +66,8 @@ test('loadTools adds multiple tool metas and reports missing ones', async () => 
 
 test('loadTools is idempotent: loading twice does not duplicate metas', async () => {
   const engine = mockEngine();
-  engine.tools['read_file'] = new ReadFileTool(engine, new Logger());
-  const tool = new LoadToolsTool(engine, new Logger());
+  engine.tools['read_file'] = new ReadFileTool(engine);
+  const tool = new LoadToolsTool(engine);
   const chat: Chat = { id: 'c1', thinking: false, messages: [], tools: [] };
 
   await tool.call({ names: ['read_file'] }, undefined, chat);
@@ -79,8 +79,8 @@ test('loadTools is idempotent: loading twice does not duplicate metas', async ()
 
 test('loadTools initialises chat.tools when undefined', async () => {
   const engine = mockEngine();
-  engine.tools['read_file'] = new ReadFileTool(engine, new Logger());
-  const tool = new LoadToolsTool(engine, new Logger());
+  engine.tools['read_file'] = new ReadFileTool(engine);
+  const tool = new LoadToolsTool(engine);
   const chat: Chat = { id: 'c1', thinking: false, messages: [] };
 
   const result = await tool.call({ names: ['read_file'] }, undefined, chat);
@@ -92,8 +92,8 @@ test('loadTools initialises chat.tools when undefined', async () => {
 
 test('loadTools still reports loaded/missing when no chat is passed', async () => {
   const engine = mockEngine();
-  engine.tools['read_file'] = new ReadFileTool(engine, new Logger());
-  const tool = new LoadToolsTool(engine, new Logger());
+  engine.tools['read_file'] = new ReadFileTool(engine);
+  const tool = new LoadToolsTool(engine);
 
   const result = await tool.call({ names: ['read_file', 'nope'] });
 

@@ -5,7 +5,7 @@ import { listChannels } from './index.js';
 import { Config } from '../types.js';
 
 function mockEngine(config: Config = {} as Config): Engine {
-  const engine = new Engine(new Logger());
+  const engine = new Engine();
   engine.config = {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },

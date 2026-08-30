@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, unlinkSync } from "fs";
 
-import type { Logger } from './logger.js';
+import logger from './logger.js';
 import { listSystems, loadSystem } from "./systems";
 import { Command, Config, Channel, Tool, Model, System, Task, Message, Integration, Skill, ToolMeta } from "./types";
 import { Agent } from './agent.js';
@@ -40,7 +40,10 @@ export default class Engine {
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
   public isDebug: boolean =  process.env.MARVIN_LOG_LEVEL === 'debug';
 
-  constructor(public logger: Logger) {
+  // shared logger (default-exported singleton from ./logger.js)
+  public logger = logger;
+
+  constructor() {
     this.logger.debug('[Engine.constructor]');
   }
 
@@ -195,7 +198,7 @@ export default class Engine {
         }
 
         // register instance of Tool
-        const instance = new Class(this, this.logger);
+        const instance = new Class(this);
         const meta = instance.meta as ToolMeta;
         this.tools[meta.function.name] = instance;
         this.logger.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded`);
@@ -220,7 +223,7 @@ export default class Engine {
         }
 
         // register instance of Tool
-        const instance = new Class(this, this.logger);
+        const instance = new Class(this);
         const meta = instance.meta as ToolMeta;
         this.tools[meta.function.name] = instance;
         this.logger.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded (custom)`);
@@ -256,7 +259,7 @@ export default class Engine {
           continue;
         }
         // register instance of Channel 
-        const instance = new Class(this, this.logger);
+        const instance = new Class(this);
         await instance.load();
         this.channels[id] = instance;
         this.logger.info('[Engine.loadChannels]', `channel "${id}" loaded`);
@@ -292,7 +295,7 @@ export default class Engine {
           continue;
         }
         // register instance of Integration
-        const instance = new Class(this, this.logger, config);
+        const instance = new Class(this, config);
         await instance.load();
         this.integrations[id] = instance;
         this.logger.info('[Engine.loadIntegrations]', `integration "${id}" loaded`);
@@ -320,7 +323,7 @@ export default class Engine {
 
       try {
         if (this.mcps[id]) continue;
-        const mcp = new Mcp(this, this.logger, id, config);
+        const mcp = new Mcp(this, id, config);
         await mcp.load();
         this.mcps[id] = mcp;
       } catch (err) {
@@ -379,7 +382,7 @@ export default class Engine {
         }
         
         // save instance (needed by agents)
-        const instance = new Class(this, this.logger, config);
+        const instance = new Class(this, config);
         this.models[modelId] = instance;
 
         this.logger.info('[Engine.loadModels]', `model "${modelId}" loaded (${config.provider} ${config.model})`);
@@ -403,7 +406,7 @@ export default class Engine {
           process.exit(1);
         }
 
-        const instance = new Class(this, this.logger, {provider: 'fallback', model: 'fallback'});
+        const instance = new Class(this, {provider: 'fallback', model: 'fallback'});
         this.models[modelId] = instance;
 
         // warn because fallback model is not a good idea, and does NOTHING
@@ -433,7 +436,7 @@ export default class Engine {
       }
 
       // add ochestrator agent
-      this.agents[marvinId] = new Agent(this, this.logger, {
+      this.agents[marvinId] = new Agent(this, {
         id: marvinId,
         enabled: true,
         memory: this.config.settings.memory,
@@ -463,7 +466,7 @@ export default class Engine {
         this.logger.warn('[Engine.loadAgents]', `no IDENTITY.md found for agent "${agentId}", using default`);
       }
 
-      this.agents[agentId] = new Agent(this, this.logger, {
+      this.agents[agentId] = new Agent(this, {
         id: agentId,
         enabled: agent.enabled,
         memory: this.config.settings.memory,

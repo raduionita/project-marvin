@@ -6,8 +6,8 @@ import DeepseekModel, { Choice } from './deepseek.js';
 class DeepseekMock extends DeepseekModel {}
 
 function mockdModel(): DeepseekModel {
-  const engine = new Engine(new Logger());
-  return new DeepseekMock(engine, new Logger(), {});
+  const engine = new Engine();
+  return new DeepseekMock(engine, {});
 }
 
 function mockChoice(content: string, toolCalls?: Choice['message']['tool_calls']): Choice {

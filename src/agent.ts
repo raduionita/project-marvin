@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import type Engine from './engine.js';
-import type { Logger } from './logger.js';
+import logger from './logger.js';
 import type { Chat, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
@@ -28,7 +28,10 @@ export class Agent {
   // chat cache (chatId: chat), swept by the engine's execSweep task
   public cache: Record<string, Chat> = {};
 
-  constructor(public engine: Engine, public logger: Logger, config: { [key: string]: any } = {}) {
+  // shared logger (default-exported singleton from ./logger.js)
+  public logger = logger;
+
+  constructor(public engine: Engine, config: { [key: string]: any } = {}) {
     Object.assign(this, config);
     this.logger.debug(`[${this.constructor.name || 'Agent'}.constructor]`);
   }
