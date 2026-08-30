@@ -2,8 +2,11 @@
 
 Status legend: `[x]` done · `[~]` partial · `[ ]` open
 
-## Phase 0 — TODOsgo r
+## Phase 0 — Quick wins
 - [ ] **Retry LLM loop on failure** — retry the entire loop on failure: if chat loops fails, retry the whole thing.
+
+## Phase 0.5 — Logger refactor (DONE)
+- [x] **Single shared logger singleton** — every class (`Command`, `System`, `Tool`, `Channel`, `Integration`, `Model`, `Engine`, `Agent`, `Mcp`) exposes a public `logger` field bound to the default-exported singleton from `src/logger.ts`. Constructors no longer take a `logger: Logger` arg; subclass ctors call `super(engine[, config])`. Slack command capture + test capture now use `setDefaultOutput()` swap-and-restore. `setDefaultOutput()` returns a no-arg `restore()` thunk. `npx tsc --noEmit` clean, 381/381 tests pass. AGENTS.md documents the architecture.
 
 ## Phase 1 — Quick fixes & low-risk hardening (easiest)
 
