@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
-import { isSafePath, safeJoin } from '../helpers.js';
+import { isSafePath, safeJoin } from '../helpers/index.js';
 
 export default class ReadFileTool extends Tool {
   public meta: ToolMeta = {

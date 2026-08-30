@@ -43,10 +43,6 @@ export default class Engine {
   // shared logger (default-exported singleton from ./logger.js)
   public logger = logger;
 
-  constructor() {
-    this.logger.debug('[Engine.constructor]');
-  }
-
   async load() {
     this.logger.debug('[Engine.load]');
 

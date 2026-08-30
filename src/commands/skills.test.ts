@@ -6,7 +6,7 @@ import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { Skill, Config } from '../types.js';
 import { Agent } from '../agent.js';
-import { buildPromptMocks, captureLogger } from '../tests.js';
+import { buildPromptMocks, captureLogger } from '../helpers/tests.js';
 
 // scripted answers consumed by the mocked @inquirer/prompts prompts
 let answers: string[] = [];
@@ -39,9 +39,6 @@ function mockEngine(): Engine {
   };
   writeFileSync(metaSkill.file, '# Create a Skill\n\nReturn ONLY the skill content.');
   engine.skills['meta'] = metaSkill;
-
-  // stub out heavy engine loading for the command test
-  engine.load = async () => { engine.state = 'load'; };
 
   // stub agent whose sendChat is scripted per-test
   const agent = new Agent(engine, { id: 'marvin', enabled: true, identity: '', channels: {}, model: {} as never });

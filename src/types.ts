@@ -294,11 +294,8 @@ export interface Chat {
   userId?: string;
   // last time this chat was used (for TTL eviction)
   updated?: number;
-  // sum/total of all usages (Reply.usage)
-  usage?: {
-    completion: number;
-    prompt: number;
-  }
+  // track usage
+  usage?: number;
 }
 
 // multi-purpose (models, channels) message
@@ -322,7 +319,7 @@ export interface Message {
   // agent
   agent?: string;
   model?: string;
-  tokens?: number;
+  usage?: number;
 }
 
 // LLM Model sendChat reply
@@ -347,5 +344,5 @@ export interface Result {
   content: string;
   steps: number;
   error?: string;
-  tokens?: number;
+  usage?: number;
 }

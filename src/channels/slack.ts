@@ -103,7 +103,7 @@ export default class SlackChannel extends Channel {
       this.socketClient.on('disconnected', this.onDisconnected.bind(this));
 
       // route Slack events to Marvin's AI loop
-      this.socketClient.on('app_mention', this.onMention.bind(this));
+      this.socketClient.on('app_mention', this.onMessage.bind(this));
       // the SocketMode client emits DM messages as "message" with channel_type "im"
       this.socketClient.on('message', this.onSocketMessage.bind(this));
       this.socketClient.on('slash_commands', this.onSlashCommand.bind(this));
@@ -181,7 +181,7 @@ export default class SlackChannel extends Channel {
                 '**Model**: `'   + (message.model  || '(none)') + '`\n' +
                 '**Channel**: `' + (message.group  || '(none)') + '`\n' +
                 '**Thread**: `'  + (message.thread || '(none)') + '`\n' + 
-                '**Tokens**: `'  + (message.tokens || '(none)') + '`\n'
+                '**Usage**: `'   + (message.usage  || '(none)') + '`\n'
         },
       ]});
 
@@ -194,8 +194,8 @@ export default class SlackChannel extends Channel {
 
       // we should know if there is a mismatch between the channel in the message and the response
       if (response.channel !== message.group) {
-        this.logger.error('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.group}, got ${response.channel}`);
-        return { ts: '', ok: false, error: response.error, message: '(slack channel mismatch)' };
+        this.logger.warn('[SlackChannel.sendMessage]', `channel mismatch: expected ${message.group}, got ${response.channel}`);
+        response.error = '(slack channel mismatch)';
       }
 
       return {
@@ -229,54 +229,16 @@ export default class SlackChannel extends Channel {
     });
   }
 
-  protected async onMention({ event, body, ack }: HandlerParams) {
+  // handles both app_mention events and DM messages (via onSocketMessage)
+  protected async onMessage({ event, body, ack }: HandlerParams) {
     const thread = event.thread_ts || event.ts || event.event_ts;
     try {
-      this.logger.debug('[SlackChannel.onMention]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      this.logger.debug('[SlackChannel.onMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
 
       // extract the actual message text (strip @marvin mention)
       const text = this.cleanText(event.text || '');
       if (!text) {
-        this.logger.warn('[SlackChannel.onMention]', 'no text content');
-        return await ack({ text: '(no text content)' });
-      }
-
-      await ack();
-
-      // find an agent that has slack configured
-      const agent = this.findAgent(event.channel);
-      const agentId = agent.id;
-      const modelId = agent.model?.model;
-      const chatId: string = `slack-${event.channel}-${thread}`;
-
-      this.logger.info('[SlackChannel.onMention]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
-
-      // forward to LLM // process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await agent.sendChat(chatId, text);
-      if (result.error) {
-        this.logger.error('[SlackChannel.onMention]', `AI loop failed for agent ${agentId}:`, result.error);
-        result.content = `(AI loop error: ${result.error})`;
-      }
-
-      // reply to user // send the result to the user
-      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, tokens: result.tokens });
-      if (!res.ok) {
-        this.logger.warn('[SlackChannel.onMention]', 'failed to post reply:', res.error, res.message);
-      }
-    } catch (error) {
-      this.logger.error('[SlackChannel.onMention]', error);
-    }
-  }
-
-  protected async onDirectMessage({ event, body, ack }: HandlerParams) {
-    const thread = event.thread_ts || event.ts || event.event_ts;
-    try {
-      this.logger.debug('[SlackChannel.onDirectMessage]', event.channel, thread);
-
-      // extract the actual message text (strip @marvin mention)
-      const text = this.cleanText(event.text || '');
-      if (!text) {
-        this.logger.warn('[SlackChannel.onDirectMessage]', 'no text content');
+        this.logger.warn('[SlackChannel.onMessage]', 'no text content');
         return await ack({ text: '(no text content)' });
       }
 
@@ -289,21 +251,22 @@ export default class SlackChannel extends Channel {
       const modelId = agent.model?.model;
       const chatId = `slack-${event.channel}-${thread}`;
 
-      this.logger.info('[SlackChannel.onDirectMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      this.logger.info('[SlackChannel.onMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
       // process through Marvin's AI loop (executes model calls + tool execution)
       const result = await agent.sendChat(chatId, text);
       if (result.error) {
-        this.logger.error('[SlackChannel.onDirectMessage]', `AI loop failed for agent ${agentId}:`, result.error);
+        this.logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
         result.content = `(AI loop error: ${result.error})`;
       }
 
-      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, tokens: result.tokens });
+      // reply to user // send the result to the user
+      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, usage: result.usage });
       if (!res.ok) {
-        this.logger.warn('[SlackChannel.onDirectMessage]', 'failed to post reply:', res.error, res.message);
+        this.logger.warn('[SlackChannel.onMessage]', 'failed to post reply:', res.error, res.message);
       }
     } catch (error) {
-      this.logger.error('[SlackChannel.onDirectMessage]', error);
+      this.logger.error('[SlackChannel.onMessage]', error);
     }
   }
 
@@ -342,7 +305,7 @@ export default class SlackChannel extends Channel {
     }
   }
 
-  // route SocketMode "message" events: DM messages reach onDirectMessage,
+  // route SocketMode "message" events: DM messages reach onMessage,
   // everything else (bot's own messages, channel messages) is acknowledged & ignored
   protected async onSocketMessage({ event, body, ack }: HandlerParams) {
     try {
@@ -350,7 +313,7 @@ export default class SlackChannel extends Channel {
       if (event.channel_type !== 'im' || isBotOwn) {
         return await ack({ text: '(ignored)' });
       }
-      await this.onDirectMessage({ event, body, ack });
+      await this.onMessage({ event, body, ack });
     } catch (error) {
       this.logger.error('[SlackChannel.onSocketMessage]', error);
     }

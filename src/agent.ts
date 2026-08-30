@@ -7,7 +7,7 @@ import type { Chat, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
-import { truncate, splitMcpToolName, splitIntegrationToolName } from './helpers.js';
+import { truncate, splitMcpToolName, splitIntegrationToolName } from './helpers/index.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI
 // loop via sendChat (model calls + tool execution) on behalf of tasks and chats,
@@ -258,7 +258,7 @@ export class Agent {
       let reply: Reply;
       let steps = -1;
       let ended = false;
-      let tokens = 0;
+      let usage = chat.usage || 0;
       do {
         steps++;
 
@@ -267,7 +267,7 @@ export class Agent {
 
         // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
         reply = await this.model.execChat(chat);
-        tokens += reply.usage.completion + reply.usage.prompt;
+        usage += reply.usage.completion + reply.usage.prompt;
 
         // persist assistant reply to chat history
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
@@ -304,10 +304,13 @@ export class Agent {
         this.logger.warn('[Agent.sendChat]', `max steps reached for ${this.id}`);
       }
 
+      // track usage
+      chat.usage = usage;
+
       // save chat to cache
       this.saveChat(chatId, chat);
 
-      return { content: (reply?.message?.content || '').trim(), steps: steps, tokens: tokens };
+      return { content: (reply?.message?.content || '').trim(), steps: steps, usage: usage };
     } catch (error) {
       this.logger.error('[Agent.sendChat]', error);
       return { content: '', steps: 0, error: (error as Error).message };

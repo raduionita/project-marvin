@@ -6,7 +6,7 @@ import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { Skill, Config } from '../types.js';
 import { Agent } from '../agent.js';
-import { buildPromptMocks, captureLogger } from '../tests.js';
+import { buildPromptMocks, captureLogger } from '../helpers/tests.js';
 
 // scripted answers consumed by the mocked @inquirer/prompts prompts
 let answers: string[] = [];
@@ -51,8 +51,6 @@ function mockEngine(): Engine {
   writeFileSync(editSkill.file, '# Edit a Tool\n\nReturn ONLY the complete updated tool file content.');
   engine.skills['tools-edit'] = editSkill;
 
-  // stub out heavy engine loading for the command test
-  engine.load = async () => { engine.state = 'load'; };
   engine.loadTools = async () => {};
 
   // stub agent whose sendChat is scripted per-test

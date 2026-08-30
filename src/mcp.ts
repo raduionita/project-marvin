@@ -8,7 +8,7 @@ import type Engine from './engine.js';
 import logger from './logger.js';
 import type { ToolMeta, Config } from './types.js';
 import * as constants from './constants.js';
-import { sanitizeToolName, flattenContent } from './helpers.js';
+import { sanitizeToolName, flattenContent } from './helpers/index.js';
 
 // client for one mcp server over stdio: spawns the process on load, lists its
 // tools and forwards tool calls. reconnects lazily if the process died.

@@ -5,7 +5,7 @@ import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import LogsCommand from './logs.js';
-import { captureLogger } from '../tests.js';
+import { captureLogger } from '../helpers/tests.js';
 
 function buildLogFile(lines: string[]): { engine: Engine; path: string } {
   const engine = new Engine();

@@ -1,5 +1,5 @@
 import { Integration, IntegrationMeta, Field } from '../types.js';
-import { tryJsonParse, withRetry } from '../helpers.js';
+import { tryJsonParse, withRetry } from '../helpers/index.js';
 
 export type WordpressConfig = { enabled?: boolean, endpoint?: string, user?: string, appPassword?: string };
 

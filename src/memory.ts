@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import type Engine from './engine.js';
 import * as constants from './constants.js';
-import { safeJoin } from './helpers.js';
+import { safeJoin } from './helpers/index.js';
 
 // memory storage helpers: per-agent notes in ~/.marvin/memories/<agent-id>/<key>.md.
 // Used by the memory tool and by the agent to build the system-prompt summary.

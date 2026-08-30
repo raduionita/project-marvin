@@ -1,6 +1,6 @@
 import { mock } from 'bun:test';
 
-import { setDefaultOutput } from './logger.js';
+import { setDefaultOutput } from '../logger.js';
 
 // shared test helpers: a capturing logger and @inquirer/prompts mocks used
 // across *.test.ts files.

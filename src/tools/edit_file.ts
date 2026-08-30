@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
-import { isSafePath, readError, safeJoin } from '../helpers.js';
+import { isSafePath, readError, safeJoin } from '../helpers/index.js';
 import { dirname, join } from 'path';
 
 export default class EditFileTool extends Tool {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Tool, ToolMeta } from '../types.js';
-import { safeJoin } from '../helpers.js';
+import { safeJoin } from '../helpers/index.js';
 
 const DEFAULT_LINES = 20;
 

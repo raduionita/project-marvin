@@ -6,8 +6,8 @@ import { configDotenv } from 'dotenv';
 
 import {  Command, Config } from './types.js';
 import * as constants from './constants.js';
-import { mergeConfig, tryJsonParse } from './helpers.js';
-import { listCommands } from './commands/index.js';
+import { mergeConfig, tryJsonParse } from './helpers/index.js';
+import { listCommands } from './commands';
 import logger, { setLoggerMode } from './logger.js';
 import Engine from './engine.js';
 

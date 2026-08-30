@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { withRetry, markdownToMrkdwn, mergeConfig, truncate } from './helpers.js';
+import { withRetry, markdownToMrkdwn, mergeConfig, truncate } from './index.js';
 
 test('truncate leaves short strings untouched', () => {
   expect(truncate('hello', 10)).toBe('hello');

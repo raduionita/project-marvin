@@ -65,7 +65,7 @@ literally in the import; the `marvin tools add` command replaces it for you.
   - return a plain JSON object (never throw to the agent)
 - Log with `this.logger.debug('[ToolName.call]', args)`.
 - Use the engine only when needed: `this.engine` (e.g. `this.engine.work`, `this.engine.integrations`, `this.engine.skills`).
-- Respect the workspace: paths must stay inside `~/.marvin` (see `safeJoin` from `helpers.js` in `read_file.ts`/`edit_file.ts`).
+- Respect the workspace: paths must stay inside `~/.marvin` (see `safeJoin` from `helpers/index.js` in `read_file.ts`/`edit_file.ts`).
 
 ## Examples to study
 

@@ -4,7 +4,7 @@ import { Tool, type ToolMeta } from '../types.js';
 import type BrowserSystem from '../systems/browser.js';
 import type Engine from '../engine.js';
 import * as constants from '../constants.js';
-import { readError } from '../helpers.js';
+import { readError } from '../helpers/index.js';
 
 export default class WebBrowseTool extends Tool {
   public meta: ToolMeta = {

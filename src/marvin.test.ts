@@ -78,7 +78,7 @@ class MockWebClient implements IWebClient {
   };
 }
 
-// real handlers (onMention, sendMessage, ...) run, only the SDK clients are swapped
+// real handlers (onMessage, sendMessage, ...) run, only the SDK clients are swapped
 class MockSlackChannel extends SlackChannel {
   public mockSok: MockSocketModeClient;
   public mockWeb: MockWebClient;
@@ -93,7 +93,7 @@ class MockSlackChannel extends SlackChannel {
     this.socketClient = this.mockSok;
     this.webClient = this.mockWeb;
     this.botId = this.mockWeb.authTestResult?.user_id || '';
-    this.socketClient.on('app_mention', this.onMention.bind(this) as (...args: any[]) => any);
+    this.socketClient.on('app_mention', this.onMessage.bind(this) as (...args: any[]) => any);
     await this.socketClient.start();
   }
 }

@@ -6,7 +6,7 @@ import { join } from 'path';
 import { Config } from '../types.js';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
-import { buildPromptMocks, captureLogger } from '../tests.js';
+import { buildPromptMocks, captureLogger } from '../helpers/tests.js';
 
 // scripted answers consumed by the mocked @inquirer/prompts prompts
 let answers: string[] = [];

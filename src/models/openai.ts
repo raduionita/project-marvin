@@ -1,4 +1,4 @@
-import { tryJsonParse } from '../helpers.js';
+import { tryJsonParse } from '../helpers/index.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
 
 export class OpenaiModel extends Model {

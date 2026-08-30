@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { Tool, ToolMeta } from '../types.js';
-import { isSafePath, safeJoin } from '../helpers.js';
+import { isSafePath, safeJoin } from '../helpers/index.js';
 
 export default class AppendFileTool extends Tool {
   public meta: ToolMeta = {

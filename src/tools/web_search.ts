@@ -1,6 +1,6 @@
 import { Tool } from '../types.js';
 import type { ToolMeta } from '../types.js';
-import { delay, rand, readError, tryJsonParse } from '../helpers.js';
+import { delay, rand, readError, tryJsonParse } from '../helpers/index.js';
 import type BrowserSystem from '../systems/browser.js';
 import TurndownService from 'turndown';
 import Engine from '../engine.js';

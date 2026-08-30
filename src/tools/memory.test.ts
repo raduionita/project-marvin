@@ -6,7 +6,7 @@ import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { Agent } from '../agent.js';
 import MemoryTool from './memory.js';
-import { safeJoin } from '../helpers.js';
+import { safeJoin } from '../helpers/index.js';
 
 function mockEngine(): { engine: Engine; home: string } {
   const home = mkdtempSync(join(tmpdir(), 'marvin-home-'));

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, extname } from 'path';
 import { Tool, ToolMeta } from '../types.js';
-import { isSafePath, safeJoin } from '../helpers.js';
+import { isSafePath, safeJoin } from '../helpers/index.js';
 
 const MAX_MATCHES = 100;
 const MAX_FILE_SIZE = 1024 * 1024; // skip files larger than 1MB

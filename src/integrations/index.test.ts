@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
 import { listIntegrations, loadIntegration, makeIntegrationToolName, loadIntegrationTools } from './index.js';
-import { splitIntegrationToolName } from '../helpers.js';
+import { splitIntegrationToolName } from '../helpers/index.js';
 import { Config, Integration, IntegrationMeta, Field } from '../types.js';
 
 function mockEngine(): Engine {

@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import Engine from '../engine.js';
-import { captureLogger } from '../tests.js';
+import { captureLogger } from '../helpers/tests.js';
 import { Config, Message, Model, Chat, Reply } from '../types.js';
 import { Agent } from '../agent.js';
 import SlackChannel from './slack.js';
@@ -88,7 +88,7 @@ class MockWebClient implements IWebClient {
 }
 
 // MockSlackChannel only replaces the client factories to inject the mocked SDK
-// clients. load() and all handlers (onMention, onDirectMessage, sendMessage, ...)
+// clients. load() and all handlers (onMessage, sendMessage, ...)
 // run the REAL code.
 class MockSlackChannel extends SlackChannel {
   public mockSok: MockSocketModeClient;
@@ -461,7 +461,7 @@ test('sendMessage() always sends the LLM markdown in a markdown block', async ()
   await channel.sendMessage({ role: 'assistant', content: '## Header\n\nParagraph', group: 'C123' });
 
   const call = channel.mockWeb.postMessageCalls[0]!;
-  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }, { type: 'divider' }, { type: 'markdown', text: '**Agent**: `(none)`\n**Model**: `(none)`\n**Channel**: `C123`\n**Thread**: `(none)`\n**Tokens**: `(none)`\n' }]);
+  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }, { type: 'divider' }, { type: 'markdown', text: '**Agent**: `(none)`\n**Model**: `(none)`\n**Channel**: `C123`\n**Thread**: `(none)`\n**Usage**: `(none)`\n' }]);
   expect(call.text).toBeUndefined();
 });
 
@@ -478,7 +478,8 @@ test('sendMessage() reports failure on channel mismatch', async () => {
     role: 'assistant', content: 'sent elsewhere', group: 'C123',
   });
 
-  expect(result.ok).toBe(false);
+  expect(result.ok).toBe(true);
+  expect(result.error).toBeDefined();
 });
 
 test('sendMessage() returns ok:false when web client is not attached', async () => {

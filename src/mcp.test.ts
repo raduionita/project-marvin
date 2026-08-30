@@ -6,8 +6,8 @@ import { join } from 'path';
 import Engine from './engine.js';
 import { Logger } from './logger.js';
 import { Mcp, makeMcpToolName, loadMcpTools } from './mcp.js';
-import { splitMcpToolName } from './helpers.js';
-import { sanitizeToolName } from './helpers.js';
+import { splitMcpToolName } from './helpers/index.js';
+import { sanitizeToolName } from './helpers/index.js';
 
 // path of the mock stdio mcp server (run with the current bun binary)
 const MOCK_SERVER = join(import.meta.dirname, 'mcp.mock.ts');

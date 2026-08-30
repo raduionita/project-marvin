@@ -3,7 +3,7 @@ import { basename, dirname, isAbsolute, join, resolve, sep } from 'path';
 import { readdirSync } from 'fs';
 import TurndownService from 'turndown';
 
-import logger from './logger.js';
+import logger from '../logger.js';
 
 export function tryJsonParse<T>(str: string): T {
   try {

@@ -103,7 +103,7 @@ export default class SkillsCommand extends Command {
     }
 
     // load the engine (models + agents) so we can prompt the LLM
-    await this.engine.load();
+    // await this.engine.load();
 
     const prompt = [
       instructions,
@@ -137,7 +137,7 @@ export default class SkillsCommand extends Command {
     this.logger.debug('[SkillsCommand.execUse]', 'using a skill...');
 
     // ensure skills are loaded (defaults + custom) so we can pick from them
-    await this.engine.load();
+    // await this.engine.load();
 
     const skills = listSkills(this.engine);
 

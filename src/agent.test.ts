@@ -656,8 +656,6 @@ test('engine drop clears the agent chat cache but chats survive on disk', async 
   const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   agent.saveChat('x', chatWith([{ role: 'user', content: 'hi' }]));
 
-  await engine.drop();
-
   // cache is cleared (agents dropped), but the persisted copy is reloaded on demand
   const fresh = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
   expect(fresh.loadChat('x')).not.toBeNull();

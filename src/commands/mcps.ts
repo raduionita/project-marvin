@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import { Command } from "../types";
 import { Mcp, testMcp, specMcp } from '../mcp.js';
-import { tryJsonParse } from '../helpers.js';
+import { tryJsonParse } from '../helpers/index.js';
 import { editor, checkbox, confirm, input } from '../terminal.js';
 
 // `marvin mcps [command]` list, add, edit, info, drop mcp connectors

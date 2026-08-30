@@ -31,9 +31,9 @@ export default class AgentsCommand extends Command {
 
         // TODO: issue here: if marvin.service is already started, systems.api will error (port already in use)
         // TODO: this may not need all the dependencies (like the api, any other?!)
-        await this.engine.load();
+        // await this.engine.load();
         await this.execChat();
-        await this.engine.drop();
+        // await this.engine.drop();
       break;
     }
   }

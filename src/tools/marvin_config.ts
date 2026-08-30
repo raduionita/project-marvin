@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { Tool, ToolMeta } from '../types.js';
-import { safeJoin } from '../helpers.js';
+import { safeJoin } from '../helpers/index.js';
 
 function getByPath(obj: Record<string, any>, path: string): any {
   return path.split('.').reduce((acc, part) => (acc && typeof acc === 'object' ? acc[part] : undefined), obj);

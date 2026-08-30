@@ -21,14 +21,14 @@ export default class ToolsCommand extends Command {
         await this.listTools();
       break;
       case 'add':
-        await this.engine.load();
+        // await this.engine.load();
         await this.execAdd();
-        await this.engine.drop();
+        // await this.engine.drop();
       break;
       case 'edit':
-        this.engine.load();
+        // this.engine.load();
         await this.execEdit();
-        await this.engine.drop();
+        // await this.engine.drop();
       break;
       default:
         await this.execTool(cmd);
@@ -122,7 +122,7 @@ export default class ToolsCommand extends Command {
     }
 
     // load the engine (models + agents) so we can prompt the LLM
-    await this.engine.load();
+    // await this.engine.load();
 
     const prompt = [
       instructions,
@@ -199,7 +199,7 @@ export default class ToolsCommand extends Command {
     }
 
     // load the engine (models + agents) so we can prompt the LLM
-    await this.engine.load();
+    // await this.engine.load();
 
     const prompt = [
       instructions,

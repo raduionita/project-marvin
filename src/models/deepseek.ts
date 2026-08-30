@@ -1,5 +1,5 @@
 import { appendFileSync, writeFileSync } from 'fs';
-import { tryJsonParse } from '../helpers.js';
+import { tryJsonParse } from '../helpers/index.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
 import { join } from 'path';
 
@@ -120,13 +120,12 @@ export default class DeepseekModel extends Model {
     // TODO: remove this
     this.logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
 
-    // call the model api
-    const apiKey = this.apiKey || process.env.DEEPSEEK_API_KEY;
+    // ! call the model api
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${this.apiKey || process.env.DEEPSEEK_API_KEY}`,
       },
       body: JSON.stringify(body),
     });
