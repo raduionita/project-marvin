@@ -18,7 +18,7 @@ export default class GrepTool extends Tool {
     group: 'filesystem',
     function: {
       name: 'grep',
-      description: 'Search the contents of files inside the ~/.marvin workspace for a regex pattern. Returns up to 100 matches with file paths and line numbers. Omit "path" to search the whole workspace, or pass a relative path to search a subdirectory or a single file',
+      description: 'Search the contents of files inside the workspace folder.',
       parameters: {
         type: 'object',
         properties: {
@@ -28,7 +28,7 @@ export default class GrepTool extends Tool {
           },
           path: {
             type: 'string',
-            description: 'Optional relative path of the file or directory to search (must be inside ~/.marvin). Omit to search the workspace root',
+            description: 'Optional relative path of the file or directory to search.',
           },
           caseSensitive: {
             type: 'boolean',

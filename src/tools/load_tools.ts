@@ -12,25 +12,25 @@ export default class LoadToolsTool extends Tool {
     group: 'control',
     function: {
       name: 'load_tools',
-      description: 'Load one or more callable tools into this chat. Pass the tool names (e.g. ["web_search", "integration__create_post", "mcp__custom-tool"]). Available tools are listed in the "## Available Tools", "## Integrations" and "## MCPs" sections of the system prompt. Integration tools use "<integrationId>__<tool>" and MCP tools use "<mcpId>__<tool>".',
+      description: 'Load one or more callable tools into this chat.',
       parameters: {
         type: 'object',
         properties: {
-          names: {
+          tools: {
             type: 'array',
             items: { type: 'string' },
             description: 'Names of the tools to load (e.g. ["web_search", "integration__create_post", "mcp__custom-tool"])',
           },
         },
-        required: ['names'],
+        required: ['tools'],
       }
     },
   }
 
-  public async call(args: { names: string[] }, agent: Agent, chat: Chat): Promise<{ [key: string]: any }> {
-    logger.debug('[LoadToolsTool.call]', Object.keys(args));
+  public async call(args: { tools: string[] }, agent: Agent, chat: Chat): Promise<{ [key: string]: any }> {
+    logger.debug('[LoadToolsTool.call]', `[${args.tools.join(',')}]`);
 
-    const names = Array.isArray(args?.names) ? args.names : [];
+    const names = Array.isArray(args?.tools) ? args.tools : [];
     if (!names.length) {
       return { error: 'load_tools: no tool names provided' };
     }

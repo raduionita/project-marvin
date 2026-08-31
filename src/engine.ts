@@ -172,11 +172,11 @@ export default class Engine {
       }
     }
 
-    logger.debug('[Engine.loadSystems]', Object.keys(this.systems));
+    logger.debug('[Engine.loadSystems]', `[${Object.keys(this.systems).join(',')}]`);
   }
 
   async loadTools() {
-    logger.debug('[Engine.loadTools]');
+    logger.debug('[Engine.loadTools]', 'loading internal tools...');
 
     const files = listInternalTools(this);
     for (const file of files) {

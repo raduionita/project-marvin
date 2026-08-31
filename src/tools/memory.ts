@@ -9,7 +9,7 @@ export default class MemoryTool extends Tool {
     group: 'memory',
     function: {
       name: 'memory',
-      description: 'Persistent memory scoped to this agent, stored in ~/.marvin/memories/<agent-id>/. Operations: "remember" saves a note under a key, "recall" reads a note, "forget" deletes a note, "list" shows all notes. Use it to remember facts, preferences, and context across chats and restarts',
+      description: 'Persistent memory scoped to this agent. Operations: `remember` saves a note under a key, `recall` reads a note, `forget` deletes a note, `list` shows all notes.',
       parameters: {
         type: 'object',
         properties: {

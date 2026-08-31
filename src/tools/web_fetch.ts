@@ -13,7 +13,7 @@ export default class WebFetchTool extends Tool {
     group: 'web',
     function: {
       name: 'web_fetch',
-      description: 'Fetch a web page and extract the content',
+      description: 'Fetch and extract content of a web page.',
       parameters: {
         type: 'object',
         properties: {

@@ -7,13 +7,13 @@ export default class MarvinStateTool extends Tool {
     group: 'marvin',
     function: {
       name: 'marvin_state',
-      description: 'Read the current Marvin runtime state. Omit "area" for a full summary, or filter to "agents", "tasks", "models", "channels", "integrations", "skills", or "settings"',
+      description: 'Read the current Marvin runtime state.',
       parameters: {
         type: 'object',
         properties: {
           area: {
             type: 'string',
-            description: 'Optional filter: "agents", "tasks", "models", "channels", "integrations", "skills", or "settings"',
+            description: 'Optional filter: "agents", "tasks", "models", "channels", "integrations", "skills", "mcps", or "settings"',
           },
         },
         required: [],

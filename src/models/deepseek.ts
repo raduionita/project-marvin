@@ -118,7 +118,7 @@ export default class DeepseekModel extends Model {
     appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
 
     // TODO: remove this
-    logger.debug('[DeepseekModel.sendChat]', 'request', `id=${chat.id} userId=${chat.userId}`);
+    logger.debug('[DeepseekModel.sendChat]', '-->', `id=${chat.id} userId=${chat.userId}`);
 
     // ! call the model api
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
@@ -174,7 +174,7 @@ export default class DeepseekModel extends Model {
       }
     } as Reply;
 
-    logger.debug('[DeepseekModel.sendChat]', 'response', `id=${json.id} finish=${choice.finish_reason} tokens=${json.usage?.completion_tokens}`);
+    logger.debug('[DeepseekModel.sendChat]', '<--', `id=${json.id} usage=${json.usage?.completion_tokens + json.usage?.prompt_tokens}`);
 
     return reply;
   }

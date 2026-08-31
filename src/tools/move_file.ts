@@ -10,17 +10,17 @@ export default class MoveFileTool extends Tool {
     group: 'filesystem',
     function: {
       name: 'move_file',
-      description: 'Move or rename a file or folder inside the `~/.marvin/files` folder. Both the source and the destination must be inside ~/.marvin',
+      description: 'Move or rename a file or folder.',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Path of the file or folder to move (must be inside ~/.marvin/files)',
+            description: 'Path of the file or folder to move.',
           },
           newPath: {
             type: 'string',
-            description: 'Destination path (must be inside ~/.marvin/files)',
+            description: 'Destination path.',
           },
         },
         required: ['path', 'newPath'],

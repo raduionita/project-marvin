@@ -10,13 +10,13 @@ export default class ListFilesTool extends Tool {
     group: 'filesystem',
     function: {
       name: 'list_files',
-      description: 'List the files and folders inside a directory of the `~/.marvin/files` folder. Omit "path" to list the workspace root, or pass a relative path. Optionally filter entries by a regex "pattern" matched against the entry name',
+      description: 'List the files and folders inside workspace folder.',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Relative path of the directory to list (must be inside ~/.marvin/files). Omit for the workspace root',
+            description: 'Relative path of the directory to list.',
           },
           pattern: {
             type: 'string',

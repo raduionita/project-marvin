@@ -9,13 +9,13 @@ export default class ReadFileTool extends Tool {
     group: 'filesystem',
     function: {
       name: 'read_file',
-      description: 'Read the contents of a file from disk (only inside the `~/.marvin/files` folder)',
+      description: 'Read the contents of a file from disk.',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Path to the file to read (must be inside ~/.marvin/files)',
+            description: 'Path to the file to read.',
           },
         },
         required: ['path'],

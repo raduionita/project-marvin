@@ -38,7 +38,7 @@ export default class MarvinConfigTool extends Tool {
     group: 'marvin',
     function: {
       name: 'marvin_config',
-      description: 'Read or edit the Marvin config file (~/.marvin/marvin.json). Default reads the whole config; pass "key" for a dotted path. Use operation "set" with "key" and "value" (JSON or string) to persist a value.',
+      description: 'Read or edit the Marvin config file (~/.marvin/marvin.json).',
       parameters: {
         type: 'object',
         properties: {

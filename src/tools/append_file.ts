@@ -10,7 +10,7 @@ export default class AppendFileTool extends Tool {
     group: 'filesystem',
     function: {
       name: 'append_file',
-      description: 'Append text to the end of a file inside the `~/.marvin/files` folder. Creates the file (and parent folders) when it does not exist yet. Use for journaling, logs, or growing notes',
+      description: 'Append text to the end of a file.',
       parameters: {
         type: 'object',
         properties: {

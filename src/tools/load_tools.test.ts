@@ -32,7 +32,7 @@ test('loadTools tool metadata', () => {
 test('loadTools returns an error when no names are provided', async () => {
   const engine = mockEngine();
   const tool = new LoadToolsTool(engine);
-  const result = await tool.call({ names: [] }, mockAgent(engine), mockChat());
+  const result = await tool.call({ tools: [] }, mockAgent(engine), mockChat());
   expect(result.error).toContain('no tool names');
 });
 
@@ -50,7 +50,7 @@ test('loadTools adds the requested tool meta to chat.tools', async () => {
   const tool = new LoadToolsTool(engine);
   const chat: Chat = { id: 'c1', thinking: false, messages: [], tools: [] };
 
-  const result = await tool.call({ names: ['read_file'] }, mockAgent(engine), chat);
+  const result = await tool.call({ tools: ['read_file'] }, mockAgent(engine), chat);
 
   expect(result.loaded).toEqual(['read_file']);
   expect(result.missing).toEqual([]);
@@ -66,7 +66,7 @@ test('loadTools adds multiple tool metas and reports missing ones', async () => 
   const tool = new LoadToolsTool(engine);
   const chat: Chat = { id: 'c1', thinking: false, messages: [], tools: [] };
 
-  const result = await tool.call({ names: ['read_file', 'web_search', 'nope'] }, mockAgent(engine), chat);
+  const result = await tool.call({ tools: ['read_file', 'web_search', 'nope'] }, mockAgent(engine), chat);
 
   expect(result.loaded.sort()).toEqual(['read_file', 'web_search']);
   expect(result.missing).toEqual(['nope']);
@@ -80,8 +80,8 @@ test('loadTools is idempotent: loading twice does not duplicate metas', async ()
   const chat: Chat = { id: 'c1', thinking: false, messages: [], tools: [] };
   const agent = mockAgent(engine);
 
-  await tool.call({ names: ['read_file'] }, agent, chat);
-  await tool.call({ names: ['read_file'] }, agent, chat);
+  await tool.call({ tools: ['read_file'] }, agent, chat);
+  await tool.call({ tools: ['read_file'] }, agent, chat);
 
   const names = chat.tools!.map(t => t.function.name);
   expect(names.filter(n => n === 'read_file').length).toBe(1);
@@ -93,7 +93,7 @@ test('loadTools initialises chat.tools when undefined', async () => {
   const tool = new LoadToolsTool(engine);
   const chat: Chat = { id: 'c1', thinking: false, messages: [] };
 
-  const result = await tool.call({ names: ['read_file'] }, mockAgent(engine), chat);
+  const result = await tool.call({ tools: ['read_file'] }, mockAgent(engine), chat);
 
   expect(result.loaded).toEqual(['read_file']);
   expect(chat.tools).toBeDefined();
@@ -106,7 +106,7 @@ test('loadTools reports loaded/missing with chat required', async () => {
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
 
-  const result = await tool.call({ names: ['read_file', 'nope'] }, mockAgent(engine), chat);
+  const result = await tool.call({ tools: ['read_file', 'nope'] }, mockAgent(engine), chat);
 
   expect(result.loaded).toEqual(['read_file']);
   expect(result.missing).toEqual(['nope']);
