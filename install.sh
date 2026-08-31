@@ -15,9 +15,9 @@ WRAPPER_PATH="$HOME/.local/bin/marvin"
 MARVIN_DIR="$HOME/.marvin"
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-info()  { echo "[INFO] $*"; }
-warn()  { echo "[WARN] $*" >&2; }
-error() { echo "[ERR ] $*" >&2; exit 1; }
+info()  { echo "[INF] $*"; }
+warn()  { echo "[WRN] $*" >&2; }
+error() { echo "[ERR] $*" >&2; exit 1; }
 
 # ── Step 1: Check prerequisites ────────────────────────────────────────────
 info "Checking prerequisites..."

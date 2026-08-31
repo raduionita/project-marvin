@@ -572,69 +572,264 @@ test('execTool returns an error for unknown integration tools', async () => {
 
 // ==================== packChat tests ====================
 
-test('packChat keeps only the system message + the last N messages', () => {
-  const engine = mockEngine();
-  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+const sysMsg = (content = 'sys'): Message => ({ role: 'system', content });
+const userMsg = (content: string): Message => ({ role: 'user', content });
+const assistantMsg = (content: string, tools?: Message['tools']): Message =>
+  tools ? { role: 'assistant', content, tools } : { role: 'assistant', content };
+const toolMsg = (toolId: string): Message => ({ role: 'tool', content: '{"ok":true}', toolId });
+const toolCalls = (id: string): Message['tools'] => [{ id, name: 'mock_tool', arguments: {} }];
+
+function packAgent(): Agent {
+  return new Agent(mockEngine(), { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+}
+
+test('packChat leaves empty and system-only chats untouched', () => {
+  const agent = packAgent();
+
+  const empty = chatWith([]);
+  agent.packChat(empty);
+  expect(empty.messages.length).toBe(0);
+
+  const only = chatWith([sysMsg()]);
+  agent.packChat(only);
+  expect(only.messages).toEqual([sysMsg()]);
+});
+
+test('packChat leaves a single short conversation untouched', () => {
+  const agent = packAgent();
   const chat = chatWith([
-    { role: 'system', content: 'sys' },
-    ...Array.from({ length: 30 }, (_, i) => ({ role: 'user' as const, content: `msg-${i}` })),
+    sysMsg(),
+    userMsg('hi'),
+    assistantMsg('hello', toolCalls('t1')),
+    toolMsg('t1'),
+    toolMsg('t1'),
   ]);
 
   agent.packChat(chat);
 
-  expect(chat.messages.length).toBe(constants.MAX_CHAT_MESSAGES);
-  expect(chat.messages[0]).toEqual({ role: 'system', content: 'sys' });
-  expect(chat.messages[chat.messages.length - 1]).toEqual({ role: 'user', content: 'msg-29' });
+  expect(chat.messages.length).toBe(5);
+  expect(chat.messages[0]).toEqual(sysMsg());
+  expect(chat.messages[2]!.tools).toEqual(toolCalls('t1'));
 });
 
-test('packChat leaves short histories untouched', () => {
-  const engine = mockEngine();
-  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+test('packChat leaves a short chat without a system message untouched', () => {
+  const agent = packAgent();
+  const chat = chatWith([userMsg('hi'), assistantMsg('hello')]);
+
+  agent.packChat(chat);
+
+  expect(chat.messages).toEqual([userMsg('hi'), assistantMsg('hello')]);
+});
+
+test('packChat trims the first assistant batch of the active conversation at the cap', () => {
+  const agent = packAgent();
   const chat = chatWith([
-    { role: 'system', content: 'sys' },
-    { role: 'user', content: 'hi' },
+    sysMsg(), 
+    userMsg('do it'), 
+    ...Array.from({ length: 6 }, (_, b) => [
+      assistantMsg(`a${b + 1}`, toolCalls(`t${b + 1}`)),
+      toolMsg(`t${b + 1}`),
+      toolMsg(`t${b + 1}`),
+      toolMsg(`t${b + 1}`),
+    ]).flat()
   ]);
 
   agent.packChat(chat);
 
-  expect(chat.messages.length).toBe(2);
+  // the first batch (a1 + its tool results) is removed, everything else stays
+  expect(chat.messages.length).toBe(22);
+  expect(chat.messages[0]).toEqual(sysMsg());
+  expect(chat.messages[1]).toEqual(userMsg('do it'));
+  expect(chat.messages[2]).toEqual(assistantMsg('a2', toolCalls('t2')));
+  expect(chat.messages[3]).toEqual(toolMsg('t2'));
+  expect(chat.messages[chat.messages.length - 1]).toEqual(toolMsg('t6'));
+  // assistants inside the active conversation keep their tool calls
+  expect(chat.messages[2]!.tools).toEqual(toolCalls('t2'));
 });
 
-test('packChat drops oldest messages when there is no system message', () => {
-  const engine = mockEngine();
-  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
-  const chat = chatWith(Array.from({ length: 30 }, (_, i) => ({ role: 'user' as const, content: `msg-${i}` })));
+test('packChat never trims below the last assistant batch', () => {
+  const agent = packAgent();
+  const chat = chatWith([
+    sysMsg(),
+    userMsg('do it'),
+    assistantMsg('a1', toolCalls('t1')),
+    ...Array.from({ length: 22 }, () => toolMsg('t1')),
+  ]); // 25 messages, a single assistant batch
 
   agent.packChat(chat);
 
-  expect(chat.messages.length).toBe(constants.MAX_CHAT_MESSAGES);
-  expect(chat.messages[0]).toEqual({ role: 'user', content: 'msg-6' });
+  expect(chat.messages.length).toBe(25);
+  expect(chat.messages[2]).toEqual(assistantMsg('a1', toolCalls('t1')));
+  expect(chat.messages[chat.messages.length - 1]).toEqual(toolMsg('t1'));
 });
 
-test('packChat drops leading tool messages orphaned by the trim', () => {
-  const engine = mockEngine();
-  const agent = new Agent(engine, { id: 'a', enabled: true, identity: '', channels: {}, model: {} as never });
+test('packChat collapses closed conversations to user + last assistant', () => {
+  const agent = packAgent();
+  const chat = chatWith([
+    sysMsg(),
+    userMsg('first'),
+    assistantMsg('working', toolCalls('t1')),
+    toolMsg('t1'),
+    assistantMsg('done-1', toolCalls('t2')),
+    toolMsg('t2'),
+    userMsg('second'),
+    assistantMsg('working', toolCalls('t3')),
+    toolMsg('t3'),
+    assistantMsg('done-2', toolCalls('t4')),
+    toolMsg('t4'),
+  ]);
 
-  const messages: Chat['messages'] = [
-    { role: 'system', content: 'sys' },
-    ...Array.from({ length: 5 }, (_, i) => ({ role: 'user' as const, content: `pre-${i}` })),
-    { role: 'assistant', content: '', tools: [{ id: 't1', name: 'mock_tool', arguments: {} }] },
-    { role: 'tool', content: '{"ok":true}', toolId: 't1' },
-    { role: 'tool', content: '{"ok":true}', toolId: 't1' },
-  ];
-  // pad so the trim boundary lands inside the tool batch above
-  while (messages.length < constants.MAX_CHAT_MESSAGES + 6) {
-    messages.push({ role: 'user', content: `pad-${messages.length}` });
+  agent.packChat(chat);
+
+  expect(chat.messages).toEqual([
+    sysMsg(),
+    userMsg('first'),
+    assistantMsg('done-1'), // last assistant of the segment, tools stripped
+    userMsg('second'),
+    assistantMsg('working', toolCalls('t3')),
+    toolMsg('t3'),
+    assistantMsg('done-2', toolCalls('t4')),
+    toolMsg('t4'),
+  ]);
+});
+
+test('packChat keeps an empty-content tool-call assistant when collapsing, stripping its tools', () => {
+  const agent = packAgent();
+  const chat = chatWith([
+    sysMsg(),
+    userMsg('first'),
+    assistantMsg('', toolCalls('t1')),
+    toolMsg('t1'),
+    userMsg('second'),
+    assistantMsg('hi'),
+  ]);
+
+  agent.packChat(chat);
+
+  expect(chat.messages).toEqual([
+    sysMsg(),
+    userMsg('first'),
+    { role: 'assistant', content: '' },
+    userMsg('second'),
+    assistantMsg('hi'),
+  ]);
+});
+
+test('packChat collapses a conversation without an assistant reply to just its user message', () => {
+  const agent = packAgent();
+  const chat = chatWith([
+    sysMsg(),
+    userMsg('first'),
+    toolMsg('t1'),
+    userMsg('second'),
+    assistantMsg('hi'),
+  ]);
+
+  agent.packChat(chat);
+
+  expect(chat.messages).toEqual([sysMsg(), userMsg('first'), userMsg('second'), assistantMsg('hi')]);
+});
+
+test('packChat keeps consecutive user messages as separate collapsed conversations', () => {
+  const agent = packAgent();
+  const chat = chatWith([
+    sysMsg(),
+    userMsg('first'),
+    assistantMsg('done-1'),
+    userMsg('again'),
+    userMsg('current'),
+    assistantMsg('hi'),
+  ]);
+
+  agent.packChat(chat);
+
+  expect(chat.messages).toEqual([
+    sysMsg(),
+    userMsg('first'),
+    assistantMsg('done-1'),
+    userMsg('again'),
+    userMsg('current'),
+    assistantMsg('hi'),
+  ]);
+});
+
+test('packChat drops leading tool messages when collapsing conversations', () => {
+  const agent = packAgent();
+  const chat = chatWith([
+    toolMsg('t0'),
+    toolMsg('t0'),
+    userMsg('first'),
+    assistantMsg('done-1', toolCalls('t1')),
+    toolMsg('t1'),
+    userMsg('second'),
+    assistantMsg('hi'),
+  ]);
+
+  agent.packChat(chat);
+
+  expect(chat.messages).toEqual([
+    userMsg('first'),
+    assistantMsg('done-1'),
+    userMsg('second'),
+    assistantMsg('hi'),
+  ]);
+});
+
+test('packChat keeps leading tool messages when there is only one conversation', () => {
+  const agent = packAgent();
+  const chat = chatWith([toolMsg('t0'), userMsg('only'), assistantMsg('hi')]);
+
+  agent.packChat(chat);
+
+  expect(chat.messages).toEqual([toolMsg('t0'), userMsg('only'), assistantMsg('hi')]);
+});
+
+test('packChat allows collapsed pairs to exceed the cap instead of dropping them', () => {
+  const agent = packAgent();
+  const messages: Chat['messages'] = [sysMsg()];
+  for (let i = 0; i < 12; i++) {
+    messages.push(userMsg(`q${i}`), assistantMsg(`a${i}`, toolCalls(`t${i}`)), toolMsg(`t${i}`));
   }
-  const chat = chatWith(messages);
+  messages.push(userMsg('current'), assistantMsg('hi'));
+  const chat = chatWith(messages); // 1 + 36 + 2 = 39 messages
 
   agent.packChat(chat);
 
-  expect(chat.messages.length <= constants.MAX_CHAT_MESSAGES).toBe(true);
-  expect(chat.messages[0]!.role).toBe('system');
-  // tool responses whose assistant tool_calls parent was trimmed are dropped too
-  expect(chat.messages[1]!.role).not.toBe('tool');
-  expect(chat.messages[1]!.content).toBe('pad-9');
+  // 12 collapsed pairs (24) + active (2) + system (1) = 27: over the cap, but nothing else can go
+  expect(chat.messages.length).toBe(27);
+  expect(chat.messages[0]).toEqual(sysMsg());
+  expect(chat.messages[1]).toEqual(userMsg('q0'));
+  expect(chat.messages[2]).toEqual(assistantMsg('a0')); // tools stripped
+  expect(chat.messages[chat.messages.length - 2]).toEqual(userMsg('current'));
+  expect(chat.messages[chat.messages.length - 1]).toEqual(assistantMsg('hi'));
+});
+
+test('packChat trims the active conversation even when collapsed conversations precede it', () => {
+  const agent = packAgent();
+  const chat = chatWith([
+    sysMsg(),
+    userMsg('first'),
+    assistantMsg('done-1', toolCalls('t1')),
+    toolMsg('t1'),
+    userMsg('current'),
+    ...Array.from({ length: 6 }, (_, b) => [
+      assistantMsg(`a${b + 1}`, toolCalls(`t${b + 1}`)),
+      toolMsg(`t${b + 1}`),
+      toolMsg(`t${b + 1}`),
+      toolMsg(`t${b + 1}`),
+    ]).flat(),
+  ]); // 1 + 3 + 1 + 24 = 29 messages
+
+  agent.packChat(chat);
+
+  // collapse -> 28, trim a1 batch -> 24, still at cap -> trim a2 batch -> 20
+  expect(chat.messages.length).toBe(24);
+  expect(chat.messages[0]).toEqual(sysMsg());
+  expect(chat.messages[1]).toEqual(userMsg('first'));
+  expect(chat.messages[2]).toEqual(assistantMsg('done-1')); // tools stripped
+  expect(chat.messages[3]).toEqual(userMsg('current'));
+  expect(chat.messages[4]).toEqual(assistantMsg('a3', toolCalls('t3')));
+  expect(chat.messages[chat.messages.length - 1]).toEqual(toolMsg('t6'));
 });
 
 // ==================== saveChat / loadChat / makeChat tests ====================

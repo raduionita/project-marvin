@@ -3,15 +3,13 @@ import { join } from 'path';
 
 import type Engine from './engine.js';
 import logger from './logger.js';
-import type { Chat, Model, Reply, Result, ToolMeta } from './types.js';
+import type { Chat, Message, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
 import { truncate, splitMcpToolName, splitIntegrationToolName } from './helpers/index.js';
 
-// agent: an identity (system prompt) + a model + output channels. runs the AI
-// loop via sendChat (model calls + tool execution) on behalf of tasks and chats,
-// and owns the chat cache (loadChat/makeChat/saveChat/packChat).
+// agent: an identity (system prompt) + a model + output channels. runs the AI loop (sendChat)
 export class Agent {
   public id: string = '';
   // agent is enabled or disabled
@@ -167,30 +165,70 @@ export class Agent {
     }
   }
 
-  // bound chat history to the system message + the last N messages
+  // pack chat history: collapse closed conversations, trim the active one when over cap
   packChat(chat: Chat): void {
-    if (chat.messages.length <= constants.MAX_CHAT_MESSAGES) {
-      // no trimming needed
-      return;
+    const messages = chat.messages;
+
+    // split off the leading system message (always kept, never trimmed)
+    const system = messages[0]?.role === 'system' ? messages[0] : undefined;
+    const body = system ? messages.slice(1) : messages;
+
+    // find the user messages that start each conversation
+    const userIdx = body.reduce<number[]>((acc, m, i) => (m.role === 'user' ? [...acc, i] : acc), []);
+
+    // stage 1: collapse every closed conversation (user .. just before the next user)
+    // to its user message + last assistant reply, stripping tool calls and tool results
+    const packed: Message[] = [];
+    if (userIdx.length > 1) {
+      for (let u = 0; u < userIdx.length - 1; u++) {
+        // from #u user message to next user message
+        const segment = body.slice(userIdx[u]!, userIdx[u + 1]!);
+        // find the last assistant message in the segment
+        const lastAssistant = [...segment].reverse().find((m) => m.role === 'assistant');
+        // add user message
+        packed.push(segment[0]!);
+        // if there is an assistant message, add the rest
+        if (lastAssistant) {
+          const { tools, ...rest } = lastAssistant;
+          packed.push(rest);
+        }
+      }
     }
 
-    // TODO: trim middle approach
+    // active conversation: last user message + everything after it
+    // (with a single conversation the whole body is active, leading messages included)
+    const activeStart = userIdx.length > 1 ? userIdx[userIdx.length - 1]! : 0;
+    let active = body.slice(activeStart);
 
-    // drop the oldest messages, always keeping the system message (index 0)
-    const drop = chat.messages.length - constants.MAX_CHAT_MESSAGES;
-    if (chat.messages[0]?.role === 'system') {
-      chat.messages = [chat.messages[0]!, ...chat.messages.slice(drop + 1)];
-    } else {
-      chat.messages = chat.messages.slice(drop);
+    // stage 2: trim the active conversation only when the chat is at/over the cap,
+    // removing the first assistant batch (assistant + its tool results) at a time
+    while ((system ? 1 : 0) + active.length >= constants.MAX_CHAT_MESSAGES) {
+      const firstAssistant = active.findIndex((m) => m.role === 'assistant');
+      if (firstAssistant === -1) break;
+      // the batch runs until the next assistant message (exclusive)
+      let batchEnd = firstAssistant + 1;
+      // find the next assistant message
+      while (batchEnd < active.length && active[batchEnd]!.role !== 'assistant')
+        batchEnd++;
+      // never remove the last assistant batch: system + user + last exchange must survive
+      if (active.slice(batchEnd).some((m) => m.role === 'assistant')) {
+        // continue to reduce the active [] until there's no more assistant messages after
+        active = [...active.slice(0, firstAssistant), ...active.slice(batchEnd)];
+      } else {
+        // is no more assistant messages after the batch, stop = found the last batch
+        break;
+      }
     }
+
+    chat.messages = system ? [system, ...packed, ...active] : [...packed, ...active];
 
     // drop tool messages left without their assistant tool_calls parent right
     // after the trim point: APIs reject tool responses with no matching
     // tool_calls message before them
-    let keep = chat.messages[0]?.role === 'system' ? 1 : 0;
-    let scan = keep; // = 1
-    while (scan < chat.messages.length && chat.messages[scan]!.role === 'tool') scan++;
-    if (scan > keep) chat.messages = [...chat.messages.slice(0, keep), ...chat.messages.slice(scan)];
+    // let keep = chat.messages[0]?.role === 'system' ? 1 : 0;
+    // let scan = keep; // = 1
+    // while (scan < chat.messages.length && chat.messages[scan]!.role === 'tool') scan++;
+    // if (scan > keep) chat.messages = [...chat.messages.slice(0, keep), ...chat.messages.slice(scan)];
   }
 
   // tool call
