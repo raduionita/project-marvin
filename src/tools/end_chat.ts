@@ -9,7 +9,7 @@ export default class EndChatTool extends Tool {
     group: 'control',
     function: {
       name: 'end_chat',
-      description: 'Call this tool ONLY when you have completed all necessary steps and are ready to give the final, definitive answer to the user.',
+      description: 'Call this tool ONLY when ready to give the final, definitive answer to the user.',
       parameters: {
         type: 'object',
         properties: {},

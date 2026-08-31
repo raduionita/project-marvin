@@ -3,6 +3,8 @@ import { Tool, ToolMeta } from '../types.js';
 import { isSafePath, safeJoin } from '../helpers/index.js';
 import logger from '../logger.js';
 
+// TODO: add support for offset - see fs.readSync
+
 export default class ReadFileTool extends Tool {
   public meta: ToolMeta = {
     type: 'function',

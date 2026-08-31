@@ -24,8 +24,8 @@ test('loadTools tool metadata', () => {
   const tool = new LoadToolsTool(engine);
   expect(tool.meta.function.name).toBe('load_tools');
   expect(tool.meta.function.description).toContain('Load one or more callable tools');
-  expect(tool.meta.function.parameters.required).toContain('names');
-  expect(tool.meta.function.parameters.properties.names!.type).toBe('array');
+  expect(tool.meta.function.parameters.required).toContain('tools');
+  expect(tool.meta.function.parameters.properties.tools!.type).toBe('array');
   expect(tool.meta.group).toBe('control');
 });
 

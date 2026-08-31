@@ -28,7 +28,7 @@ export default class LoadToolsTool extends Tool {
   }
 
   public async call(args: { tools: string[] }, agent: Agent, chat: Chat): Promise<{ [key: string]: any }> {
-    logger.debug('[LoadToolsTool.call]', `[${args.tools.join(',')}]`);
+    logger.debug('[LoadToolsTool.call]', `[${(args?.tools || []).join(',')}]`);
 
     const names = Array.isArray(args?.tools) ? args.tools : [];
     if (!names.length) {

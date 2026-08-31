@@ -630,6 +630,6 @@ test('execTask no longer merges task integration tools (lazy via load_tools)', a
   const prompt = seen[0]!.messages[0]!.content as string;
   expect(prompt).toContain('## Integrations');
   expect(prompt).toContain('gloobeam__create_post');
-  expect(prompt).toContain('## Available Tools');
+  expect(prompt).toContain('## Internal Tools');
   expect(prompt).toContain('mock_tool');
 });

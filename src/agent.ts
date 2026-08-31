@@ -125,26 +125,24 @@ export class Agent {
 
     {
       // inject a compact catalog of loadable tools so the agent can discover and load them on demand via the load_tools
-      const available = Object.values(this.engine.tools).filter(t => !t.stop && t.meta.function.name !== 'load_tools');
-      if (available.length) {
-        const groups: Record<string, { name: string, info: string, args: string }[]> = {};
-        for (const tool of available) {
-          (groups[tool.meta.group] ||= []).push({ 
-            name: tool.meta.function.name, 
-            info: tool.meta.function.description, 
-            args: Object.keys(tool.meta.function.parameters.properties).map(p => tool.meta.function.parameters.required?.includes(p) ? `?${p}` : p).join(',')
-          });
-        }
+      const available = Object.values(this.engine.tools);
+      const groups: Record<string, { name: string, info: string, args: string }[]> = {};
+      for (const tool of available) {
+        (groups[tool.meta.group] ||= []).push({ 
+          name: tool.meta.function.name, 
+          info: tool.meta.function.description, 
+          args: Object.keys(tool.meta.function.parameters.properties).map(p => tool.meta.function.parameters.required?.includes(p) ? `?${p}` : p).join(',')
+        });
+      }
 
-        system += '\n\n';
-        system += '## Internal Tools\n';
-        for (const [group, names] of Object.entries(groups)) {
-          system += `### ${group} tools:\n`;
-          for (const { name, info, args } of names) {
-            system += `- \`${name}\`: ${info}\n`;
-            // add internal tool to the list of tools to load
-            tools.push(name);
-          }
+      system += '\n\n';
+      system += '## Internal Tools\n';
+      for (const [group, names] of Object.entries(groups)) {
+        system += `### ${group} tools:\n`;
+        for (const { name, info, args } of names) {
+          system += `- \`${name}\`: ${info}\n`;
+          // add internal tool to the list of tools to load
+          tools.push(name);
         }
       }
 
@@ -158,9 +156,7 @@ export class Agent {
           chat.messages = [{ role: 'system', content: system }];
           chat.thinking = false;
           chat.userId = '';
-          chat.tools = [];
-          chat.tools.push(this.engine.tools['end_chat']!.meta);
-          chat.tools.push(this.engine.tools['load_tools']!.meta);
+          chat.tools = Object.values(this.engine.tools).filter(t => t.stop || t.meta.function.name === 'load_tools').map(t => t.meta);
           chat.updated = Date.now();
 
     return chat;
@@ -221,7 +217,7 @@ export class Agent {
 
     // stage 2: trim the active conversation only when the chat is at/over the cap,
     // removing the first assistant batch (assistant + its tool results) at a time
-    while ((system ? 1 : 0) + active.length >= constants.MAX_CHAT_MESSAGES) {
+    while ((system ? 1 : 0) + packed.length + active.length >= constants.MAX_CHAT_MESSAGES) {
       const firstAssistant = active.findIndex((m) => m.role === 'assistant');
       if (firstAssistant === -1) break;
       // the batch runs until the next assistant message (exclusive)
