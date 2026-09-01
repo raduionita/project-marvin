@@ -7,7 +7,7 @@ import type { Chat, Message, Model, Reply, Result, ToolMeta } from './types.js';
 import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
-import { truncate, splitMcpToolName, splitIntegrationToolName } from './helpers/index.js';
+import { truncate, splitMcpToolName, splitIntegrationToolName, readError } from './helpers/index.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI loop (sendChat)
 export class Agent {
@@ -146,9 +146,11 @@ export class Agent {
         }
       }
 
-      system += '\n';
-      system += '## Execution\n';
-      system += 'Use the `load_tools` tool to load (integration, MCP, or internal) tools before calling them.';
+      system += '\n\n';
+      system += '## Tool execution\n';
+      system += '- use the `load_tools` tool to load (integration, MCP, or internal) tools before calling them.\n';
+      system += '- try to batch multiple tools together into a single call.\n';
+      system += '- use the `end_chat` tool to signal the end of the chat.\n';
     } // tools
 
     const chat = {} as Chat;
@@ -282,7 +284,7 @@ export class Agent {
   // exec chat // agent loop
   async sendChat(chatId: string | undefined, message: string) : Promise<Result> {
     try {
-      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
+      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`, '---------------');
 
       // get chat from cache/store, or create a new one seeded with the system prompt
       const chat = this.loadChat(chatId);
@@ -343,10 +345,11 @@ export class Agent {
       // save chat to cache
       this.saveChat(chatId, chat);
 
+      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, reply=${reply?.message?.content?.slice(0, 32)}`, '---------------');
       return { content: (reply?.message?.content || '').trim(), steps: steps, usage: usage };
-    } catch (error) {
-      logger.error('[Agent.sendChat]', error);
-      return { content: '', steps: 0, error: (error as Error).message };
+    } catch (err) {
+      logger.error('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}`, readError(err), '---------------');
+      return { content: '', steps: 0, error: (err as Error).message };
     } 
   }
 }

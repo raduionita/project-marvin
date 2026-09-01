@@ -1,3 +1,4 @@
+import { join } from "path";
 import { existsSync, readFileSync, unlinkSync } from "fs";
 
 import logger from './logger.js';
@@ -8,10 +9,9 @@ import * as constants from './constants.js';
 import { listInternalTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
 import { listIntegrations } from "./integrations/index.js";
-import { Mcp } from "./mcp.js";
+import { Mcp } from "./mcp";
 import { listSkills, loadSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
-import { join } from "path";
 
 export default class Engine {
   public state: 'none' | 'load' | 'exec' | 'drop' = 'none';
@@ -156,7 +156,7 @@ export default class Engine {
   }
 
   async loadSystems() {
-    logger.debug('[Engine.loadSystems]');
+    logger.debug('[Engine.loadSystems]', 'loading systems...');
 
     const files = listSystems(this);
     for (const name of files) {
@@ -230,7 +230,7 @@ export default class Engine {
   }
 
   async loadChannels() {
-    logger.debug('[Engine.loadChannels]');
+    logger.debug('[Engine.loadChannels]', 'loading channels...');
     
     const files = listChannels(this);
     for (const [id, config] of Object.entries(this.config.channels)) {
@@ -262,11 +262,11 @@ export default class Engine {
       }
     }
 
-    logger.debug('[Engine.loadChannels]', Object.keys(this.channels));
+    logger.debug('[Engine.loadChannels]', `[${Object.keys(this.channels).join(',')}]`);
   }
 
   async loadIntegrations() {
-    logger.debug('[Engine.loadIntegrations]');
+    logger.debug('[Engine.loadIntegrations]', 'loading integrations...');
 
     const files = listIntegrations(this);
     for (const [id, config] of Object.entries(this.config.integrations)) {
@@ -305,12 +305,12 @@ export default class Engine {
       if (typeof refresh === 'function') refresh.call(tool);
     }
 
-    logger.debug('[Engine.loadIntegrations]', Object.keys(this.integrations));
+    logger.debug('[Engine.loadIntegrations]', `[${Object.keys(this.integrations).join(',')}]`);
   }
 
   // connects the configured mcp servers (spawn + initialize)
   async loadMcps() {
-    logger.debug('[Engine.loadMcps]');
+    logger.debug('[Engine.loadMcps]', 'loading mcps...');
 
     for (const [id, config] of Object.entries(this.config.mcps || {})) {
       if (!config.enabled) continue;
@@ -325,11 +325,11 @@ export default class Engine {
       }
     }
 
-    logger.debug('[Engine.loadMcps]', 'mcps:', Object.keys(this.mcps));
+    logger.debug('[Engine.loadMcps]', 'mcps:', `[${Object.keys(this.mcps).join(',')}]`);
   }
 
   async loadSkills() {
-    logger.debug('[Engine.loadSkills]');
+    logger.debug('[Engine.loadSkills]', 'loading skills...');
 
     // default skills shipped with marvin (src/skills), overridden by
     // custom workspace skills (~/.marvin/skills)
@@ -343,10 +343,12 @@ export default class Engine {
         logger.error('[Engine.loadSkills]', `failed to load "${id}":`, err);
       }
     }
+
+    logger.debug('[Engine.loadSkills]', `[${Object.keys(this.skills).join(',')}]`);
   }
 
   async loadModels() {
-    logger.debug('[Engine.loadModels]');
+    logger.debug('[Engine.loadModels]', 'loading models...');
 
     // config models
     const files = listModels(this);
@@ -409,10 +411,12 @@ export default class Engine {
         logger.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
       }
     }
+
+    logger.debug('[Engine.loadModels]', `[${Object.keys(this.models).join(',')}]`);
   }
 
   async loadAgents() {
-    logger.debug('[Engine.loadAgents]');
+    logger.debug('[Engine.loadAgents]', 'loading agents...');
 
     // type: orchestrator/supervisor
     if (!this.agents[this.config.settings.name]) {
@@ -469,7 +473,7 @@ export default class Engine {
         model: model,
       });
 
-      logger.info('[Engine.loadAgents]',`agent [${agentId}] loaded`);
+      logger.info('[Engine.loadAgents]',`agent "${agentId}" loaded`);
     }
 
     logger.debug('[Engine.loadAgents]', 'agents:', Object.keys(this.agents));
@@ -478,7 +482,7 @@ export default class Engine {
   // loads tasks: the internal monitor/sweep tasks run on the orchestrator
   // agent, config tasks run on the agent referenced by task.agent
   async loadTasks() {
-    logger.debug('[Engine.loadTasks]');
+    logger.debug('[Engine.loadTasks]', 'loading tasks...');
 
     const marvinId = this.config.settings.name;
     const marvin = this.agents[marvinId];
@@ -490,7 +494,7 @@ export default class Engine {
         enabled: true,
         type: 'monitor',
         agent: marvin,
-        schedule: 60*60*1000,
+        schedule: constants.MONITOR_TASK_MS,
         timeout: null,
         maxSteps: 0,
         input: 'monitor',
@@ -501,7 +505,7 @@ export default class Engine {
         enabled: true,
         type: 'sweep',
         agent: marvin,
-        schedule: constants.CHAT_SWEEP_MS,
+        schedule: constants.SWEEP_TASK_MS,
         timeout: null,
         maxSteps: 0,
         input: 'sweep',
@@ -550,16 +554,17 @@ export default class Engine {
       logger.info('[Engine.loadTasks]', `task "${taskId}" created (agent ${agent.id})`);
     }
 
-    logger.debug('[Engine.loadTasks]', 'tasks:', Object.keys(this.tasks));
+    logger.debug('[Engine.loadTasks]', `[${Object.keys(this.tasks).join(',')}]`);
   }
 
   async dropAgents() {
-    logger.debug('[Engine.dropAgents]');
+    logger.debug('[Engine.dropAgents]', 'dropping agents...');
     this.agents = {};
+    logger.debug('[Engine.dropAgents]', 'done');
   }
 
   async dropTasks() {
-    logger.debug('[Engine.dropTasks]');
+    logger.debug('[Engine.dropTasks]', 'dropping tasks...');
     for (const [taskId, task] of Object.entries(this.tasks)) {
       if (task.timeout) {
         logger.debug('[Engine.dropTasks]', `stopping task ${taskId}`);
@@ -572,23 +577,24 @@ export default class Engine {
   }
 
   async dropModels() {
-    logger.debug('[Engine.dropModels]');
+    logger.debug('[Engine.dropModels]', 'dropping models...');
     this.models = {};
+    logger.debug('[Engine.dropModels]', 'done');
   }
 
   async dropSkills() {
-    logger.debug('[Engine.dropSkills]');
+    logger.debug('[Engine.dropSkills]', 'dropping skills...');
     this.skills = {};
   }
 
   async dropIntegrations() {
-    logger.debug('[Engine.dropIntegrations]');
+    logger.debug('[Engine.dropIntegrations]', 'dropping integrations...');
     this.integrations = {};
   }
 
   // will detach and delete ALL channels from the engine
   async dropChannels() {
-    logger.debug('[Engine.dropChannels]');
+    logger.debug('[Engine.dropChannels]', 'dropping channels...');
     for (const [channelId, channel] of Object.entries(this.channels)) {
       try {
         logger.debug('[Engine.dropChannels]', `detaching channel ${channelId}`);
@@ -620,7 +626,7 @@ export default class Engine {
 
   // disconnects all mcp servers (kills their processes)
   async dropMcps() {
-    logger.debug('[Engine.dropMcps]');
+    logger.debug('[Engine.dropMcps]', 'dropping mcps...');
     for (const [id, client] of Object.entries(this.mcps)) {
       try {
         logger.debug('[Engine.dropMcps]', `disconnecting mcp ${id}`);
@@ -647,7 +653,7 @@ export default class Engine {
   }
 
   async dropSystems() {
-    logger.debug('[Engine.dropSystems]');
+    logger.debug('[Engine.dropSystems]', 'dropping systems...');
     for (const [name, system] of Object.entries(this.systems)) {
       try {
         logger.debug('[Engine.dropSystems]', `detaching system ${name}`);
@@ -689,19 +695,19 @@ export default class Engine {
     }
     
     // log agents and their tasks
-    logger.info('[Engine.execMonitor]', `marvin agents:`);
+    logger.info('[Engine.execMonitor]', `agents:`);
     for (const [agentId, agent] of Object.entries(this.agents)) {
-      logger.info('[Engine.execMonitor]', `agent ${agentId}:`);
-      logger.info('[Engine.execMonitor]', `- enabled: ${agent.enabled?'yes':'no'}`);
-      logger.info('[Engine.execMonitor]', `- model: ${agent.model.model}`);
-      logger.info('[Engine.execMonitor]', `- channels: ${Object.keys(agent.channels)}`);
+      logger.info('[Engine.execMonitor]', `  "${agentId}":`);
+      logger.info('[Engine.execMonitor]', `  - enabled: ${agent.enabled?'yes':'no'}`);
+      logger.info('[Engine.execMonitor]', `  - model: ${agent.model.model}`);
+      logger.info('[Engine.execMonitor]', `  - channels: ${Object.keys(agent.channels)}`);
     }
 
-    logger.info('[Engine.execMonitor]', `  tasks:`);
+    logger.info('[Engine.execMonitor]', `tasks:`);
     for (const [taskId, task] of Object.entries(this.tasks)) {
-      logger.info('[Engine.execMonitor]', `task ${taskId}`);
-      logger.info('[Engine.execMonitor]', `- input: ${task.input?.slice(0, 32)}`);
-      logger.info('[Engine.execMonitor]', `- schedule: ${task.schedule}ms`);
+      logger.info('[Engine.execMonitor]', `  "${taskId}"`);
+      logger.info('[Engine.execMonitor]', `  - input: ${task.input?.slice(0, 32)}`);
+      logger.info('[Engine.execMonitor]', `  - schedule: ${task.schedule}ms`);
     }
     
     // re-schedule next execution
@@ -742,7 +748,7 @@ export default class Engine {
 
     logger.info('[Engine.execSweep]', `removed ${removed} idle chat(s)`);
 
-    const schedule = Math.max(60*60*1000, Math.min(60*1000, removed === 0 ? task.schedule * 2 : task.schedule / 2));
+    const schedule = Math.max(constants.SWEEP_TASK_MS, removed === 0 ? task.schedule * 2 : constants.SWEEP_TASK_MS);
 
     // re-schedule next execution
     task.timeout = setTimeout(this.execSweep.bind(this), schedule, taskId);

@@ -234,7 +234,7 @@ export default class SlackChannel extends Channel {
   protected async onMessage({ event, body, ack }: HandlerParams) {
     const thread = event.thread_ts || event.ts || event.event_ts;
     try {
-      logger.debug('[SlackChannel.onMessage]', event.channel, thread, 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      logger.debug('[SlackChannel.onMessage]', event.channel, thread); // , 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
 
       // extract the actual message text (strip @marvin mention)
       const text = this.cleanText(event.text || '');

@@ -95,7 +95,7 @@ export class Mcp {
 
   // call a tool by its sanitized name, returning the flattened result content.
   async call(name: string, args: { [key: string]: any } = {}): Promise<{ [key: string]: any }> {
-    logger.debug(`[Mcp.call]`, this.id, name, `input: [${Object.keys(args).join(',')}]`);
+    logger.debug(`[Mcp.call]`, this.id, name, `input=${JSON.stringify(args).slice(0, 32)}`);
 
     if (!this.client) {
       logger.warn(`[Mcp.call]`, this.id, 'not connected, reconnecting');
@@ -117,7 +117,7 @@ export class Mcp {
       throw new Error(flat.text || `tool ${name}(${Object.keys(args).join(',')}) failed on "${this.id}" mpc tool call`);
     }
 
-    logger.debug(`[Mcp.call]`, this.id, name, `reply: [${Object.keys(flat).join(',')}]`);
+    logger.debug(`[Mcp.call]`, this.id, name, `reply=${JSON.stringify(flat).slice(0, 32)}`);
 
     return flat;
   }
