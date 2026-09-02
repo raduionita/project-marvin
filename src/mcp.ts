@@ -8,7 +8,7 @@ import type Engine from './engine.js';
 import logger from './logger.js';
 import type { ToolMeta, Config } from './types.js';
 import * as constants from './constants.js';
-import { sanitizeToolName, flattenContent } from './helpers/index.js';
+import { sanitizeToolName } from './helpers/index.js';
 
 // client for one mcp server over stdio: spawns the process on load, lists its
 // tools and forwards tool calls. reconnects lazily if the process died.
@@ -94,8 +94,8 @@ export class Mcp {
   }
 
   // call a tool by its sanitized name, returning the flattened result content.
-  async call(name: string, args: { [key: string]: any } = {}): Promise<{ [key: string]: any }> {
-    logger.debug(`[Mcp.call]`, this.id, name, `input=${JSON.stringify(args).slice(0, 32)}`);
+  async call(name: string, args: { [key: string]: any } = {}): Promise<{ schemas: {[key: string]: any}[] }> {
+    logger.debug(`[Mcp.call]`, this.id, name, JSON.stringify(args).slice(0, 128));
 
     if (!this.client) {
       logger.warn(`[Mcp.call]`, this.id, 'not connected, reconnecting');
@@ -110,16 +110,33 @@ export class Mcp {
       { timeout: constants.MCP_CALL_TIMEOUT_MS },
     );
 
-    const flat = flattenContent(result.content);
-    
-    // in-band errors (isError=true) surface as thrown errors for the ai loop
+    const blocks = Array.isArray(result.content) ? result.content : [];
+
     if (result.isError) {
-      throw new Error(flat.text || `tool ${name}(${Object.keys(args).join(',')}) failed on "${this.id}" mpc tool call`);
+      throw new Error(blocks[0]?.text || `tool ${name}(${Object.keys(args).join(',')}) failed on "${this.id}" mpc tool call`);
     }
 
-    logger.debug(`[Mcp.call]`, this.id, name, `reply=${JSON.stringify(flat).slice(0, 32)}`);
+    const schemas: { [key: string]: any }[] = [];
+    let count: number = 0;
+    for (const block of blocks as { type: string, text?: string, data?: string, uri?: string }[]) {
+      if (block.type === 'text' && typeof block.text === 'string') {
+        // try to parse structured JSON, fall back to plain text
+        let parsed: any = null;
+        try { parsed = JSON.parse(block.text); } catch { parsed = null; }
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) {
+          schemas.push(parsed);
+        } else {
+          schemas.push({ 'text': block.text });
+        }
+      } else {
+        schemas.push({ [block.type]: block });
+      }
+      count++;
+    }
 
-    return flat;
+    logger.debug(`[Mcp.call]`, this.id, name, count, JSON.stringify(schemas).slice(0, 128));
+
+    return { schemas: schemas };
   }
 
   private onStderr(chunk: Buffer) {

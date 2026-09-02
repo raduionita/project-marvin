@@ -62,7 +62,7 @@ export default class WebSearchTool extends Tool {
   }
 
   public async call(args: { query: string }) {
-    logger.debug('[WebSearchTool.call]', Object.keys(args));
+    logger.debug('[WebSearchTool.call]', args.query.slice(0, 64));
 
     if (!this.engine.systems['browser']) {
       throw new Error('[WebSearchTool.call] ERROR - Browser is not loaded in the server engine');

@@ -13,7 +13,7 @@ export default class WebFetchTool extends Tool {
     group: 'web',
     function: {
       name: 'web_fetch',
-      description: 'Fetch and extract content of a web page.',
+      description: 'Fetch and extract content of a web page. If it fails, blocked or empty, try `web_browse`.',
       parameters: {
         type: 'object',
         properties: {
@@ -60,7 +60,7 @@ export default class WebFetchTool extends Tool {
   }
 
   public async call(args: { url: string }) {
-    logger.debug('[WebFetchTool.call]', Object.keys(args));
+    logger.debug('[WebFetchTool.call]', args.url.slice('https://'.length, 64));
 
     // use fetch to fetch the page
     const response = await fetch(args.url);

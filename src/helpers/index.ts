@@ -9,7 +9,7 @@ export function tryJsonParse<T>(str: string): T {
   try {
     return JSON.parse(str) as T;
   } catch (error) {
-    logger.warn('[tryJsonParse]', `"${str}"`, (error as Error).message);
+    logger.warn('[tryJsonParse]', `"${str.slice(0,1238)}"`, readError(error));
     return {} as T;
   }
 }
@@ -68,22 +68,6 @@ export function truncate(text: string, max: number): string {
 // llm function names must match ^[a-zA-Z0-9_-]+$: map anything else to _
 export function sanitizeToolName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-// flatten mcp result content blocks into a plain object: text blocks join into
-// .text, other block types (image, audio, resource) are kept under their type
-export function flattenContent(content: unknown): { [key: string]: any } {
-  const out: { [key: string]: any } = {};
-  const texts: string[] = [];
-  for (const block of (Array.isArray(content) ? content : []) as { type: string, text?: string }[]) {
-    if (block.type === 'text' && typeof block.text === 'string') {
-      texts.push(block.text);
-    } else {
-      (out[block.type] ||= []).push(block);
-    }
-  }
-  if (texts.length) out.text = texts.join('\n');
-  return out;
 }
 
 export function getRootDir() {

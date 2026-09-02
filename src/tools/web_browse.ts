@@ -60,7 +60,7 @@ export default class WebBrowseTool extends Tool {
   }
 
   public async call(args: { url: string }) {
-    logger.debug('[WebBrowseTool.call]', Object.keys(args));
+    logger.debug('[WebBrowseTool.call]', args.url.slice('https://'.length, 64));
 
     if (!this.engine.systems['browser']) {
       return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server engine' }

@@ -248,7 +248,7 @@ export class Agent {
 
   // tool call
   async execTool(tool: string, args: {[key:string]:any}, chat: Chat) : Promise<{[key:string]:any}> {
-    logger.debug('[Agent.execTool]', tool, `${Object.keys(args).join(',')}]`);
+    logger.debug('[Agent.execTool]', tool, JSON.stringify(args).slice(0, 64));
     try {
       // internal tools
       const instance = this.engine.tools[tool];
@@ -315,7 +315,7 @@ export class Agent {
         ended = reply.stop || ended;
         // execute any tool calls (engine tools, integration __ tools, mcp __ tools via execTool)
         for (const call of reply.message.tools || []) {
-          logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, `[${Object.keys(call.arguments).join(',')}]`);
+          logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, JSON.stringify(call.arguments).slice(0, 64));
           const tool = this.engine.tools[call.name];
           if (tool?.stop) {
             ended = true;
