@@ -99,8 +99,6 @@ export default class SlackChannel extends Channel {
       this.socketClient.on('error', this.onError.bind(this));
       this.socketClient.on('connecting', this.onConnecting.bind(this));
       this.socketClient.on('connected', this.onConnected.bind(this));
-      this.socketClient.on('reconnecting', this.onReconnecting.bind(this));
-      this.socketClient.on('reconnected', this.onReconnected.bind(this));
       this.socketClient.on('disconnected', this.onDisconnected.bind(this));
 
       // route Slack events to Marvin's AI loop
@@ -254,7 +252,7 @@ export default class SlackChannel extends Channel {
 
       logger.info('[SlackChannel.onMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
 
-      // process through Marvin's AI loop (executes model calls + tool execution)
+      // ! process through Marvin's AI loop (executes model calls + tool execution)
       const result = await agent.sendChat(chatId, text);
       if (result.error) {
         logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
@@ -330,14 +328,6 @@ export default class SlackChannel extends Channel {
 
   protected async onConnected() {
     logger.info('[SlackChannel.onConnected]', 'connected!');
-  }
-
-  protected async onReconnecting(attemptNumber: number) {
-    logger.warn('[SlackChannel.onReconnecting]', `reconnecting... (${attemptNumber})`);
-  }
-
-  protected async onReconnected() {
-    logger.warn('[SlackChannel.onReconnected]', 'reconnected!');
   }
 
   protected async onDisconnected(error: Error) {

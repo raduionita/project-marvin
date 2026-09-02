@@ -17,6 +17,17 @@ export const LEVEL_PREFIXES: Record<LogLevel, string> = {
   error: '[ERR]',
 };
 
+// ANSI colors per level (log = no color / white)
+export const LEVEL_COLORS: Record<LogMethod, string> = {
+  debug: '\x1b[90m', // bright black / light gray
+  info : '\x1b[94m', // bright blue / light blue
+  warn : '\x1b[33m', // yellow / orange
+  error: '\x1b[91m', // bright red
+  log  : '',
+};
+
+const RESET = '\x1b[0m';
+
 // the levels a Logger can emit, including raw (unfiltered) log lines
 export type LogMethod = 'log' | LogLevel;
 
@@ -42,8 +53,27 @@ export function setLoggerMode(mode: { prefix?: boolean; stripTags?: boolean }): 
 }
 
 // the sink every Logger writes to when no `output` override is passed: the
-// real console by default; tests and daemon consumers can swap it in one call
+// real console by default; tests and daemon consumers can swap it in one call.
+// colors are applied here so setDefaultOutput captures stay uncolored.
 let defaultOutput: LogOutput = (level, args) => {
+  const color = LEVEL_COLORS[level];
+  // honor NO_COLOR and non-TTY without forcing colors; tests swap the sink
+  if (color && !process.env.NO_COLOR) {
+    const colored = [...args] as unknown[];
+    if (typeof colored[0] === 'string') {
+      colored[0] = color + (colored[0] as string);
+    } else {
+      colored.unshift(color);
+    }
+    const last = colored.length - 1;
+    if (typeof colored[last] === 'string') {
+      colored[last] = (colored[last] as string) + RESET;
+    } else {
+      colored.push(RESET);
+    }
+    (console[level] as (...a: unknown[]) => void)(...colored);
+    return;
+  }
   console[level](...args);
 };
 

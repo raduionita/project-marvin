@@ -23,11 +23,11 @@ export default class Engine {
 
   // channels, models, agents
   public channels: Record<string, Channel> = {};
-  public skills  : Record<string, Skill> = {};
   public models  : Record<string, Model> = {};
   public agents  : Record<string, Agent> = {};
   public tasks   : Record<string, Task> = {};
   
+  public skills      : Record<string, Skill> = {};
   public tools       : Record<string, Tool> = {};
   public mcps        : Record<string, Mcp> = {};
   public integrations: Record<string, Integration> = {};
@@ -697,7 +697,7 @@ export default class Engine {
     // log agents and their tasks
     logger.info('[Engine.execMonitor]', `agents:`);
     for (const [agentId, agent] of Object.entries(this.agents)) {
-      logger.info('[Engine.execMonitor]', `  "${agentId}":`);
+      logger.info('[Engine.execMonitor]', `  ${agentId}:`);
       logger.info('[Engine.execMonitor]', `  - enabled: ${agent.enabled?'yes':'no'}`);
       logger.info('[Engine.execMonitor]', `  - model: ${agent.model.model}`);
       logger.info('[Engine.execMonitor]', `  - channels: ${Object.keys(agent.channels)}`);
@@ -705,7 +705,8 @@ export default class Engine {
 
     logger.info('[Engine.execMonitor]', `tasks:`);
     for (const [taskId, task] of Object.entries(this.tasks)) {
-      logger.info('[Engine.execMonitor]', `  "${taskId}"`);
+      logger.info('[Engine.execMonitor]', `  ${taskId}`);
+      logger.info('[Engine.execMonitor]', `  - agent: ${task.agent?.id}`);
       logger.info('[Engine.execMonitor]', `  - input: ${task.input?.slice(0, 32)}`);
       logger.info('[Engine.execMonitor]', `  - schedule: ${task.schedule}ms`);
     }

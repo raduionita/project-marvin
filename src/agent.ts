@@ -22,14 +22,12 @@ export class Agent {
   public channels: Record<string, string> = {};
   // will use this model to communicate with the LLMs
   public model!: Model;
-
   // chat cache (chatId: chat), swept by the engine's execSweep task
   public cache: Record<string, Chat> = {};
 
   // shared logger (default-exported singleton from ./logger.js)
   constructor(public engine: Engine, config: { [key: string]: any } = {}) {
     Object.assign(this, config);
-    logger.debug(`[${this.constructor.name || 'Agent'}.constructor]`);
   }
 
   // get a chat for this id: reuse the cached/persisted one, or create a new
