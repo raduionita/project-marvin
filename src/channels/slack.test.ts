@@ -128,8 +128,6 @@ class MockSlackChannel extends SlackChannel {
   async onError(err: Error) { return super.onError(err); }
   async onConnecting() { return super.onConnecting(); }
   async onConnected() { return super.onConnected(); }
-  async onReconnecting(n: number) { return super.onReconnecting(n); }
-  async onReconnected() { return super.onReconnected(); }
   async onDisconnected(err: Error) { return super.onDisconnected(err); }
 }
 
@@ -859,18 +857,6 @@ test('onConnected logs connected message', async () => {
   await channel.onConnected();
 
   expect(lines[0]).toContain('connected');
-  restore();
-});
-
-test('onReconnecting logs warning with attempt number', async () => {
-  const { lines, restore } = captureLogger();
-  const channel = buildChannel();
-  await channel.load();
-
-  await channel.onReconnecting(3);
-
-  expect(lines[0]).toContain('reconnecting');
-  expect(lines[0]).toContain('3');
   restore();
 });
 

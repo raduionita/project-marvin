@@ -282,7 +282,7 @@ export class Agent {
   // exec chat // agent loop
   async sendChat(chatId: string | undefined, message: string) : Promise<Result> {
     try {
-      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`, '---------------');
+      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`, '--------');
 
       // get chat from cache/store, or create a new one seeded with the system prompt
       const chat = this.loadChat(chatId);
@@ -343,10 +343,10 @@ export class Agent {
       // save chat to cache
       this.saveChat(chatId, chat);
 
-      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, reply=${reply?.message?.content?.slice(0, 32)}`, '---------------');
+      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, reply=${reply?.message?.content?.slice(0, 32)}`, '--------');
       return { content: (reply?.message?.content || '').trim(), steps: steps, usage: usage };
     } catch (err) {
-      logger.error('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}`, readError(err), '---------------');
+      logger.error('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}`, readError(err), '--------');
       return { content: '', steps: 0, error: (err as Error).message };
     } 
   }

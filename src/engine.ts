@@ -40,7 +40,6 @@ export default class Engine {
   public isTest: boolean = process.env.NODE_ENV === 'test' || process.env.BUN_TEST === '1';
   public isDebug: boolean =  process.env.MARVIN_LOG_LEVEL === 'debug';
 
-  // shared logger (default-exported singleton from ./logger.js)
   async load() {
     logger.debug('[Engine.load]');
 
@@ -86,7 +85,8 @@ export default class Engine {
   }
 
   async exec() {
-    logger.debug('[Engine.exec]');
+    logger.debug('[Engine.exec]', '----------------------------------------------------------------');
+    logger.debug('[Engine.exec]', 'state:', this.state);
 
     // force load if not loaded
     if (this.state === 'none') {

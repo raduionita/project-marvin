@@ -19,9 +19,9 @@ export const LEVEL_PREFIXES: Record<LogLevel, string> = {
 
 // ANSI colors per level (log = no color / white)
 export const LEVEL_COLORS: Record<LogMethod, string> = {
-  debug: '\x1b[90m', // bright black / light gray
-  info : '\x1b[94m', // bright blue / light blue
-  warn : '\x1b[33m', // yellow / orange
+  debug: '\x1b[90m', // bright black 
+  info : '\x1b[36m', // bright cyan 
+  warn : '\x1b[33m', // yellow
   error: '\x1b[91m', // bright red
   log  : '',
 };
