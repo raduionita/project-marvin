@@ -18,7 +18,7 @@ export default class LoadToolsTool extends Tool {
           tools: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Names of the tools to load (e.g. ["web_search", "mcp__endpoint-tool"])',
+            description: 'Names of tools to load (e.g. ["web_search", "mcpName__endpoint-tool"])',
           },
         },
         required: ['tools'],

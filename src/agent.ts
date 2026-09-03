@@ -6,7 +6,7 @@ import logger from './logger.js';
 import type { Chat, Message, Model, Reply, Result, ToolMeta } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
-import { truncate, splitMcpToolName, readError } from './helpers/index.js';
+import { truncate, splitMcpToolName as splitToolName, readError } from './helpers/index.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI loop (sendChat)
 export class Agent {
@@ -237,7 +237,7 @@ export class Agent {
 
   // tool call
   async execTool(tool: string, args: {[key:string]:any}, chat: Chat) : Promise<{[key:string]:any}> {
-    logger.info('[Agent.execTool]', tool, JSON.stringify(args).slice(0, 64));
+    logger.info('[Agent.execTool]', tool, JSON.stringify(args).slice(0, 128));
     try {
       // internal tools
       const instance = this.engine.tools[tool];
@@ -247,10 +247,10 @@ export class Agent {
       }
 
       // mcp tools (<mcpId>__<toolName>) loaded per-task
-      const mcpSplit = splitMcpToolName(tool);
-      const mcp = mcpSplit ? this.engine.mcps[mcpSplit.id] : undefined;
+      const split = splitToolName(tool);
+      const mcp = split ? this.engine.mcps[split.id] : undefined;
       if (mcp) {
-        return await mcp.call(mcpSplit!.name, args);
+        return await mcp.call(split!.name, args);
       }
     } catch (err) {
       logger.warn('[Agent.execTool]', `failed=${tool} error=${(err as Error).message}`);
@@ -258,7 +258,7 @@ export class Agent {
     }
     // not found
     logger.error('[Agent.execTool]', `tool ${tool} not found`);
-    return {tool: tool, error: `tool ${tool} does NOT exist`};
+    return {tool: tool, error: `tool ${tool} NOT found`};
   }
 
   // exec chat // agent loop

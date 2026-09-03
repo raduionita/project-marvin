@@ -846,8 +846,10 @@ test('makeChat creates a fresh chat (with system prompt) when none was saved', (
   const prompt = chat.messages[0]!.content as string;
   expect(prompt).toContain('my identity');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tool execution');
-  expect(prompt).toContain('use the `load_tools` tool to load');
+  expect(prompt).toContain('## Tools');
+  expect(prompt).toContain('### control tools:');
+  expect(prompt).toContain('`end_chat`');
+  expect(prompt).toContain('`load_tools`');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -862,8 +864,8 @@ test('makeChat seeds only the identity', () => {
   const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
   expect(prompt).toContain('my identity');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Internal Tools');
-  expect(prompt).toContain('## Tool execution');
+  expect(prompt).toContain('## Tools');
+  expect(prompt).toContain('### control tools:');
 });
 
 test('makeChat renders a memory block when memory notes exist', () => {
@@ -882,7 +884,7 @@ test('makeChat renders a memory block when memory notes exist', () => {
   expect(prompt).toContain('prefs: Prefers concise answers');
   expect(prompt).toContain('goals: Ship marvin 1.0');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tool execution');
+  expect(prompt).toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -894,8 +896,8 @@ test('makeChat omits the memory block when memory is disabled', () => {
   expect(prompt).toContain('my identity');
   expect(prompt).not.toContain('## Memory');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Internal Tools');
-  expect(prompt).toContain('## Tool execution');
+  expect(prompt).toContain('## Tools');
+  expect(prompt).toContain('### control tools:');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -918,7 +920,7 @@ test('makeChat seeds a system prompt with an MCPs block for loaded mcps', () => 
   expect(prompt).toContain('`my_mcp__my_tool`: Does a thing');
   expect(prompt).toContain('`my_mcp__other_tool`: Other');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tool execution');
+  expect(prompt).toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -935,7 +937,7 @@ test('makeChat omits MCP tools when mcp is not loaded', () => {
   expect(prompt).toContain('## MCPs');
   expect(prompt).not.toContain('my_mcp__');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tool execution');
+  expect(prompt).toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -946,8 +948,7 @@ test('makeChat omits MCP block when no mcps are configured', () => {
   expect(prompt).toContain('my identity');
   expect(prompt).not.toContain('## MCPs');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Internal Tools');
-  expect(prompt).toContain('## Tool execution');
+  expect(prompt).toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -970,17 +971,15 @@ test('makeChat seeds the system prompt with a grouped "## Internal Tools" block'
 
   const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
 
-  expect(prompt).toContain('## Internal Tools');
-  // grouped entries: "### <group> tools:" with "- `name` (desc)"
+  expect(prompt).toContain('## Tools');
+  // grouped entries: "### <group> tools:" with "- `name`: desc"
+  expect(prompt).toContain('### control tools:');
   expect(prompt).toContain('### filesystem tools:');
   expect(prompt).toContain('`read_file`');
   expect(prompt).toContain('### web tools:');
   expect(prompt).toContain('`web_search`');
   expect(prompt).toContain('### general tools:');
   expect(prompt).toContain('`get_date`');
-  // hint to use load_tools
-  expect(prompt).toContain('## Tool execution');
-  expect(prompt).toContain('use the `load_tools` tool to load');
   expect(prompt).toContain('`end_chat`');
   expect(prompt).toContain('`load_tools`');
 });
@@ -1036,8 +1035,10 @@ test('makeChat omits the available-tools block when no loadable tools are config
 
   const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
 
-  expect(prompt).toContain('## Internal Tools');
+  expect(prompt).toContain('## Tools');
+  expect(prompt).toContain('### control tools:');
   expect(prompt).toContain('`end_chat`');
+  expect(prompt).not.toContain('### general tools:');
 });
 
 test('loadTools tool is always present in chat.tools even when the tool itself is not installed', () => {
