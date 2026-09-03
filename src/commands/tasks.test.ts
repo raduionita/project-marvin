@@ -22,7 +22,6 @@ function mockConfig(agents: Config['agents'], tasks: Config['tasks'] = {}): Conf
   return {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: {},
-    integrations: {},
     models: {},
     agents,
     tasks,
@@ -106,16 +105,12 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
   });
 });
 
-test('tasks add no longer links integrations (tools load via load_tools)', async () => {
+test('tasks add persists task without extra fields', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
     'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} },
   });
-  engine.config.integrations = {
-    'gloobeam': { enabled: true, type: 'wordpress' },
-    'other-site': { enabled: true, type: 'wordpress' },
-  } as Config['integrations'];
 
   const cmd = new TasksCommand(engine, []);
   answers = ['', 'post-task', '60'];
@@ -127,6 +122,4 @@ test('tasks add no longer links integrations (tools load via load_tools)', async
     agent: 'my-agent',
     schedule: 60,
   });
-  // ensure no integrations field persisted
-  expect((engine.config.tasks!['post-task'] as any).integrations).toBeUndefined();
 });

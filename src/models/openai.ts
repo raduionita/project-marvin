@@ -74,7 +74,7 @@ export class OpenaiModel extends Model {
           id: t.id,
           name: t.function.name,
           // arguments arrive as a JSON string from the OpenAI API
-          arguments: tryJsonParse(t.function.arguments),
+          arguments: tryJsonParse(t.function.arguments) || {},
         })),
       },
       usage: {

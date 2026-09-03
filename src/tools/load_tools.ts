@@ -1,9 +1,8 @@
 import { Tool, ToolMeta } from '../types.js';
 import type { Agent } from '../agent.js';
 import type { Chat } from '../types.js';
-import { loadIntegrationTools } from '../integrations/index.js';
 import { loadMcpTools } from '../mcp.js';
-import { splitIntegrationToolName, splitMcpToolName } from '../helpers/index.js';
+import { splitMcpToolName } from '../helpers/index.js';
 import logger from '../logger.js';
 
 export default class LoadToolsTool extends Tool {
@@ -19,7 +18,7 @@ export default class LoadToolsTool extends Tool {
           tools: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Names of the tools to load (e.g. ["web_search", "integration__create_post", "mcp__custom-tool"])',
+            description: 'Names of the tools to load (e.g. ["web_search", "mcp__endpoint-tool"])',
           },
         },
         required: ['tools'],
@@ -38,8 +37,6 @@ export default class LoadToolsTool extends Tool {
     const loaded: string[] = [];
     const missing: string[] = [];
 
-    // batch caches to avoid re-loading the same integration/mcp per call
-    const integrationCache = new Map<string, ToolMeta[]>();
     const mcpCache = new Map<string, ToolMeta[]>();
 
     for (const name of names) {
@@ -54,32 +51,8 @@ export default class LoadToolsTool extends Tool {
         continue;
       }
 
-      // 2) integration tool (<integrationId>__<tool>) - built via loadIntegrationTools per Engine.loadIntegrations/execTask
+      // 2) mcp tool (<mcpId>__<toolName>) - built via loadMcpTools
       let found = false;
-      const intSplit = splitIntegrationToolName(name);
-      if (intSplit) {
-        const integration = this.engine.integrations[intSplit.id];
-        if (integration) {
-          let metas = integrationCache.get(intSplit.id);
-          if (!metas) {
-            metas = await loadIntegrationTools(this.engine, [intSplit.id]);
-            integrationCache.set(intSplit.id, metas);
-          }
-          const meta = metas.find(m => m.function.name === name);
-          if (meta) {
-            chat.tools ||= [];
-            if (!chat.tools.some(t => t.function.name === name)) {
-              chat.tools.push(meta);
-            }
-            loaded.push(name);
-            continue;
-          }
-          // integration exists but tool not found -> will be reported as missing after mcp check
-          found = true;
-        }
-      }
-
-      // 3) mcp tool (<mcpId>__<toolName>) - built via loadMcpTools per Engine.loadMcps/execTask
       const mcpSplit = splitMcpToolName(name);
       if (mcpSplit) {
         const mcp = this.engine.mcps[mcpSplit.id];
@@ -102,9 +75,8 @@ export default class LoadToolsTool extends Tool {
         }
       }
 
-      // neither engine, integration, nor mcp matched
+      // neither engine nor mcp matched
       if (!found) {
-        // if name contained __ but neither integration nor mcp matched, still missing
       }
       missing.push(name);
     }

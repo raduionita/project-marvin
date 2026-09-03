@@ -19,7 +19,7 @@ A skill file is plain markdown with:
 - The description must be one clear sentence: what task does this skill handle?
 - Write instructions the agent can follow without any external context:
   - concrete steps, numbered where order matters
-  - what to read/write, what tools to call (`call_integration`, `edit_file`,
+  - what to read/write, what tools to call (`edit_file`,
     `read_file`, `marvin_config`, `web_search`, ...)
   - do's and don'ts, format examples, edge cases
 - Do not use front-matter, YAML, or code fences around the whole file.

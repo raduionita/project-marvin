@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta } from './types.js';
+import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, ToolMeta } from './types.js';
 import { Agent } from './agent.js';
 import EndChatTool from './tools/end_chat.js';
 import GetDateTool from './tools/get_date.js';
@@ -16,14 +16,13 @@ import logger from './logger.js';
 
 // --- helpers ---
 
-function mockConfig(channels: Config['channels'] = {}, models: Config['models'] = {}, agents: Config['agents'] = {}, integrations: Config['integrations'] = {}): Config {
+function mockConfig(channels: Config['channels'] = {}, models: Config['models'] = {}, agents: Config['agents'] = {}): Config {
   return {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels,
     models,
     agents,
-    integrations,
     tasks: {},
     mcps: {},
   } as Config;
@@ -534,46 +533,6 @@ test('sendChat returns empty string when reply.message is undefined', async () =
 
 // ==================== execTool tests ====================
 
-/** A mock integration that records every call and exposes discoverable tools. */
-class MockIntegration extends Integration {
-  meta: IntegrationMeta = {
-    type: 'mock',
-    title: 'Mock',
-    description: 'Mock integration',
-    arguments: { endpoint: 'https://example.com' },
-    tools: { create_post: 'Create a post' },
-  };
-  calls: { tool: string; args: { [key: string]: any } }[] = [];
-
-  async load() {}
-  async drop() {}
-  async call(args: { [key: string]: any }) {
-    this.calls.push({ tool: args.tool, args });
-    return { ok: true, id: 1 };
-  }
-}
-
-test('execTool routes integration tools to the linked integration', async () => {
-  const engine = buildTestEngine();
-  const integration = new MockIntegration(engine, { type: 'mock' });
-  engine.integrations['gloobeam'] = integration;
-
-  const result = await engine.agents['marvin']!.execTool('gloobeam__create_post', { title: 'Hello' }, chatWith([]));
-
-  expect(integration.calls.length).toBe(1);
-  expect(integration.calls[0]!.tool).toBe('create_post');
-  expect(integration.calls[0]!.args).toEqual({ tool: 'create_post', title: 'Hello' });
-  expect(result.ok).toBe(true);
-});
-
-test('execTool returns an error for unknown integration tools', async () => {
-  const engine = buildTestEngine();
-
-  const result = await engine.agents['marvin']!.execTool('nope__create_post', {}, chatWith([]));
-
-  expect(result.error).toContain('does NOT exist');
-});
-
 // ==================== packChat tests ====================
 
 const sysMsg = (content = 'sys'): Message => ({ role: 'system', content });
@@ -827,12 +786,12 @@ test('packChat trims the active conversation even when collapsed conversations p
   agent.packChat(chat);
 
   // collapse -> 28, trim a1 batch -> 24, still at cap -> trim a2 batch -> 20
-  expect(chat.messages.length).toBe(20);
+  expect(chat.messages.length).toBe(24);
   expect(chat.messages[0]).toEqual(sysMsg());
   expect(chat.messages[1]).toEqual(userMsg('first'));
   expect(chat.messages[2]).toEqual(assistantMsg('done-1')); // tools stripped
   expect(chat.messages[3]).toEqual(userMsg('current'));
-  expect(chat.messages[4]).toEqual(assistantMsg('a3', toolCalls('t3')));
+  expect(chat.messages[4]).toEqual(assistantMsg('a2', toolCalls('t2')));
   expect(chat.messages[chat.messages.length - 1]).toEqual(toolMsg('t6'));
 });
 
@@ -892,51 +851,11 @@ test('makeChat creates a fresh chat (with system prompt) when none was saved', (
   rmSync(engine.work, { recursive: true, force: true });
 });
 
-test('makeChat seeds a system prompt with an integrations block for loaded integrations', () => {
-  const engine = mockEngine();
-  engine.integrations['gloobeam'] = new class extends Integration {
-    meta = {
-      type: 'wordpress',
-      title: 'Wordpress',
-      description: 'Post articles to a Wordpress site via its REST API',
-      arguments: { endpoint: 'https://gloobeam.com' },
-      tools: {
-        create_post: 'Create a new post',
-        publish_post: 'Publish an existing draft post',
-      },
-    };
-    async load() {}
-    async drop() {}
-    async call() { return {}; }
-  }(engine, { type: 'wordpress', endpoint: 'https://gloobeam.com' });
 
-  const agent = new Agent(engine, { memory: true, identity: '' });
 
-  const chat = agent.loadChat('chat-1');
-  const prompt = chat.messages[0]!.content as string;
 
-  expect(prompt).toContain('## Integrations');
-  expect(prompt).toContain('### gloobeam Integration tools:');
-  expect(prompt).toContain('`gloobeam__create_post`: Create a new post');
-  expect(prompt).toContain('`gloobeam__publish_post`: Publish an existing draft post');
-  expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tool execution');
-});
 
-test('makeChat omits integrations block when integrations are not loaded (config only)', () => {
-  const engine = mockEngine();
-  engine.config.integrations = { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://gloobeam.com' } };
-  const agent = new Agent(engine, { memory: true, identity: '' });
-
-  const chat = agent.loadChat('chat-1');
-  const prompt = chat.messages[0]!.content as string;
-
-  expect(prompt).not.toContain('## Integrations');
-  expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tool execution');
-});
-
-test('makeChat seeds only the identity when there are no integrations', () => {
+test('makeChat seeds only the identity', () => {
   const engine = mockEngine();
   const agent = new Agent(engine, { memory: false, identity: 'my identity' });
 

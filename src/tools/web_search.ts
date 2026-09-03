@@ -105,16 +105,23 @@ export default class WebSearchTool extends Tool {
       const start = text.indexOf(SEARCH_START_TAG);
       const end = text.indexOf(SEARCH_END_TAG, start);
             raw = text.substring(start + SEARCH_START_TAG.length, end);
+      // in case result is actually empty
+            raw = raw.replaceAll('window.execDeep = funct', ''); 
       const json: any[] = tryJsonParse(raw) || [];
             json.length = Math.min(json.length, 10);
       return { 
+        description: json.length ? `${json.length} results` : 'no results',
         results: json.map((o: { [key: string]: any }) => ({
           title: this.turndown.turndown(o.t || ''),
           body: this.turndown.turndown(o.a || ''),
           link: o.c || '',
         })),
-      };
+      };``
     } catch (error) {
+      if (page && !page.isClosed()) {
+        logger.debug('[WebSearchTool.call]', 'closing page');
+        await page.close();
+      }
       // distinguish "search failed" from "no results", so the LLM does not
       // conclude nothing exists when the scrape/parse simply failed
       logger.error('[WebSearchTool.call]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw?.substring(0,100));
@@ -123,8 +130,8 @@ export default class WebSearchTool extends Tool {
         error: `web_search failed: ${(error as Error).message}` 
       };
     } finally {
-      logger.debug('[WebSearchTool.call]', 'closing page');
       if (page && !page.isClosed()) {
+        logger.debug('[WebSearchTool.call]', 'closing page');
         await page.close();
       }
     }

@@ -13,7 +13,6 @@ function mockEngine(config: Config = {} as Config): Engine {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: config.channels || {},
-    integrations: {},
     models: {},
     agents: {},
     tasks: {},
@@ -58,7 +57,6 @@ test('listTools includes known tools', () => {
   expect(tools).toContain('marvin_state');
   expect(tools).toContain('marvin_config');
   expect(tools).toContain('load_tools');
-  expect(tools).not.toContain('call_integration');
 });
 
 test('listCustomTools returns [] when the workspace tools folder is missing', () => {

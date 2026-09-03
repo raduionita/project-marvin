@@ -64,7 +64,9 @@ export class Mcp {
       },
     ]));
 
-    logger.info(`[Mcp.call]`, this.id, 'connected', `[${Object.keys(this.tools).join(',')}]`);
+    for (const tool of result.tools || []) {
+      logger.debug(`[Mcp.load]`, 'mcp', this.id, 'result', tool.name, JSON.stringify(tool.inputSchema));
+    }
   }
 
   // close the connection and kill the server process
@@ -113,7 +115,8 @@ export class Mcp {
     const blocks = Array.isArray(result.content) ? result.content : [];
 
     if (result.isError) {
-      throw new Error(blocks[0]?.text || `tool ${name}(${Object.keys(args).join(',')}) failed on "${this.id}" mpc tool call`);
+      const errror = blocks.map(b => b.text).join(' | ');
+      throw new Error(errror || `tool ${name}(${Object.keys(args).join(',')}) failed on "${this.id}" mpc tool call`);
     }
 
     const schemas: { [key: string]: any }[] = [];
@@ -207,6 +210,7 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
       });
     }
   }
+
   return tools;
 }
 

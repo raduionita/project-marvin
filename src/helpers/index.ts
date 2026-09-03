@@ -3,16 +3,8 @@ import { basename, dirname, isAbsolute, join, resolve, sep } from 'path';
 import { readdirSync } from 'fs';
 import TurndownService from 'turndown';
 
-import logger from '../logger.js';
-
-export function tryJsonParse<T>(str: string): T {
-  try {
-    return JSON.parse(str) as T;
-  } catch (error) {
-    logger.warn('[tryJsonParse]', `"${str.slice(0,1238)}"`, readError(error));
-    return {} as T;
-  }
-}
+export * from './error.js';
+export * from './json.js';
 
 export function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -20,7 +12,7 @@ export function delay(ms: number) {
 
 // Deep merge: defaults fill in missing keys, incoming values win. Used to
 // combine DEFAULT_CONFIG with a parsed marvin.json so missing sections
-// (integrations, channels, ...) never end up undefined.
+// (channels, ...) never end up undefined.
 export function mergeConfig<T>(defaults: T, incoming: any): T {
   const out: any = { ...defaults };
   for (const [key, value] of Object.entries(incoming || {})) {
@@ -165,23 +157,4 @@ export function splitMcpToolName(name: string): { id: string, name: string } | n
   const idx = name.lastIndexOf('__');
   if (idx <= 0 || idx === name.length - 2) return null;
   return { id: name.slice(0, idx), name: name.slice(idx + 2) };
-}
-
-// split a tool name back into { integrationId, tool }, or null when the name
-// is not an integration tool
-export function splitIntegrationToolName(name: string): { id: string, tool: string } | null {
-  const idx = name.lastIndexOf('__');
-  if (idx <= 0 || idx === name.length - 2) return null;
-  return { id: name.slice(0, idx), tool: name.slice(idx + 2) };
-}
-
-export function readError(error: unknown): string {
-  if (error instanceof Error) {
-    const lines = error.stack?.split('\n');
-    if (lines && lines.length > 0) {
-      return error.message + ' ' + (lines[0] || 'N/A');
-    }
-    return error.message;
-  }
-  return error?.toString() || 'N/A';
 }

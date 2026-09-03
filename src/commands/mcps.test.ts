@@ -28,7 +28,6 @@ function buildEngine(...mcps: [string, { [key: string]: any }][]): Engine {
   const config = {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels: {},
-    integrations: {},
     mcps: Object.fromEntries(mcps) as Config['mcps'],
     models: {},
     agents: {},

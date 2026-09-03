@@ -4,10 +4,9 @@ import { join } from 'path';
 import type Engine from './engine.js';
 import logger from './logger.js';
 import type { Chat, Message, Model, Reply, Result, ToolMeta } from './types.js';
-import { Integration } from './types.js';
 import * as constants from './constants.js';
 import { readMemorySummary } from './memory.js';
-import { truncate, splitMcpToolName, splitIntegrationToolName, readError } from './helpers/index.js';
+import { truncate, splitMcpToolName, readError } from './helpers/index.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI loop (sendChat)
 export class Agent {
@@ -31,7 +30,7 @@ export class Agent {
   }
 
   // get a chat for this id: reuse the cached/persisted one, or create a new
-  // chat seeded with the system prompt (identity + integrations + memory)
+  // chat seeded with the system prompt (identity + memory)
   loadChat(chatId: string | undefined): Chat {
     logger.debug('[Agent.loadChat]', chatId);
 
@@ -61,48 +60,13 @@ export class Agent {
     return this.makeChat(chatId);
   }
 
-  // make new chat seeded with the system prompt (identity + integrations + memory)
+  // make new chat seeded with the system prompt (identity + memory)
   makeChat(chatId: string | undefined): Chat {
     logger.debug('[Agent.makeChat]', chatId);
 
     let system: string = this.identity;
-    let tools: string[] = [];
 
     system += '\n\n---';
-
-    {
-      if (Object.keys(this.engine.integrations).length) {
-        system += '\n\n';
-        system += '## Integrations\n';
-        for (const [id, integration] of Object.entries(this.engine.integrations)) {
-          system += `### ${id} Integration tools:\n`;
-          for (const [tool, desc] of Object.entries(integration.meta.tools)) {
-            system += `- \`${id}__${tool}\`: ${desc}\n`;
-            // add integration tool to the list of tools to load
-            tools.push(id + '__' + tool);
-          }
-        }
-      }
-    } // integrations
-    
-    {
-      // inject the mcps block: loaded servers list their tools, config-only entries just their spawn spec
-      if (Object.keys(this.engine.mcps).length) {
-        system += '\n\n';
-        system += '## MCPs\n';
-        for (const [id, mcp] of Object.entries(this.engine.mcps)) {
-          if (mcp.isLoaded) {
-            system += `### ${id} MCP tools:\n`;
-            for (const tool of Object.values(mcp.tools)) {
-              system += '\n';
-              system += `- \`${id}__${tool.name}\`: ${tool.description}`;
-              // add mcp tool to the list of tools to load
-              tools.push(id + '__' + tool.name);
-            }
-          }
-        }
-      }
-    } // mcps
 
     {
       // inject a compact summary of the most recently updated memory notes, so
@@ -116,13 +80,28 @@ export class Agent {
           system += 'Use the memory tool (remember/recall) to read and update these notes.';
           logger.debug('[Agent.makeChat]', 'memory:', memory);
         }
-        // add memory tool to the list of tools to load
-        tools.push('memory');
       }
     } // memories
 
     {
+      // inject the mcps block: loaded servers list their tools, config-only entries just their spawn spec
+      if (Object.keys(this.engine.mcps).length) {
+        system += '\n\n';
+        system += '## MCPs\n';
+        for (const [id, mcp] of Object.entries(this.engine.mcps)) {
+          if (mcp.isLoaded) {
+            system += `- ${id}\n`;
+          }
+        }
+      }
+    } // mcps
+
+    {
       // inject a compact catalog of loadable tools so the agent can discover and load them on demand via the load_tools
+      system += '\n\n';
+      system += '## Tools\n';
+
+      // group internal tools
       const available = Object.values(this.engine.tools);
       const groups: Record<string, { name: string, info: string, args: string }[]> = {};
       for (const tool of available) {
@@ -133,22 +112,32 @@ export class Agent {
         });
       }
 
-      system += '\n\n';
-      system += '## Internal Tools\n';
-      for (const [group, names] of Object.entries(groups)) {
+      // control tools first
+      for (const [group, tools] of Object.entries(groups).filter(g => g[0] === 'control')) {
         system += `### ${group} tools:\n`;
-        for (const { name, info, args } of names) {
+        for (const { name, info, args } of tools) {
           system += `- \`${name}\`: ${info}\n`;
-          // add internal tool to the list of tools to load
-          tools.push(name);
         }
       }
 
-      system += '\n\n';
-      system += '## Tool execution\n';
-      system += '- use the `load_tools` tool to load (integration, MCP, or internal) tools before calling them.\n';
-      system += '- try to batch multiple tools together into a single call.\n';
-      system += '- use the `end_chat` tool to signal the end of the chat.\n';
+      // internal tools
+      for (const [group, tools] of Object.entries(groups).filter(g => g[0] !== 'control')) {
+        system += `### ${group} tools:\n`;
+        for (const { name, info, args } of tools) {
+          system += `- \`${name}\`: ${info}\n`;
+        }
+      }
+
+      // mcp tools
+      for (const [id, mcp] of Object.entries(this.engine.mcps)) {
+        if (mcp.isLoaded) {
+          system += `### ${id} MCP tools:\n`;
+          for (const tool of Object.values(mcp.tools)) {
+            system += '\n';
+            system += `- \`${id}__${tool.name}\`: ${tool.description}`;
+          }
+        }
+      }
     } // tools
 
     const chat = {} as Chat;
@@ -217,7 +206,7 @@ export class Agent {
 
     // stage 2: trim the active conversation only when the chat is at/over the cap,
     // removing the first assistant batch (assistant + its tool results) at a time
-    while ((system ? 1 : 0) + packed.length + active.length >= constants.MAX_CHAT_MESSAGES) {
+    while ((system ? 1 : 0) + active.length >= constants.MAX_CHAT_MESSAGES) {
       const firstAssistant = active.findIndex((m) => m.role === 'assistant');
       if (firstAssistant === -1) break;
       // the batch runs until the next assistant message (exclusive)
@@ -248,20 +237,13 @@ export class Agent {
 
   // tool call
   async execTool(tool: string, args: {[key:string]:any}, chat: Chat) : Promise<{[key:string]:any}> {
-    logger.debug('[Agent.execTool]', tool, JSON.stringify(args).slice(0, 64));
+    logger.info('[Agent.execTool]', tool, JSON.stringify(args).slice(0, 64));
     try {
       // internal tools
       const instance = this.engine.tools[tool];
       if (instance) {
         // ! tool call
         return await instance.call(args, this, chat);
-      }
-
-      // integration tools (<integrationId>__<tool>) loaded per-task
-      const intSplit = splitIntegrationToolName(tool);
-      const integration = intSplit ? this.engine.integrations[intSplit.id] : undefined;
-      if (integration) {
-        return await integration.call({ tool: intSplit!.tool, ...args });
       }
 
       // mcp tools (<mcpId>__<toolName>) loaded per-task
@@ -271,7 +253,7 @@ export class Agent {
         return await mcp.call(mcpSplit!.name, args);
       }
     } catch (err) {
-      logger.warn('[Agent.execTool]', `failed: ${tool}`, 'error:', (err as Error).message);
+      logger.warn('[Agent.execTool]', `failed=${tool} error=${(err as Error).message}`);
       return {tool: tool, error: (err as Error).message};
     }
     // not found
@@ -282,7 +264,7 @@ export class Agent {
   // exec chat // agent loop
   async sendChat(chatId: string | undefined, message: string) : Promise<Result> {
     try {
-      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`, '--------');
+      logger.info('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, message=${message.slice(0, 32)}`);
 
       // get chat from cache/store, or create a new one seeded with the system prompt
       const chat = this.loadChat(chatId);
@@ -309,11 +291,8 @@ export class Agent {
         // persist assistant reply to chat history
         chat.messages.push({ role: 'assistant', content: reply.message.content?.trim() || '', tools: reply.message.tools });
 
-        // trim result, this can be really big
-        logger.debug('[Agent.sendChat]', `ended=${ended}`, `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
-
         ended = reply.stop || ended;
-        // execute any tool calls (engine tools, integration __ tools, mcp __ tools via execTool)
+        // execute any tool calls (engine tools, mcp __ tools via execTool)
         for (const call of reply.message.tools || []) {
           logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, JSON.stringify(call.arguments).slice(0, 64));
           const tool = this.engine.tools[call.name];
@@ -324,12 +303,16 @@ export class Agent {
             // tools after end_chat / stop are skipped, but their ids still need an answer
             chat.messages.push({role: 'tool', content: JSON.stringify({ skipped: true }), toolId: call.id});
           } else {
-            // ! tool call - delegated to execTool which handles engine, integration and mcp tools
+            // ! tool call - delegated to execTool which handles (engine and mcp) tools
             let result = await this.execTool(call.name, call.arguments, chat);
+            
             // add tool call to chat history, truncating huge results
             chat.messages.push({role: 'tool', content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS), toolId: call.id});
           }
         }
+
+        // trim result, this can be really big
+        logger.debug('[Agent.sendChat]', `ended=${ended}`, `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
       } while ((!ended) && (steps < constants.DEFAULT_MAX_STEPS - 1));
 
       // warn if max steps reached
@@ -343,10 +326,10 @@ export class Agent {
       // save chat to cache
       this.saveChat(chatId, chat);
 
-      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, reply=${reply?.message?.content?.slice(0, 32)}`, '--------');
+      logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, reply=${reply?.message?.content?.slice(0, 32)}`);
       return { content: (reply?.message?.content || '').trim(), steps: steps, usage: usage };
     } catch (err) {
-      logger.error('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}`, readError(err), '--------');
+      logger.error('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}`, readError(err));
       return { content: '', steps: 0, error: (err as Error).message };
     } 
   }

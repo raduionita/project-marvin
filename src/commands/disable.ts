@@ -11,7 +11,6 @@ export default class DisableCommand extends Command {
         this.execHelp();
       break;
       case 'tool': break;
-      case 'integration': break;
       case 'mcp': break;
       default:
         await this.execDisable();

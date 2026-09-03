@@ -9,13 +9,11 @@ import { Agent } from './agent.js';
 import SlackChannel from './channels/slack.js';
 import { type ISocketModeClient, type IWebClient } from './channels/slack.js';
 import WebSearchTool from './tools/web_search.js';
-import WordpressIntegration from './integrations/wordpress.js';
 
 // ============================================================================
-// End-to-end flow: Slack -> Marvin AI loop -> web_search -> wordpress -> Slack
+// End-to-end flow: Slack -> Marvin AI loop -> web_search -> Slack
 // The real Slack handlers, the real engine AI loop, the real web_search tool
-// (against a fake browser page), the real call_integration tool and the real
-// wordpress integration (against a mocked fetch) all run. Only the LLM itself
+// (against a fake browser page) all run. Only the LLM itself
 // (FlowModel) and the Slack SDK clients are mocked.
 // ============================================================================
 
@@ -139,24 +137,10 @@ class FlowModel extends Model {
         usage: { completion: 5, prompt: 10 },
       } as Reply;
     }
-    if (this.callCount === 2) {
-      // publish step via per-tool tool (lazy via load_tools)
-      return {
-        id: 'r2', stop: false, finish: 'tool_calls',
-        message: {
-          role: 'assistant', content: '',
-          tools: [{
-            id: 'call_2', name: 'gloobeam__create_post',
-            arguments: { title: 'The History of Coffee', content: 'A short summary...', publish: true },
-          }],
-        },
-        usage: { completion: 5, prompt: 10 },
-      } as Reply;
-    }
     // final answer
     return {
-      id: 'r3', stop: true, finish: 'stop',
-      message: { role: 'assistant', content: 'Published to Wordpress: https://wp.example.com/?p=42' },
+      id: 'r2', stop: true, finish: 'stop',
+      message: { role: 'assistant', content: 'Here is the history of coffee...' },
       usage: { completion: 5, prompt: 10 },
     } as Reply;
   }
@@ -168,7 +152,6 @@ function mockConfig(): Config {
   return {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', apiToken: 'changeme' },
     channels: { slack: { enabled: true, appToken: 'xapp-test', botToken: 'xbot-test' } },
-    integrations: { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://wp.example.com' } },
     models: {},
     agents: { marvin: { enabled: true, channels: { slack: 'C123' } } },
     tasks: {},
@@ -180,7 +163,7 @@ function mentionEvent(overrides: { [key: string]: any } = {}): { event: any; bod
   return {
     event: {
       type: 'app_mention',
-      text: '<@U12345678> research the history of coffee and post a summary to wordpress',
+      text: '<@U12345678> research the history of coffee',
       channel: 'C123',
       ts: '1700000000.001',
       thread_ts: '1700000000.001',
@@ -192,7 +175,7 @@ function mentionEvent(overrides: { [key: string]: any } = {}): { event: any; bod
   };
 }
 
-function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChannel; browser: FakeBrowserSystem; wpCalls: { url: string; init: any }[] } {
+function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChannel; browser: FakeBrowserSystem } {
   const engine = new Engine();
   engine.state = 'exec';
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-flow-'));
@@ -209,60 +192,31 @@ function buildFlow(): { engine: Engine; model: FlowModel; channel: MockSlackChan
     model: model,
   });
 
-  // real tools (per-tool tools load lazily via load_tools)
   engine.tools['web_search'] = new WebSearchTool(engine);
 
   // fake browser so the real web_search tool runs end-to-end
   const browser = new FakeBrowserSystem(engine);
   engine.systems['browser'] = browser;
 
-  // real wordpress integration, with fetch mocked
-  const wpCalls: { url: string; init: any }[] = [];
-  globalThis.fetch = (async (url: any, init?: any) => {
-    wpCalls.push({ url: String(url), init });
-    return {
-      ok: true,
-      status: 201,
-      text: async () => JSON.stringify({ id: 42, title: 'The History of Coffee', link: 'https://wp.example.com/?p=42' }),
-      json: async () => ({ id: 42, title: 'The History of Coffee', link: 'https://wp.example.com/?p=42' }),
-    } as Response;
-  }) as typeof fetch;
-
-  engine.integrations['gloobeam'] = new WordpressIntegration(engine, {
-    type: 'wordpress',
-    endpoint: 'https://wp.example.com',
-    user: 'admin',
-    appPassword: 'abcd efgh',
-  });
-
   const channel = new MockSlackChannel(engine);
-  return { engine, model, channel, browser, wpCalls };
+  return { engine, model, channel, browser };
 }
 
-test('full flow: slack research request reaches wordpress and replies in the thread', async () => {
-  const { channel, model, browser, wpCalls } = buildFlow();
+test('full flow: slack research request replies in the thread', async () => {
+  const { channel, model, browser } = buildFlow();
   await channel.load();
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  // the AI loop ran: search -> publish (per-tool) -> final reply
-  expect(model.callCount).toBe(3);
+  // the AI loop ran: search -> final reply
+  expect(model.callCount).toBe(2);
 
   // web_search really executed (the real tool against the fake browser page)
   expect(browser.pagesOpened).toBe(1);
 
-  // wordpress publish executed (no extra schema lookup via find_integration)
-  expect(wpCalls.length).toBe(1);
-  expect(wpCalls[0]!.url).toBe('https://wp.example.com/wp-json/wp/v2/posts');
-  expect(wpCalls[0]!.init.method).toBe('POST');
-  const body = JSON.parse(wpCalls[0]!.init.body);
-  expect(body.title).toBe('The History of Coffee');
-  expect(body.status).toBe('publish');
-  expect(body.content).toContain('summary');
-
   // the final Slack reply is posted in the original thread
   expect(channel.mockWeb.postMessageCalls.length).toBe(1);
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('Published to Wordpress: https://wp.example.com/?p=42');
+  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('Here is the history of coffee...');
   expect(channel.mockWeb.postMessageCalls[0]!.channel).toBe('C123');
   expect(channel.mockWeb.postMessageCalls[0]!.thread_ts).toBe('1700000000.001');
 });
@@ -277,8 +231,6 @@ test('full flow: the tool results are kept in the chat cache for context', async
   expect(chat).not.toBeNull();
 
   const toolMessages = chat!.messages.filter(m => m.role === 'tool');
-  // one web_search result + one per-tool wordpress result
-  expect(toolMessages.length).toBe(2);
+  expect(toolMessages.length).toBe(1);
   expect(toolMessages[0]!.content).toContain('Coffee');
-  expect(toolMessages[1]!.content).toContain('42');
 });

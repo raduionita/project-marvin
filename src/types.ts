@@ -21,11 +21,6 @@ export interface Config {
     enabled?: boolean;
     [key: string]: any;
   }>;
-  integrations: Record<string, {
-    enabled?: boolean;
-    type: string;
-    [key: string]: any;
-  }>;
   // mcp connectors (client): spawn command + args + env per server
   mcps: Record<string, {
     enabled?: boolean;
@@ -133,62 +128,6 @@ export abstract class Channel {
 
   abstract info(): Promise<{ groups: { [key: string]: string } }>;
   abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;
-}
-
-// a single parameter/field an integration tool accepts (used to build the
-// call_integration tool schema and to prompt the user during `marvin
-// integrations add`). derived from the provider's API schema via discovery.
-export interface Field {
-  // field name as sent to the provider (e.g. title, content, meta)
-  name: string;
-  // parameter type: string, number, boolean, object, array, integer
-  type: string;
-  // required by the provider (schema "required" or user-marked during add)
-  required: boolean;
-  // human readable description of what the field is for
-  description: string;
-  // allowed values, when the provider restricts them (e.g. post status)
-  enum?: string[];
-  // target when the field is a custom/meta field: meta, acf or undefined
-  meta?: 'meta' | 'acf';
-  // nested sub-fields for object/array types (e.g. meta.keywords), keyed by name
-  properties?: { [key: string]: Field };
-}
-
-// what an integration type is capable of, without any per-site configuration.
-export interface IntegrationMeta {
-  // integration type (e.g. wordpress)
-  type: string;
-  // human readable title (e.g. "Wordpress")
-  title: string;
-  // one line description (e.g. "Post articles to a Wordpress site")
-  description: string;
-  // all tools this integration type supports: tool name -> description
-  tools: { [key: string]: string };
-  // config keys the integration needs (endpoint, credentials, ...) with placeholder values
-  arguments: { [key: string]: any };
-}
-
-// integration interface: a bridge to a 3rd party endpoint (e.g. Wordpress API)
-export abstract class Integration {
-  // static info about this integration type (type, title, description, tools, arguments).
-  // used to build the ## Integrations system-prompt block and the wizard prompts.
-  abstract meta: IntegrationMeta;
-  constructor(public engine: Engine, public config: { [key: string]: any }) {
-    logger.debug(`[${this.constructor.name||'Integration'}.constructor]`);
-  }
-
-  abstract load(): Promise<void>;
-  abstract drop(): Promise<void>;
-  // run a named tool on the integration (e.g. create_post, publish_post)
-  abstract call(args: {[key:string]:any}): Promise<{[key:string]:any}>;
-
-  // discover the fields an tool accepts from the provider (e.g. via OPTIONS
-  // on the Wordpress REST API). returns normalized FieldDef[], throws when the
-  // provider cannot be reached or exposes no schema.
-  async discover(tool: string): Promise<Field[]> {
-    return [];
-  }
 }
 
 // skill meta data, populated on engine load. The .md content itself is loaded

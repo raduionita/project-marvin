@@ -79,7 +79,7 @@ test('markdownToMrkdwn handles empty content', () => {
 });
 
 test('mergeConfig fills missing keys with defaults', () => {
-  const defaults = { settings: { name: 'marvin', port: 7331 }, channels: {}, integrations: {} };
+  const defaults = { settings: { name: 'marvin', port: 7331 }, channels: {} };
   const incoming = { settings: { name: 'other' } };
 
   const merged = mergeConfig(defaults as any, incoming);
@@ -87,7 +87,6 @@ test('mergeConfig fills missing keys with defaults', () => {
   expect(merged.settings.name).toBe('other');
   expect(merged.settings.port).toBe(7331);
   expect(merged.channels).toEqual({});
-  expect(merged.integrations).toEqual({});
 });
 
 test('mergeConfig keeps incoming top-level keys not in defaults', () => {
@@ -110,7 +109,7 @@ test('mergeConfig merges nested objects recursively, incoming wins', () => {
 });
 
 test('mergeConfig treats empty incoming as full defaults', () => {
-  const defaults = { settings: { name: 'marvin', port: 7331 }, integrations: {} };
+  const defaults = { settings: { name: 'marvin', port: 7331 }, channels: {} };
 
   expect(mergeConfig(defaults as any, {})).toEqual(defaults);
 });

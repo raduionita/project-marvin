@@ -22,7 +22,6 @@ function mockEngine(): Engine {
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },
     channels: {},
-    integrations: {},
     models: { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     agents: {},
     tasks: {},

@@ -71,7 +71,7 @@ export default class ToolsCommand extends Command {
       const system = await loadSystem(this.engine, 'browser');
       this.engine.systems['browser'] = system;
       // call tool
-      const params = tryJsonParse(this.args.slice(1).join(' ')) as { [key: string]: any };
+      const params = tryJsonParse(this.args.slice(1).join(' ')) || {} as { [key: string]: any };
       // load tool (repo tools first, then custom workspace tools)
       const tool = await loadTool(this.engine, name);
       // call the tool with agent/chat context (required by Tool.call)

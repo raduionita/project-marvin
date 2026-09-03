@@ -232,7 +232,7 @@ export default class SlackChannel extends Channel {
   protected async onMessage({ event, body, ack }: HandlerParams) {
     const thread = event.thread_ts || event.ts || event.event_ts;
     try {
-      logger.debug('[SlackChannel.onMessage]', event.channel, thread); // , 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      logger.info('[SlackChannel.onMessage]', event.channel, thread); // , 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
 
       // extract the actual message text (strip @marvin mention)
       const text = this.cleanText(event.text || '');
@@ -250,7 +250,7 @@ export default class SlackChannel extends Channel {
       const modelId = agent.model?.model;
       const chatId = `slack-${event.channel}-${thread}`;
 
-      logger.info('[SlackChannel.onMessage]', `processing via agent ${agentId}: ${text.slice(0, 100)}`);
+      logger.debug('[SlackChannel.onMessage]', `processing agent=${agentId} "${text.slice(0, 64)}"`);
 
       // ! process through Marvin's AI loop (executes model calls + tool execution)
       const result = await agent.sendChat(chatId, text);

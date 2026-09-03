@@ -164,7 +164,7 @@ export default class DeepseekModel extends Model {
         tools: choice.message.tool_calls?.map((t: {[key: string]: any}) => ({
           id: t.id,
           name: t.function.name,
-          arguments: tryJsonParse(t.function.arguments),
+          arguments: tryJsonParse(t.function.arguments) || {},
         }))
         // TODO: research of reasoning_content may be needed?
       },

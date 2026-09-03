@@ -36,7 +36,6 @@ export const DEFAULT_CONFIG = {
     memory: true,
   },
   channels: {},
-  integrations: {},
   mcps: {},
   models: {},
   agents: {},
@@ -52,4 +51,3 @@ export const AGENTS_FOLDER = 'agents';
 export const SKILLS_FOLDER = 'skills';
 export const TOOLS_FOLDER = 'tools';
 export const CHANNELS_FOLDER = 'channels';
-export const INTEGRATIONS_FOLDER = 'integrations';

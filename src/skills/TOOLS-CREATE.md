@@ -65,7 +65,7 @@ literally in the import; the `marvin tools add` command replaces it for you.
   - validate the inputs and return `{ error: '...' }` on bad input
   - return a plain JSON object (never throw to the agent)
 - Log with `logger.debug('[ToolName.call]', args)`.
-- Use the engine only when needed: `this.engine` (e.g. `this.engine.work`, `this.engine.integrations`, `this.engine.skills`).
+- Use the engine only when needed: `this.engine` (e.g. `this.engine.work`, `this.engine.skills`).
 - Respect the workspace: paths must stay inside `~/.marvin` (see `safeJoin` from `helpers/index.js` in `read_file.ts`/`edit_file.ts`).
 
 ## Examples to study
@@ -75,7 +75,6 @@ literally in the import; the `marvin tools add` command replaces it for you.
 - `src/tools/list_files.ts` / `grep.ts` — workspace discovery and search
 - `src/tools/memory.ts` — persistent memory (remember/recall/forget/list)
 - `src/tools/marvin_config.ts` — reads/writes the config
-- `src/tools/call_integration.ts` — calls a configured integration
 - `src/tools/web_search.ts` — longer tool with error handling
 
 ## Output

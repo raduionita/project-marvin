@@ -3,12 +3,11 @@ import { existsSync, readFileSync, unlinkSync } from "fs";
 
 import logger from './logger.js';
 import { listSystems, loadSystem } from "./systems";
-import { Command, Config, Channel, Tool, Model, System, Task, Message, Integration, Skill, ToolMeta } from "./types";
+import { Command, Config, Channel, Tool, Model, System, Task, Message, Skill, ToolMeta } from "./types";
 import { Agent } from './agent.js';
 import * as constants from './constants.js';
 import { listInternalTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
-import { listIntegrations } from "./integrations/index.js";
 import { Mcp } from "./mcp";
 import { listSkills, loadSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
@@ -30,7 +29,6 @@ export default class Engine {
   public skills      : Record<string, Skill> = {};
   public tools       : Record<string, Tool> = {};
   public mcps        : Record<string, Mcp> = {};
-  public integrations: Record<string, Integration> = {};
 
   // workspace (~/.marvin) data folder
   public work: string = process.env.HOME + '/.marvin';
@@ -52,7 +50,6 @@ export default class Engine {
     await this.loadSystems();
     await this.loadTools();
     await this.loadChannels();
-    await this.loadIntegrations();
     await this.loadMcps();
     await this.loadSkills();
     await this.loadModels();
@@ -76,7 +73,6 @@ export default class Engine {
     await this.dropTasks();
     await this.dropModels();
     await this.dropChannels();
-    await this.dropIntegrations();
     await this.dropMcps();
     await this.dropSkills();
     await this.dropSystems();
@@ -195,7 +191,7 @@ export default class Engine {
         const instance = new Class(this);
         const meta = instance.meta as ToolMeta;
         this.tools[meta.function.name] = instance;
-        logger.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded`);
+        logger.info('[Engine.loadTools]', `tool "${meta.function.name}" + [${meta.function.parameters.required?.join(',')}]`);
       } catch (err) {
         logger.error('[Engine.loadTools]', `failed to load "${file}":`, err);
       }
@@ -220,7 +216,7 @@ export default class Engine {
         const instance = new Class(this);
         const meta = instance.meta as ToolMeta;
         this.tools[meta.function.name] = instance;
-        logger.info('[Engine.loadTools]', `tool "${meta.function.name}" loaded (custom)`);
+        logger.info('[Engine.loadTools]', `tool "${meta.function.name}" + [${meta.function.parameters.required?.join(',')}]`);
       } catch (err) {
         logger.error('[Engine.loadTools]', `failed to load custom tool "${file}":`, err);
       }
@@ -265,49 +261,6 @@ export default class Engine {
     logger.debug('[Engine.loadChannels]', `[${Object.keys(this.channels).join(',')}]`);
   }
 
-  async loadIntegrations() {
-    logger.debug('[Engine.loadIntegrations]', 'loading integrations...');
-
-    const files = listIntegrations(this);
-    for (const [id, config] of Object.entries(this.config.integrations)) {
-      if (!config.enabled) continue;
-
-      const file = files.find(f => f === config.type);
-      if (!file) {
-        logger.error('[Engine.loadIntegrations]', `no file for integration "${id}" type "${config.type}", skipping`);
-        continue;
-      }
-
-      try {
-        if (this.integrations[id]) continue;
-
-        const Module = await import(`./integrations/${file}.js`);
-        const Class = Module.default;
-        // must be an Integration class
-        if (!Class || !(Class.prototype instanceof Integration)) {
-          logger.error('[Engine.loadIntegrations]', `"${id}" does not export an Integration class, skipping`);
-          continue;
-        }
-        // register instance of Integration
-        const instance = new Class(this, config);
-        await instance.load();
-        this.integrations[id] = instance;
-        logger.info('[Engine.loadIntegrations]', `integration "${id}" loaded`);
-      } catch (err) {
-        logger.error('[Engine.loadIntegrations]', `failed to load "${id}":`, err);
-      }
-    }
-
-    // tools may derive meta from loaded integrations (e.g. call_integration
-    // lists the actual sites and tools), so refresh them after loading
-    for (const tool of Object.values(this.tools)) {
-      const refresh = (tool as { refresh?: () => void }).refresh;
-      if (typeof refresh === 'function') refresh.call(tool);
-    }
-
-    logger.debug('[Engine.loadIntegrations]', `[${Object.keys(this.integrations).join(',')}]`);
-  }
-
   // connects the configured mcp servers (spawn + initialize)
   async loadMcps() {
     logger.debug('[Engine.loadMcps]', 'loading mcps...');
@@ -320,6 +273,8 @@ export default class Engine {
         const mcp = new Mcp(this, id, config);
         await mcp.load();
         this.mcps[id] = mcp;
+
+        logger.info('[Engine.loadMcps]', `mcp "${id}" + [${Object.keys(mcp.tools).join(',')}]`);
       } catch (err) {
         logger.error('[Engine.loadMcps]', `failed to connect mcp "${id}":`, err);
       }
@@ -587,11 +542,6 @@ export default class Engine {
     this.skills = {};
   }
 
-  async dropIntegrations() {
-    logger.debug('[Engine.dropIntegrations]', 'dropping integrations...');
-    this.integrations = {};
-  }
-
   // will detach and delete ALL channels from the engine
   async dropChannels() {
     logger.debug('[Engine.dropChannels]', 'dropping channels...');
@@ -617,11 +567,6 @@ export default class Engine {
       }
       delete this.channels[id];
     }
-  }
-
-  async dropIntegration(id: string) {
-    logger.debug('[Engine.dropIntegration]', id);
-    delete this.integrations[id];
   }
 
   // disconnects all mcp servers (kills their processes)

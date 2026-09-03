@@ -29,15 +29,6 @@
       "input": ""
     }
   },
-  "integrations": {
-    "gloobeam": {
-      "enabled": false,
-      "type": "wordpress",
-      "endpoint": "https://gloobeam.com",
-      "user": "admin",
-      "appPassword": "xxxx xxxx xxxx xxxx xxxx xxxx"
-    }
-  },
   "mcps": {
     "gloobeam": {
       "enabled": true,

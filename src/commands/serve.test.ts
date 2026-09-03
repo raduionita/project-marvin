@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, Integration, IntegrationMeta, ToolMeta, Task } from '../types.js';
+import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, ToolMeta, Task } from '../types.js';
 import { Agent } from '../agent.js';
 import { writeFileSync, mkdirSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
@@ -10,14 +10,13 @@ import logger from '../logger.js';
 
 // --- helpers ---
 
-function mockConfig(channels: Config['channels'] = {}, models: Config['models'] = {}, agents: Config['agents'] = {}, integrations: Config['integrations'] = {}): Config {
+function mockConfig(channels: Config['channels'] = {}, models: Config['models'] = {}, agents: Config['agents'] = {}): Config {
   return {
     timestamp: Date.now(),
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels,
     models,
     agents,
-    integrations,
     tasks: {},
     mcps: {},
   } as Config;
@@ -213,46 +212,6 @@ test('execChannels stores channels in engine.channels', async () => {
 
   expect(Object.keys(engine.channels).length).toBeGreaterThan(0);
   expect(Object.keys(engine.channels)).toContain('channel.mock');
-});
-
-// ==================== loadIntegrations tests ====================
-
-test('execIntegrations loads enabled integrations with valid type', async () => {
-  const engine = mockEngine();
-  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://example.com' } });
-
-  await engine.loadIntegrations();
-
-  expect(engine.integrations['gloobeam']).toBeDefined();
-  expect(engine.integrations['gloobeam'] instanceof Integration).toBe(true);
-});
-
-test('execIntegrations skips disabled integrations', async () => {
-  const engine = mockEngine();
-  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: false, type: 'wordpress' } });
-
-  await engine.loadIntegrations();
-
-  expect(engine.integrations['gloobeam']).toBeUndefined();
-});
-
-test('execIntegrations warns on unknown type', async () => {
-  const engine = mockEngine();
-  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: true, type: 'nope' } });
-
-  await engine.loadIntegrations();
-
-  expect(engine.integrations['gloobeam']).toBeUndefined();
-});
-
-test('dropIntegrations clears all integrations', async () => {
-  const engine = mockEngine();
-  engine.config = mockConfig({}, {}, {}, { gloobeam: { enabled: true, type: 'wordpress', endpoint: 'https://example.com' } });
-
-  await engine.loadIntegrations();
-  await engine.dropIntegrations();
-
-  expect(Object.keys(engine.integrations).length).toBe(0);
 });
 
 // ==================== loadSkills tests ====================
@@ -575,61 +534,3 @@ test('dropModels clears all models', async () => {
   expect(Object.keys(engine.models).length).toBe(0);
 });
 
-// ==================== execTask integration tools tests ====================
-
-/** A mock integration that records every call and exposes discoverable tools. */
-class MockIntegration extends Integration {
-  meta: IntegrationMeta = {
-    type: 'mock',
-    title: 'Mock',
-    description: 'Mock integration',
-    arguments: { endpoint: 'https://example.com' },
-    tools: { create_post: 'Create a post' },
-  };
-  calls: { tool: string; args: { [key: string]: any } }[] = [];
-
-  async load() {}
-  async drop() {}
-  async call(args: { [key: string]: any }) {
-    this.calls.push({ tool: args.tool, args });
-    return { ok: true, id: 1 };
-  }
-}
-
-test('execTask no longer merges task integration tools (lazy via load_tools)', async () => {
-  const engine = buildTestEngine();
-  engine.integrations['gloobeam'] = new MockIntegration(engine, { type: 'mock' });
-
-  engine.tasks['test-task'] = {
-    id: 'test-task',
-    enabled: true,
-    type: 'task',
-    agent: engine.agents['marvin'],
-    schedule: 60_000,
-    maxSteps: 2,
-    input: 'task input',
-    timeout: null,
-  } as Task;
-
-  // capture the chat the model receives on each call
-  const model = engine.models['mock.model'] as MockModel;
-  const seen: Chat[] = [];
-  model.execChat = async (chat: Chat) => { seen.push(chat); return (model as any)._reply; };
-
-  await engine.execTask('test-task');
-  clearTimeout(engine.tasks['test-task']!.timeout!);
-
-  expect(seen.length).toBeGreaterThan(0);
-  const toolNames = seen[0]!.tools?.map(t => t.function.name) || [];
-  // integration tools are NOT in chat.tools by default; they are listed in
-  // the "## Integrations" / "## MCPs" prompt blocks and loaded on demand via load_tools
-  expect(toolNames).not.toContain('gloobeam__create_post');
-  expect(toolNames).not.toContain('mock_tool');
-
-  // the system prompt seeds the catalogs so the LLM can discover and load via load_tools
-  const prompt = seen[0]!.messages[0]!.content as string;
-  expect(prompt).toContain('## Integrations');
-  expect(prompt).toContain('gloobeam__create_post');
-  expect(prompt).toContain('## Internal Tools');
-  expect(prompt).toContain('mock_tool');
-});

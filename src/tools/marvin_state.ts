@@ -13,7 +13,7 @@ export default class MarvinStateTool extends Tool {
         properties: {
           area: {
             type: 'string',
-            description: 'Optional filter: "agents", "tasks", "models", "channels", "integrations", "skills", "mcps", or "settings"',
+            description: 'Optional filter: "agents", "tasks", "models", "channels", "skills", "mcps", or "settings"',
           },
         },
         required: [],
@@ -60,14 +60,6 @@ export default class MarvinStateTool extends Tool {
       channels[channelId] = { enabled: !!config.enabled };
     }
 
-    const integrations: Record<string, any> = {};
-    for (const [integrationId, integration] of Object.entries(this.engine.integrations)) {
-      integrations[integrationId] = { type: integration.config.type, enabled: true };
-    }
-    for (const [integrationId, config] of Object.entries(this.engine.config.integrations || {})) {
-      integrations[integrationId] = { type: config.type, enabled: !!config.enabled };
-    }
-
     const skills: Record<string, any> = {};
     for (const [skillId, skill] of Object.entries(this.engine.skills)) {
       skills[skillId] = { title: skill.title, description: skill.description, source: skill.source };
@@ -75,12 +67,12 @@ export default class MarvinStateTool extends Tool {
 
     const settings = this.engine.config.settings || {};
 
-    const all: Record<string, any> = { agents, tasks, models, channels, integrations, skills, settings };
+    const all: Record<string, any> = { agents, tasks, models, channels, skills, settings };
 
     const area = args?.area;
     if (area) {
       if (!(area in all)) {
-        return { error: `marvin_state: unknown area "${area}", use agents, tasks, models, channels, integrations, skills or settings` };
+        return { error: `marvin_state: unknown area "${area}", use agents, tasks, models, channels, skills or settings` };
       }
       return { [area]: all[area] };
     }

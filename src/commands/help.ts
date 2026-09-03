@@ -25,7 +25,6 @@ export default class HelpCommand extends Command {
     logger.log('  models      ', 'list, add, bind, drop models');
     logger.log('  agents      ', 'list, add, bind, chat, drop agents');
     logger.log('  tasks       ', 'list, add tasks');
-    logger.log('  integrations', 'list, add, drop integrations');
     logger.log('  mcps        ', 'list, add, edit, info, drop mcp connectors');
     logger.log('');
   }

@@ -87,7 +87,7 @@ await (new class Marvin {
 
     const data = readFileSync(cpath, 'utf8');
 
-    this.engine.config = mergeConfig(constants.DEFAULT_CONFIG as Config, tryJsonParse(data));
+    this.engine.config = mergeConfig(constants.DEFAULT_CONFIG as Config, tryJsonParse(data) || {});
   }
 
   loadFlags() {

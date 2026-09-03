@@ -19,7 +19,6 @@ function mockConfig(models: Config['models'], channels: Config['channels']): Con
   return {
     settings: { name: 'marvin', port: 7331, host: '127.0.0.1', logLevel: 'info', apiToken: 'changeme' },
     channels,
-    integrations: {},
     models,
     agents: {},
     tasks: {},

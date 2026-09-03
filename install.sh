@@ -154,7 +154,6 @@ fi
 # ── Done ───────────────────────────────────────────────────────────────────
 echo ""
 info "Marvin installed successfully!"
-echo ""
 info "  Install directory:   $INSTALL_DIR"
 info "  Executable path:     $WRAPPER_PATH"
 info "  Workspace directory: $MARVIN_DIR"

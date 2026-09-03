@@ -19,7 +19,6 @@ function mockEngine(): Engine {
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },
     channels: { slack: { enabled: true }, telegram: { enabled: false } },
-    integrations: { gloobeam: { enabled: true, type: 'wordpress' } },
     models: { llm: { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
     agents: {},
     tasks: {},
@@ -68,7 +67,6 @@ test('marvinState returns a full summary', async () => {
   expect(result.tasks['marvin/status'].schedule).toBe(3600000);
   expect(result.models['llm'].provider).toBe('deepseek');
   expect(result.channels['slack'].enabled).toBe(true);
-  expect(result.integrations['gloobeam'].type).toBe('wordpress');
   expect(result.settings.name).toBe('marvin');
 });
 
