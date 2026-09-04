@@ -583,8 +583,8 @@ test('E2E: message (im) → LLM → Slack DM reply', async () => {
   });
 
   expect(model.callCount).toBe(1);
-  expect(channel.mockWeb.postMessageCalls[0]!.channel).toBe('D123');
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('Direct message reply');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.channel).toBe('D123');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('Direct message reply');
 });
 
 test('E2E: non-im message events are acknowledged and ignored', async () => {
@@ -678,7 +678,7 @@ test('E2E: LLM failure posts an (AI loop error) reply', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toContain('(AI loop error: mock model failure)');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toContain('(AI loop error: mock model failure)');
 });
 
 test('E2E: empty AI content posts the (no response) placeholder', async () => {
@@ -724,7 +724,7 @@ test('E2E: LLM output is posted to Slack unchanged', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('The answer is 42');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('The answer is 42');
 });
 
 test('E2E: non-JSON LLM output is posted unchanged', async () => {
@@ -737,7 +737,7 @@ test('E2E: non-JSON LLM output is posted unchanged', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('plain text reply');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('plain text reply');
 });
 
 // ============================================================================

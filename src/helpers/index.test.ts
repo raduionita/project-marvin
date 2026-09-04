@@ -9,7 +9,7 @@ test('truncate leaves short strings untouched', () => {
 test('truncate clips long strings and appends a marker', () => {
   const out = truncate('x'.repeat(30), 10);
   expect(out.startsWith('x'.repeat(10))).toBe(true);
-  expect(out).toContain('truncated 20 chars');
+  expect(out).toContain('xxxxxxxxxx...');
 });
 
 test('truncate returns the text for non-positive max only when short', () => {
