@@ -278,7 +278,7 @@ export class Agent {
 
       // AI loop: call model, execute tool calls, repeat until done
       let reply: Reply;
-      let steps = -1;
+      let steps = 0;
       let ended = false;
       let usage = chat.usage || 0;
       do {

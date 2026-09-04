@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Tool, ToolMeta } from '../types.js';
-import { safeJoin } from '../helpers/index.js';
+import { readError, safeJoin } from '../helpers/index.js';
 import logger from '../logger.js';
 
 const DEFAULT_LINES = 20;
@@ -37,9 +37,13 @@ export default class ReadLogsTool extends Tool {
       const content = readFileSync(logPath, 'utf-8');
       const all = content.split('\n').filter(l => l.trim().length > 0);
       const tail = all.slice(-lines);
-      return { path: logPath, lines: tail.length, entries: tail };
+      return { 
+        path: logPath, 
+        lines: tail.length, 
+        entries: tail
+      };
     } catch (err) {
-      logger.error('[ReadLogsTool.call]', 'error:', err);
+      logger.error('[ReadLogsTool.call]', 'error:', readError(err));
       return { path: logPath, error: (err as Error).message };
     }
   }

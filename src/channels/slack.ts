@@ -329,7 +329,7 @@ export default class SlackChannel extends Channel {
   }
 
   protected async onConnected() {
-    logger.debug('[SlackChannel.onConnected]', 'connected!');
+    logger.info('connected!');
   }
 
   protected async onDisconnected(error: Error) {

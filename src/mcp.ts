@@ -8,7 +8,7 @@ import type Engine from './engine.js';
 import logger from './logger.js';
 import type { ToolMeta, Config } from './types.js';
 import * as constants from './constants.js';
-import { sanitizeToolName } from './helpers/index.js';
+import { sanitizeToolName, tryJsonParse } from './helpers/index.js';
 
 // client for one mcp server over stdio: spawns the process on load, lists its
 // tools and forwards tool calls. reconnects lazily if the process died.
@@ -124,8 +124,8 @@ export class Mcp {
     for (const block of blocks as { type: string, text?: string, data?: string, uri?: string }[]) {
       if (block.type === 'text' && typeof block.text === 'string') {
         // try to parse structured JSON, fall back to plain text
-        let parsed: any = null;
-        try { parsed = JSON.parse(block.text); } catch { parsed = null; }
+        let parsed = tryJsonParse(block.text);
+        // must be a non-empty object
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) {
           schemas.push(parsed);
         } else {

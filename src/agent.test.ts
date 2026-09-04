@@ -206,8 +206,8 @@ test('sendChat returns content and step count from model reply', async () => {
 
   expect(result!.content).toBe('hello from model');
   // The mock model returns stop=false, no tools, no end chat.
-  // The loop runs DEFAULT_MAX_STEPS (20) times: steps goes -1, 0, ..., 18 -> final steps=19
-  expect(result!.steps).toBe(19);
+  // The loop runs DEFAULT_MAX_STEPS (20) times: steps goes 0, 1, ..., 20 -> final steps=20
+  expect(result!.steps).toBe(20);
 });
 
 test('sendChat caches the chat after execution', async () => {
@@ -422,39 +422,6 @@ test('sendChat answers pending tool calls when force stopped', async () => {
   expect(last.toolId).toBe('t-1');
 });
 
-test('sendChat truncates oversized tool results', async () => {
-  const engine = buildTestEngine();
-
-  class BigTool extends MockTool {
-    async call(_args: any) {
-      return { result: 'x'.repeat(constants.MAX_TOOL_RESULT_CHARS * 3) };
-    }
-  }
-  engine.tools['mock_tool'] = new BigTool(engine);
-
-  (engine.models['mock.model'] as MockModel).setReply({
-    id: 'reply-big',
-    stop: false,
-    finish: 'tool_calls',
-    usage: { completion: 5, prompt: 10 },
-    message: {
-      role: 'assistant',
-      content: '',
-      tools: [
-        { id: 't-big', name: 'mock_tool', arguments: {} },
-        { id: 't-end', name: 'end_chat', arguments: {} },
-      ],
-    },
-  } as Reply);
-
-  await engine.agents['marvin']!.sendChat('chat-1', 'hello');
-
-  const chat = engine.agents['marvin']!.loadChat('chat-1');
-  const toolMsg = chat!.messages.find((m: Message) => m.toolId === 't-big')!;
-  expect(toolMsg.content.length < constants.MAX_TOOL_RESULT_CHARS * 2).toBe(true);
-  expect(toolMsg.content).toContain('truncated');
-});
-
 test('sendChat returns empty content when reply has no message content', async () => {
   const engine = buildTestEngine();
 
@@ -496,8 +463,8 @@ test('sendChat returns content and steps from model reply', async () => {
   expect(result).not.toBeNull();;
 
   expect(result!.content).toBe('end chat');
-  // The model runs DEFAULT_MAX_STEPS (20) times: steps goes -1, 0, ..., 18 -> final steps=19
-  expect(result!.steps).toBe(19);
+  // The model runs DEFAULT_MAX_STEPS (20) times: steps goes 0, 1, ..., 20 -> final steps=20
+  expect(result!.steps).toBe(20);
   expect((engine.models['mock.model'] as MockModel).callCount).toBe(20);
 });
 

@@ -1,10 +1,12 @@
+import TurndownService from 'turndown';
+
 import { Tool } from '../types.js';
 import type { ToolMeta } from '../types.js';
 import { delay, rand, readError, tryJsonParse } from '../helpers/index.js';
 import type BrowserSystem from '../systems/browser.js';
-import TurndownService from 'turndown';
 import Engine from '../engine.js';
 import logger from '../logger.js';
+import * as constants from '../constants.js';
 
 const SEARCH_START_TAG = "DDG.pageLayout.load('d',";
 const SEARCH_END_TAG = ");DDG.duckbar.loadModule";
@@ -113,7 +115,7 @@ export default class WebSearchTool extends Tool {
         description: json.length ? `${json.length} results` : 'no results',
         results: json.map((o: { [key: string]: any }) => ({
           title: this.turndown.turndown(o.t || ''),
-          body: this.turndown.turndown(o.a || ''),
+          body: (this.turndown.turndown(o.a || '')).slice(0, constants.MAX_TOOL_RESULT_CHARS),
           link: o.c || '',
         })),
       };``

@@ -13,7 +13,7 @@ export default class WebFetchTool extends Tool {
     group: 'web',
     function: {
       name: 'web_fetch',
-      description: 'Fetch and extract content of a web page. If it fails, blocked or empty, try `web_browse`.',
+      description: 'Fetch content of a web page, API or RSS feed. If blocked, fails, or empty, try `web_browse`.',
       parameters: {
         type: 'object',
         properties: {
@@ -34,6 +34,7 @@ export default class WebFetchTool extends Tool {
     this.turndown.remove([
       'script',
       'style',
+      'head',
       'aside',
       'nav',
       'footer',
@@ -52,7 +53,6 @@ export default class WebFetchTool extends Tool {
       'picture',
       'colgroup',
       'form', 'input', 'select', 'textarea', 'optgroup', 'option', 'label', 'fieldset',
-      'head',
       'map', 'area',
       'template',
       'dialog',
@@ -64,6 +64,13 @@ export default class WebFetchTool extends Tool {
 
     // use fetch to fetch the page
     const response = await fetch(args.url);
+
+    // switch content type
+      // application/rss+xml
+      // text/html
+      // application/json
+      // text/plain (default)
+
     const html = await response.text();
     
     // extract the relevant content
@@ -71,7 +78,7 @@ export default class WebFetchTool extends Tool {
     // const title = html.substring(html.indexOf('<title>') + 7, html.indexOf('</title>'));
 
     return { 
-      result: this.turndown.turndown(html).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8),
+      result: this.turndown.turndown(html).slice(0, constants.MAX_TOOL_RESULT_CHARS),
     };
   }
 }

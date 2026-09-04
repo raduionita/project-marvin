@@ -1,7 +1,9 @@
 import { readFileSync } from 'fs';
+
 import { Tool, ToolMeta } from '../types.js';
-import { isSafePath, safeJoin } from '../helpers/index.js';
+import { isSafePath, readError, safeJoin } from '../helpers/index.js';
 import logger from '../logger.js';
+import * as constants from '../constants.js';
 
 // TODO: add support for offset - see fs.readSync
 
@@ -40,9 +42,12 @@ export default class ReadFileTool extends Tool {
 
     try {
       const content = readFileSync(path, 'utf-8');
-      return { path: args.path, content };
+      return { 
+        path: args.path, 
+        content: content.slice(0, constants.MAX_TOOL_RESULT_CHARS),
+      };
     } catch (err) {
-      logger.error('[ReadFileTool.call]', 'error:', err);
+      logger.error('[ReadFileTool.call]', 'error:', readError(err));
       return { path: args.path, error: (err as Error).message };
     }
   }

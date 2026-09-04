@@ -84,7 +84,7 @@ export default class WebBrowseTool extends Tool {
       });
       // output
       title = await page.title();
-      body  = this.turndown.turndown(body).slice(0, constants.MAX_TOOL_RESULT_CHARS - 8);
+      body  = this.turndown.turndown(body).slice(0, constants.MAX_TOOL_RESULT_CHARS);
     } catch (error) {
       logger.error('[WebBrowseTool.call]', 'error:', readError(error), 'url:', url);
       title = 'error';
