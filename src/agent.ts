@@ -275,6 +275,8 @@ export class Agent {
 
       // load task input as user message
       chat.messages.push({ role: 'user', content: message.trim() });
+      // send an update to the channel
+      onUpdate?.(`\`${this.id}\` agent is thinking...`);
 
       // AI loop: call model, execute tool calls, repeat until done
       let reply: Reply;
@@ -290,11 +292,12 @@ export class Agent {
 
         // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
         reply = await this.model.execChat(chat);
+        // trim content
         content = reply.message.content?.trim() || '';
         // count usage
         usage += reply.usage.completion + reply.usage.prompt;
         // send onUpdate to the channel
-        onUpdate?.(`${content}`);
+        onUpdate?.(`${content.slice(0, 64) || 'still thkinking...'}`);
 
         // persist assistant reply to chat history
         chat.messages.push({ role: 'assistant', content: content, tools: reply.message.tools });
@@ -308,12 +311,12 @@ export class Agent {
             ended = true;
             chat.messages.push({role: 'tool', content: JSON.stringify({ ended: true }), toolId: call.id});
             // send an update to the channel
-            onUpdate?.(`  \`${call.name}\` - end chat!`);
+            onUpdate?.(`  \`${call.name}\` - ending chat!`);
           } else if (ended) {
             // tools after end_chat / stop are skipped, but their ids still need an answer
             chat.messages.push({role: 'tool', content: JSON.stringify({ skipped: true }), toolId: call.id});
             // send an update to the channel
-            onUpdate?.(`  \`${call.name}\` - skipped!`);
+            onUpdate?.(`\`${call.name}\` - skipped!`);
           } else {
             // ! tool call - delegated to execTool which handles (engine and mcp) tools
             let result = await this.execTool(call.name, call.arguments, chat);
@@ -321,7 +324,7 @@ export class Agent {
             // add tool call to chat history, truncating huge results
             chat.messages.push({role: 'tool', content: content, toolId: call.id});
             // send an update to the channel
-            onUpdate?.(`  \`${call.name}\` - ${truncate(content, 64)}`);
+            onUpdate?.(`\`${call.name}\` - ${truncate(content, 64)}`);
           }
         }
 
@@ -339,6 +342,9 @@ export class Agent {
 
       // save chat to cache
       this.saveChat(chatId, chat);
+
+      // done
+      onUpdate?.(`\`${this.id}\` has finished!`);
 
       logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, reply=${reply?.message?.content?.slice(0, 32)}`);
       return { content: (reply?.message?.content || '').trim(), steps: steps, usage: usage };

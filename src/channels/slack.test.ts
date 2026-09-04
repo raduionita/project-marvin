@@ -538,8 +538,7 @@ test('E2E: app_mention → LLM → Slack reply', async () => {
 
   expect(acked).toBe(true);
   expect(model.callCount).toBe(1);
-  expect(channel.mockWeb.postMessageCalls.length).toBe(1);
-  const posted = channel.mockWeb.postMessageCalls[0]!;
+  const posted = channel.mockWeb.postMessageCalls.at(-1)!;
   expect(posted.channel).toBe('C123');
   expect(posted.thread_ts).toBe('1700000000.001');
   expect(posted.blocks![0]!.text).toBe('Hello there!');
@@ -561,7 +560,7 @@ test('E2E: app_mention runs tools then posts the final answer', async () => {
   await channel.mockSok.emit('app_mention', mentionEvent({ text: '<@U12345678> what is today?' }));
 
   expect(model.callCount).toBe(2);
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('The date is 1/1/1970');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('The date is 1/1/1970');
 
   // tool result was persisted to the thread's chat history
   const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001');
@@ -692,7 +691,7 @@ test('E2E: empty AI content posts the (no response) placeholder', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('(no response)');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('(no response)');
 });
 
 test('E2E: missing agent does not crash', async () => {

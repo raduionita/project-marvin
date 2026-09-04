@@ -215,10 +215,10 @@ test('full flow: slack research request replies in the thread', async () => {
   expect(browser.pagesOpened).toBe(1);
 
   // the final Slack reply is posted in the original thread
-  expect(channel.mockWeb.postMessageCalls.length).toBe(1);
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![0]!.text).toBe('Here is the history of coffee...');
-  expect(channel.mockWeb.postMessageCalls[0]!.channel).toBe('C123');
-  expect(channel.mockWeb.postMessageCalls[0]!.thread_ts).toBe('1700000000.001');
+  const posted = channel.mockWeb.postMessageCalls.at(-1)!;
+  expect(posted.blocks![0]!.text).toBe('Here is the history of coffee...');
+  expect(posted.channel).toBe('C123');
+  expect(posted.thread_ts).toBe('1700000000.001');
 });
 
 test('full flow: the tool results are kept in the chat cache for context', async () => {

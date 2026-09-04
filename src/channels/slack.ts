@@ -213,8 +213,10 @@ export default class SlackChannel extends Channel {
   }
 
   // send an "status" update (not the final answer) message to Slaxk 
-  private async sendUpdate(update: string, group?: string, thread?: string) : Promise<boolean> {
+  private async sendUpdates(updates: string[] = [], update: string, group?: string, thread?: string, chatId?: string, done: boolean = false) : Promise<boolean> {
     try {
+      // accumulate updates
+      updates.push(update);
 
       // need web client
       if (!this.webClient) {
@@ -223,22 +225,44 @@ export default class SlackChannel extends Channel {
       }
 
       if (!group) {
-        logger.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
+        logger.warn('[SlackChannel.sendUpdate]', 'no channel, skipping submit');
         return false;
       }
 
-      // always send a markdown block: the LLM output is markdown, Slack renders
-      // it (headers, bold, links, ...) via the legacy "markdown" block type
       const response = await this.webClient.chat.postMessage({
         channel: group,
         thread_ts: thread || undefined,
-        blocks: [{ 
-          type: 'markdown', 
-          text: update
-        }, {
-          type: "divider"
-        }
-      ]});
+        blocks: [
+          {
+            "type": "task_card",
+            "task_id": chatId,
+            "title": `Task ${chatId}`,
+            "status": done ? "complete" : "in_progress",
+            "details": {
+              "type": "rich_text",
+              "elements": []
+            },
+            "output": {
+              "type": "rich_text",
+              "elements": updates.map(u => ({ 
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": u,
+                    }
+                  ]
+              }))
+            }
+          }
+        ]
+      });
+
+      if (!response.ok) {
+        const hint = this.errorToHint(response.error);
+        logger.error('[SlackChannel.sendUpdate]', 'response NOT ok:', response.error, hint);
+        return false;
+      }
 
       return true;
     } catch (err) {
@@ -289,14 +313,20 @@ export default class SlackChannel extends Channel {
 
       logger.debug('[SlackChannel.onMessage]', `processing agent=${agentId} "${text.slice(0, 64)}"`);
 
+      const updates: string[] = [];
+      const sendUpdates = (update:string) => this.sendUpdates(updates, update, event.channel, thread, chatId);
+
       // ! process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await agent.sendChat(chatId, text, this.sendUpdate.bind(this));
+      const result = await agent.sendChat(chatId, text, sendUpdates);
       if (result.error) {
         logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
         result.content = `(AI loop error: ${result.error})`;
       }
 
-      // reply to user // send the result to the user
+      // update the task card
+      this.sendUpdates(updates, '', event.channel, thread, chatId, true);
+
+      // ! reply to user // send the result to the user
       const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, usage: result.usage });
       if (!res.ok) {
         logger.warn('[SlackChannel.onMessage]', 'failed to post reply:', res.error, res.message);
