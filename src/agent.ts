@@ -87,10 +87,11 @@ export class Agent {
       // inject the mcps block: loaded servers list their tools, config-only entries just their spawn spec
       if (Object.keys(this.engine.mcps).length) {
         system += '\n\n';
-        system += '## MCPs\n';
+        system += '## MCPs';
         for (const [id, mcp] of Object.entries(this.engine.mcps)) {
           if (mcp.isLoaded) {
-            system += `- ${id}\n`;
+            system += '\n';
+            system += `- ${id}`;
           }
         }
       }
@@ -114,16 +115,18 @@ export class Agent {
 
       // control tools first
       for (const [group, tools] of Object.entries(groups).filter(g => g[0] === 'control')) {
-        system += `### ${group} tools:\n`;
+        system += `### ${group} tools:`;
         for (const { name, info, args } of tools) {
+          system += '\n';
           system += `- \`${name}\`: ${info}\n`;
         }
       }
 
       // internal tools
       for (const [group, tools] of Object.entries(groups).filter(g => g[0] !== 'control')) {
-        system += `### ${group} tools:\n`;
+        system += `### ${group} tools:`;
         for (const { name, info, args } of tools) {
+          system += '\n';
           system += `- \`${name}\`: ${info}\n`;
         }
       }
@@ -131,7 +134,7 @@ export class Agent {
       // mcp tools
       for (const [id, mcp] of Object.entries(this.engine.mcps)) {
         if (mcp.isLoaded) {
-          system += `### ${id} MCP tools:\n`;
+          system += `### ${id} MCP tools:`;
           for (const tool of Object.values(mcp.tools)) {
             system += '\n';
             system += `- \`${id}__${tool.name}\`: ${tool.description}`;
@@ -226,6 +229,7 @@ export class Agent {
 
     chat.messages = system ? [system, ...packed, ...active] : [...packed, ...active];
 
+    // TODO
     // drop tool messages left without their assistant tool_calls parent right
     // after the trim point: APIs reject tool responses with no matching
     // tool_calls message before them
@@ -305,15 +309,14 @@ export class Agent {
           } else {
             // ! tool call - delegated to execTool which handles (engine and mcp) tools
             let result = await this.execTool(call.name, call.arguments, chat);
-            
             // add tool call to chat history, truncating huge results
-            chat.messages.push({role: 'tool', content: truncate(JSON.stringify(result), constants.MAX_TOOL_RESULT_CHARS), toolId: call.id});
+            chat.messages.push({role: 'tool', content: JSON.stringify(result), toolId: call.id});
           }
         }
 
         // trim result, this can be really big
         logger.debug('[Agent.sendChat]', `ended=${ended}`, `step=#${steps}`, `tools=${reply.message.tools?.map(t => t.name)}`);
-      } while ((!ended) && (steps < constants.DEFAULT_MAX_STEPS - 1));
+      } while ((!ended) && (steps < constants.DEFAULT_MAX_STEPS));
 
       // warn if max steps reached
       if (steps >= constants.DEFAULT_MAX_STEPS) {

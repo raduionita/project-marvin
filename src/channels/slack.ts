@@ -7,6 +7,8 @@ import { listCommands } from '../commands/index.js';
 import { setDefaultOutput } from '../logger.js';
 import * as constants from '../constants.js';
 import logger from '../logger.js';
+import { read } from 'node:fs';
+import { readError } from '../helpers/error.js';
 
 // commands that mutate/restart the daemon itself (or serve it) and are
 // therefore not callable from Slack
@@ -151,7 +153,7 @@ export default class SlackChannel extends Channel {
   // send a message to Slack, optionally as a thread reply
   public async sendMessage(message: Message) : Promise<SlackResponse> {
     try {
-      logger.debug('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'} agent=${message.agent || '(none)'}`);
+      logger.info('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'} agent=${message.agent || '(none)'}`);
 
       // need web client
       if (!this.webClient) {
@@ -232,7 +234,7 @@ export default class SlackChannel extends Channel {
   protected async onMessage({ event, body, ack }: HandlerParams) {
     const thread = event.thread_ts || event.ts || event.event_ts;
     try {
-      logger.info('[SlackChannel.onMessage]', event.channel, thread); // , 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
+      logger.info('[SlackChannel.onMessage]', `group=${event.channel}, thread=${thread}`); // , 'body=', JSON.stringify(body), 'event=', JSON.stringify(event));
 
       // extract the actual message text (strip @marvin mention)
       const text = this.cleanText(event.text || '');
@@ -323,15 +325,15 @@ export default class SlackChannel extends Channel {
   }
 
   protected async onConnecting() {
-    logger.info('[SlackChannel.onConnecting]', 'connecting?');
+    logger.debug('[SlackChannel.onConnecting]', 'connecting?');
   }
 
   protected async onConnected() {
-    logger.info('[SlackChannel.onConnected]', 'connected!');
+    logger.debug('[SlackChannel.onConnected]', 'connected!');
   }
 
   protected async onDisconnected(error: Error) {
-    logger.warn('[SlackChannel.onDisconnected]', 'disconnected!', error);
+    logger.warn('[SlackChannel.onDisconnected]', 'disconnected!', readError(error));
   }
 
 // dynamically load a command class (mirrors marvin.ts execCommand), execute it

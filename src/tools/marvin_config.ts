@@ -38,7 +38,7 @@ export default class MarvinConfigTool extends Tool {
     group: 'marvin',
     function: {
       name: 'marvin_config',
-      description: 'Read or edit the Marvin config file (~/.marvin/marvin.json).',
+      description: 'Read or edit the Marvin config file.',
       parameters: {
         type: 'object',
         properties: {
