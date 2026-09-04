@@ -1,6 +1,6 @@
 {
   "name": "marvin",
-  "version": "0.9.14",
+  "version": "0.9.15",
   "description": "mArvIn - your AI sidekick",
   "keywords": [
     "marvin",
@@ -40,6 +40,10 @@
     "puppeteer": "^25.3.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "undici-real": "npm:undici@^7.29.0"
+  },
+  "patchedDependencies": {
+    "@slack/socket-mode@3.0.1": "src/patches/@slack__socket-mode@3.0.1.patch"
   }
 }
