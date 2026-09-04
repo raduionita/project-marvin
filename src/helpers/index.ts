@@ -54,7 +54,7 @@ export function rand(min:number, max:number) {
 // clip a string to a maximum length, appending a marker when truncated
 export function truncate(text: string, max: number): string {
   if (max <= 0 || text.length <= max) return text;
-  return text.slice(0, max) + `...[truncated ${text.length - max} chars]`;
+  return text.slice(0, max) + `...`;
 }
 
 // llm function names must match ^[a-zA-Z0-9_-]+$: map anything else to _
@@ -157,4 +157,8 @@ export function splitMcpToolName(name: string): { id: string, name: string } | n
   const idx = name.lastIndexOf('__');
   if (idx <= 0 || idx === name.length - 2) return null;
   return { id: name.slice(0, idx), name: name.slice(idx + 2) };
+}
+
+export function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, '').trim();
 }

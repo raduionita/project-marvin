@@ -1,6 +1,6 @@
 {
   "name": "marvin",
-  "version": "0.9.13",
+  "version": "0.9.14",
   "description": "mArvIn - your AI sidekick",
   "keywords": [
     "marvin",
@@ -36,6 +36,7 @@
     "@slack/socket-mode": "^2.0.7",
     "@slack/web-api": "^7.16.0",
     "dotenv": "^17.4.2",
+    "fast-xml-parser": "^5.11.1",
     "puppeteer": "^25.3.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",

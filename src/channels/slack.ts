@@ -206,9 +206,44 @@ export default class SlackChannel extends Channel {
         message: response.message?.text || '',
         channel: response.channel || message.group || '',
       }
-    } catch (error) {
-      logger.error('[SlackChannel.sendMessage]', 'failed to send message:', error);
-      return { ts: '', ok: false, error: (error as Error).message, message: '(slack sendMessage failed)' };
+    } catch (err) {
+      logger.error('[SlackChannel.sendMessage]', 'failed to send message:', readError(err));
+      return { ts: '', ok: false, error: (err as Error).message, message: '(slack sendMessage failed)' };
+    }
+  }
+
+  // send an "status" update (not the final answer) message to Slaxk 
+  private async sendUpdate(update: string, group?: string, thread?: string) : Promise<boolean> {
+    try {
+
+      // need web client
+      if (!this.webClient) {
+        logger.error('[SlackChannel.sendUpdate]', 'not attached, skipping submit');
+        return false;
+      }
+
+      if (!group) {
+        logger.warn('[SlackChannel.sendMessage]', 'no channel, skipping submit');
+        return false;
+      }
+
+      // always send a markdown block: the LLM output is markdown, Slack renders
+      // it (headers, bold, links, ...) via the legacy "markdown" block type
+      const response = await this.webClient.chat.postMessage({
+        channel: group,
+        thread_ts: thread || undefined,
+        blocks: [{ 
+          type: 'markdown', 
+          text: update
+        }, {
+          type: "divider"
+        }
+      ]});
+
+      return true;
+    } catch (err) {
+      logger.error('[SlackChannel.sendUpdate]', 'failed to send update:', readError(err));
+      return false;
     }
   }
 
@@ -255,7 +290,7 @@ export default class SlackChannel extends Channel {
       logger.debug('[SlackChannel.onMessage]', `processing agent=${agentId} "${text.slice(0, 64)}"`);
 
       // ! process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await agent.sendChat(chatId, text);
+      const result = await agent.sendChat(chatId, text, this.sendUpdate.bind(this));
       if (result.error) {
         logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
         result.content = `(AI loop error: ${result.error})`;

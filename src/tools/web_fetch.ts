@@ -1,11 +1,12 @@
 
 import TurndownService from 'turndown';
+import { XMLParser } from "fast-xml-parser";
 
 import { Tool, type ToolMeta } from '../types.js';
 import type Engine from '../engine.js';
 import * as constants from '../constants.js';
 import logger from '../logger.js';
-
+import { stripTags } from '../helpers/index.js';
 
 export default class WebFetchTool extends Tool {
   public meta: ToolMeta = {
@@ -62,23 +63,47 @@ export default class WebFetchTool extends Tool {
   public async call(args: { url: string }) {
     logger.debug('[WebFetchTool.call]', args.url.slice('https://'.length, 64));
 
-    // use fetch to fetch the page
     const response = await fetch(args.url);
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
 
-    // switch content type
-      // application/rss+xml
-      // text/html
-      // application/json
-      // text/plain (default)
+    let result: string;
 
-    const html = await response.text();
-    
-    // extract the relevant content
-    // const body = html.substring(html.search(/\<body.+\>/) + 6, html.search(/\<\/body\>/i))
-    // const title = html.substring(html.indexOf('<title>') + 7, html.indexOf('</title>'));
+    if (contentType.includes('text/html')) {
+      result = this.turndown.turndown(text);
+    } else if (contentType.includes('application/json')) {
+      try {
+        const parsed = JSON.parse(text);
+        result = JSON.stringify(parsed, null, 2);
+      } catch {
+        result = text;
+      }
+    } else if (contentType.includes('rss+xml') || contentType.includes('xml')) {
+      const limit = 10;
+      const parser = new XMLParser();
+      const doc = parser.parse(text);
+
+      // navigate to channel items (RSS 2.0) or feed entries (Atom)
+      const channel = doc?.rss?.channel || doc?.feed;
+      const rawItems = channel?.item || channel?.entry || [];
+      const items: Record<string, string>[] = Array.isArray(rawItems) ? rawItems : [rawItems];
+
+      const lines = items.slice(0, limit).map((item) => {
+        const title = item.title || '';
+        const rawLink = item.link;
+        const link = typeof rawLink === 'object' ? rawLink['@_href'] || '' : rawLink || '';
+        const description = stripTags(item.description || item.summary || item.content || '');
+        return `## ${title}\n${link}\n${description}`;
+      });
+
+      result = lines.join('\n\n');
+    } else {
+      // text/plain and anything else
+      result = text;
+    }
 
     return { 
-      result: this.turndown.turndown(html).slice(0, constants.MAX_TOOL_RESULT_CHARS),
+      result: result.slice(0, constants.MAX_TOOL_RESULT_CHARS),
     };
   }
 }

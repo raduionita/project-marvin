@@ -127,6 +127,7 @@ export abstract class Channel {
   abstract drop(): Promise<void>;
 
   abstract info(): Promise<{ groups: { [key: string]: string } }>;
+
   abstract sendMessage(message: Message): Promise<{ok:boolean, error:string|undefined, message?:string}>;
 }
 
