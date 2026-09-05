@@ -1,4 +1,4 @@
-import { SocketModeClient, LogLevel } from '@slack/socket-mode';
+import { SocketModeClient, LogLevel, SMWebsocketError } from '@slack/socket-mode';
 import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
 import { Channel, Command, Message, ChannelMeta } from '../types.js';
 import { Agent } from '../agent.js';
@@ -102,6 +102,7 @@ export default class SlackChannel extends Channel {
       this.socketClient.on('connecting', this.onConnecting.bind(this));
       this.socketClient.on('connected', this.onConnected.bind(this));
       this.socketClient.on('disconnected', this.onDisconnected.bind(this));
+      this.socketClient.on('reconnecting', this.onReconnecting.bind(this));
 
       // route Slack events to Marvin's AI loop
       this.socketClient.on('app_mention', this.onMessage.bind(this));
@@ -386,11 +387,23 @@ export default class SlackChannel extends Channel {
   }
 
   protected async onError(error: Error) {
-    logger.error('[SlackChannel.onError]', error);
+    // routine transport disconnects (abnormal close 1006, empty message) are
+    // expected and handled by the client's auto-reconnect; only surface real errors
+    const msg = (error as any)?.original?.message || error.message;
+    const code = (error as any)?.code || 0;
+    if (!msg) {
+      logger.warn('[SlackChannel.onError]', 'websocket disconnected (auto-reconnecting)');
+      return;
+    }
+    logger.error('[SlackChannel.onError]', `code=${code} message=${msg}`);
   }
 
   protected async onConnecting() {
     logger.debug('[SlackChannel.onConnecting]', 'connecting?');
+  }
+
+  protected async onReconnecting() {
+    logger.debug('[SlackChannel.onReconnecting]', 'reconnecting?');
   }
 
   protected async onConnected() {
