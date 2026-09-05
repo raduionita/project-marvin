@@ -458,7 +458,7 @@ test('sendMessage() always sends the LLM markdown in a markdown block', async ()
   await channel.sendMessage({ role: 'assistant', content: '## Header\n\nParagraph', group: 'C123' });
 
   const call = channel.mockWeb.postMessageCalls[0]!;
-  expect(call.blocks).toEqual([{ type: 'markdown', text: '## Header\n\nParagraph' }, { type: 'divider' }, { type: 'markdown', text: '**Agent**: `(none)`\n**Model**: `(none)`\n**Channel**: `C123`\n**Thread**: `(none)`\n**Usage**: `(none)`\n' }]);
+  expect(call.blocks).toEqual([{ type: 'divider' }, { type: 'markdown', text: '## Header\n\nParagraph' }, { type: 'divider' }, { type: 'markdown', text: '**Agent**: `(none)`\n**Model**: `(none)`\n**Channel**: `C123`\n**Thread**: `(none)`\n**Usage**: `(none)`\n' }]);
   expect(call.text).toBeUndefined();
 });
 
@@ -541,7 +541,7 @@ test('E2E: app_mention → LLM → Slack reply', async () => {
   const posted = channel.mockWeb.postMessageCalls.at(-1)!;
   expect(posted.channel).toBe('C123');
   expect(posted.thread_ts).toBe('1700000000.001');
-  expect(posted.blocks![0]!.text).toBe('Hello there!');
+  expect(posted.blocks![1]!.text).toBe('Hello there!');
 });
 
 test('E2E: app_mention runs tools then posts the final answer', async () => {
@@ -560,7 +560,7 @@ test('E2E: app_mention runs tools then posts the final answer', async () => {
   await channel.mockSok.emit('app_mention', mentionEvent({ text: '<@U12345678> what is today?' }));
 
   expect(model.callCount).toBe(2);
-  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('The date is 1/1/1970');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toBe('The date is 1/1/1970');
 
   // tool result was persisted to the thread's chat history
   const chat = engine.agents['marvin']!.loadChat('slack-C123-1700000000.001');
@@ -584,7 +584,7 @@ test('E2E: message (im) → LLM → Slack DM reply', async () => {
 
   expect(model.callCount).toBe(1);
   expect(channel.mockWeb.postMessageCalls.at(-1)!.channel).toBe('D123');
-  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('Direct message reply');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toBe('Direct message reply');
 });
 
 test('E2E: non-im message events are acknowledged and ignored', async () => {
@@ -678,7 +678,7 @@ test('E2E: LLM failure posts an (AI loop error) reply', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toContain('(AI loop error: mock model failure)');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toContain('(AI loop error: mock model failure)');
 });
 
 test('E2E: empty AI content posts the (no response) placeholder', async () => {
@@ -691,7 +691,7 @@ test('E2E: empty AI content posts the (no response) placeholder', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('(no response)');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toBe('(no response)');
 });
 
 test('E2E: missing agent does not crash', async () => {
@@ -724,7 +724,7 @@ test('E2E: LLM output is posted to Slack unchanged', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('The answer is 42');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toBe('The answer is 42');
 });
 
 test('E2E: non-JSON LLM output is posted unchanged', async () => {
@@ -737,7 +737,7 @@ test('E2E: non-JSON LLM output is posted unchanged', async () => {
 
   await channel.mockSok.emit('app_mention', mentionEvent());
 
-  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![0]!.text).toBe('plain text reply');
+  expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toBe('plain text reply');
 });
 
 // ============================================================================
@@ -763,8 +763,8 @@ test('onSlashCommand acks then posts the help output to the channel', async () =
   expect(channel.mockWeb.postMessageCalls.length).toBe(1);
   const posted = channel.mockWeb.postMessageCalls[0]!;
   expect(posted.channel).toBe('C123');
-  expect(posted.blocks![0]!.text).toContain('usage: marvin [command]');
-  expect(posted.blocks![0]!.text).toContain('version');
+  expect(posted.blocks![1]!.text).toContain('usage: marvin [command]');
+  expect(posted.blocks![1]!.text).toContain('version');
 });
 
 test('onSlashCommand forwards command args and posts the result', async () => {
@@ -783,7 +783,7 @@ test('onSlashCommand forwards command args and posts the result', async () => {
 
   const posted = channel.mockWeb.postMessageCalls[0]!;
   // the "list" arg was forwarded to SkillsCommand (without it, help would run)
-  expect(posted.blocks![0]!.text).toContain('skills:');
+  expect(posted.blocks![1]!.text).toContain('skills:');
 });
 
 test('onSlashCommand replies with an error for an unknown command', async () => {
@@ -801,8 +801,8 @@ test('onSlashCommand replies with an error for an unknown command', async () => 
   });
 
   const posted = channel.mockWeb.postMessageCalls[0]!;
-  expect(posted.blocks![0]!.text).toContain('unknown command: foobar');
-  expect(posted.blocks![0]!.text).toContain('available commands');
+  expect(posted.blocks![1]!.text).toContain('unknown command: foobar');
+  expect(posted.blocks![1]!.text).toContain('available commands');
 });
 
 test('onSlashCommand does not expose blocked commands', async () => {
@@ -820,9 +820,9 @@ test('onSlashCommand does not expose blocked commands', async () => {
   });
 
   const posted = channel.mockWeb.postMessageCalls[0]!;
-  expect(posted.blocks![0]!.text).toContain('serve cannot be run from slack');
+  expect(posted.blocks![1]!.text).toContain('serve cannot be run from slack');
   // serve must not be listed among the available commands
-  const list = (posted.blocks![0]!.text || '').split('available commands: ')[1] || '';
+  const list = (posted.blocks![1]!.text || '').split('available commands: ')[1] || '';
   expect(list).not.toContain('serve');
 
   await channel.mockSok.emit('slash_commands', {
@@ -832,7 +832,7 @@ test('onSlashCommand does not expose blocked commands', async () => {
   });
 
   const second = channel.mockWeb.postMessageCalls[1]!;
-  expect(second.blocks![0]!.text).toContain('disable cannot be run from slack');
+  expect(second.blocks![1]!.text).toContain('disable cannot be run from slack');
 });
 
 test('onError logs error to its logger', async () => {
