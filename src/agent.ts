@@ -69,6 +69,14 @@ export class Agent {
     system += '\n\n---';
 
     {
+      system += '\n\n';
+      system += '## Context\n';
+      system += ' - now:' + (new Date()).toUTCString();
+      // last run?
+      // trigger?
+    } // state / world state
+
+    {
       // inject a compact summary of the most recently updated memory notes, so
       // the agent keeps cross-run context (facts, preferences, progress)
       if (this.engine.config.settings.memory || this.memory) {
@@ -340,11 +348,11 @@ export class Agent {
       // track usage
       chat.usage = usage;
 
-      // save chat to cache
-      this.saveChat(chatId, chat);
-
       // done
       onUpdate?.(`\`${this.id}\` has finished!`);
+
+      // save chat to cache
+      this.saveChat(chatId, chat);
 
       logger.debug('[Agent.sendChat]', `chatId=${chatId} agent=${this.id}, reply=${reply?.message?.content?.slice(0, 32)}`);
       return { content: (reply?.message?.content || '').trim(), steps: steps, usage: usage };

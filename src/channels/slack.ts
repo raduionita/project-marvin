@@ -177,10 +177,12 @@ export default class SlackChannel extends Channel {
       const response = await this.webClient.chat.postMessage({
         channel: message.group,
         thread_ts: message.thread || undefined,
-        blocks: [{ 
+        blocks: [{
+          type: "divider"
+        },{ 
           type: 'markdown', 
           text: message.content 
-        }, {
+        },{
           type: "divider"
         },{
           type: "markdown",
@@ -238,12 +240,12 @@ export default class SlackChannel extends Channel {
       const response = await this.webClient.chat.postMessage({
         channel: group,
         thread_ts: thread || undefined,
-        blocks: [
-          {
-            "type": "markdown",
-            "text": update,
-          }
-        ]
+        blocks: [{
+          type: "divider"
+        },{
+          "type": "markdown",
+          "text": '> ' + update,
+        }]
       });
 
       if (!response.ok) {
@@ -301,7 +303,6 @@ export default class SlackChannel extends Channel {
 
       logger.debug('[SlackChannel.onMessage]', `processing agent=${agentId} "${text.slice(0, 64)}"`);
 
-      const updates: string[] = [];
       const sendUpdates = (update:string) => this.sendUpdates(update, event.channel, thread, chatId);
 
       // ! process through Marvin's AI loop (executes model calls + tool execution)
@@ -310,9 +311,6 @@ export default class SlackChannel extends Channel {
         logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
         result.content = `(AI loop error: ${result.error})`;
       }
-
-      // update the task card
-      this.sendUpdates('done', event.channel, thread, chatId);
 
       // ! reply to user // send the result to the user
       const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, usage: result.usage });
