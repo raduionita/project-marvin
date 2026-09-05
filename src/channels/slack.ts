@@ -1,5 +1,5 @@
 import { SocketModeClient, LogLevel, SMWebsocketError } from '@slack/socket-mode';
-import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse } from '@slack/web-api';
+import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse, ViewsPublishResponse,ViewsOpenArguments, ViewsOpenResponse, ViewsUpdateArguments, ViewsPublishArguments} from '@slack/web-api';
 import { Channel, Command, Message, ChannelMeta } from '../types.js';
 import { Agent } from '../agent.js';
 import type Engine from '../engine.js';
@@ -30,6 +30,11 @@ export interface ISocketModeClient {
 export interface IWebClient {
   chat: {
     postMessage: (args: ChatPostMessageArguments) => Promise<ChatPostMessageResponse>;
+  };
+  views?: {
+    publish: (args: ViewsPublishArguments) => Promise<ViewsPublishResponse>;
+    update: (args: ViewsUpdateArguments) => Promise<ViewsPublishResponse>;
+    open: (args: ViewsOpenArguments) => Promise<ViewsOpenResponse>;
   };
   conversations: {
     list: (args?: any) => Promise<any>;
@@ -214,11 +219,8 @@ export default class SlackChannel extends Channel {
   }
 
   // send an "status" update (not the final answer) message to Slaxk 
-  private async sendUpdates(updates: string[] = [], update: string, group?: string, thread?: string, chatId?: string, done: boolean = false) : Promise<boolean> {
+  private async sendUpdates(update: string, group?: string, thread?: string, chatId?: string, done: boolean = false) : Promise<boolean> {
     try {
-      // accumulate updates
-      updates.push(update);
-
       // need web client
       if (!this.webClient) {
         logger.error('[SlackChannel.sendUpdate]', 'not attached, skipping submit');
@@ -230,31 +232,16 @@ export default class SlackChannel extends Channel {
         return false;
       }
 
+      // todo: views
+      // this.webClient.v
+
       const response = await this.webClient.chat.postMessage({
         channel: group,
         thread_ts: thread || undefined,
         blocks: [
           {
-            "type": "task_card",
-            "task_id": chatId,
-            "title": `Task ${chatId}`,
-            "status": done ? "complete" : "in_progress",
-            "details": {
-              "type": "rich_text",
-              "elements": []
-            },
-            "output": {
-              "type": "rich_text",
-              "elements": updates.map(u => ({ 
-                  "type": "rich_text_section",
-                  "elements": [
-                    {
-                      "type": "text",
-                      "text": u,
-                    }
-                  ]
-              }))
-            }
+            "type": "markdown",
+            "text": update,
           }
         ]
       });
@@ -315,7 +302,7 @@ export default class SlackChannel extends Channel {
       logger.debug('[SlackChannel.onMessage]', `processing agent=${agentId} "${text.slice(0, 64)}"`);
 
       const updates: string[] = [];
-      const sendUpdates = (update:string) => this.sendUpdates(updates, update, event.channel, thread, chatId);
+      const sendUpdates = (update:string) => this.sendUpdates(update, event.channel, thread, chatId);
 
       // ! process through Marvin's AI loop (executes model calls + tool execution)
       const result = await agent.sendChat(chatId, text, sendUpdates);
@@ -325,7 +312,7 @@ export default class SlackChannel extends Channel {
       }
 
       // update the task card
-      this.sendUpdates(updates, '', event.channel, thread, chatId, true);
+      this.sendUpdates('done', event.channel, thread, chatId);
 
       // ! reply to user // send the result to the user
       const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, usage: result.usage });

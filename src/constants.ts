@@ -24,6 +24,10 @@ export const MONITOR_TASK_MS = 60 * 60 * 1000;
 
 // mcp client: timeout for the initialize handshake (npx cold start can be slow)
 export const MCP_INIT_TIMEOUT_MS = 30 * 1000;
+// mcp client: how many times to retry the spawn + initialize handshake on failure
+export const MCP_LOAD_RETRIES = 3;
+// mcp client: base delay (ms) between load retries, multiplied per attempt
+export const MCP_LOAD_RETRY_DELAY_MS = 500;
 // mcp client: timeout for a single tools/call request
 export const MCP_CALL_TIMEOUT_MS = 60 * 1000;
 

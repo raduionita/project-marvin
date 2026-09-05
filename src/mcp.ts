@@ -8,7 +8,7 @@ import type Engine from './engine.js';
 import logger from './logger.js';
 import type { ToolMeta, Config } from './types.js';
 import * as constants from './constants.js';
-import { sanitizeToolName, tryJsonParse } from './helpers/index.js';
+import { sanitizeToolName, tryJsonParse, withRetry } from './helpers/index.js';
 
 // client for one mcp server over stdio: spawns the process on load, lists its
 // tools and forwards tool calls. reconnects lazily if the process died.
@@ -31,11 +31,24 @@ export class Mcp {
     return !!this.client;
   }
 
-  // spawn the server process and run the initialize handshake
+  // spawn the server process and run the initialize handshake, retrying a
+  // few times. each attempt cleans up so a failure never leaves a dead
+  // client behind that would make future load() calls no-op.
   async load(): Promise<void> {
     logger.debug(`[Mcp.load]`, this.id);
 
     if (this.client) return;
+
+    await withRetry(() => this.connect(), {
+      retries: constants.MCP_LOAD_RETRIES,
+      delayMs: constants.MCP_LOAD_RETRY_DELAY_MS,
+    });
+  }
+
+  // one spawn + initialize + tools/list attempt, throwing on failure
+  private async connect(): Promise<void> {
+    // start clean so a previous failed attempt cannot leak into this one
+    await this.drop();
 
     this.transport = new StdioClientTransport({
       command: this.config.command,
@@ -47,25 +60,46 @@ export class Mcp {
     // drain stderr at debug level so a chatty server cannot block on a full pipe
     this.transport.stderr?.on('data', this.onStderr.bind(this));
 
-    this.client = new Client({ name: 'marvin', version: this.version() }, { capabilities: {} });
-    this.client.onclose = this.onClose.bind(this);
-    this.client.onerror = this.onError.bind(this);
+    const client = new Client({ name: 'marvin', version: this.version() }, { capabilities: {} });
+    client.onclose = this.onClose.bind(this);
+    client.onerror = this.onError.bind(this);
 
-    await this.client.connect(this.transport, { timeout: constants.MCP_INIT_TIMEOUT_MS });
+    try {
+      await client.connect(this.transport, { timeout: constants.MCP_INIT_TIMEOUT_MS });
 
-    // cache the tool list, keyed by sanitized name
-    const result = await this.client.listTools({}, { timeout: constants.MCP_CALL_TIMEOUT_MS });
-    this.tools = Object.fromEntries((result.tools || []).map(t => [
-      sanitizeToolName(t.name),
-      {
-        name: t.name,
-        ...(t.description ? { description: t.description } : {}),
-        inputSchema: (t.inputSchema || { type: 'object', properties: {} }) as { [key: string]: any },
-      },
-    ]));
+      // cache the tool list, keyed by sanitized name
+      const result = await client.listTools({}, { timeout: constants.MCP_CALL_TIMEOUT_MS });
+      this.tools = Object.fromEntries((result.tools || []).map(t => [
+        sanitizeToolName(t.name),
+        {
+          name: t.name,
+          ...(t.description ? { description: t.description } : {}),
+          inputSchema: (t.inputSchema || { type: 'object', properties: {} }) as { [key: string]: any },
+        },
+      ]));
 
-    for (const tool of result.tools || []) {
-      logger.debug(`[Mcp.load]`, 'mcp', this.id, 'result', tool.name, JSON.stringify(tool.inputSchema));
+      for (const tool of result.tools || []) {
+        logger.debug(`[Mcp.load]`, 'mcp', this.id, 'result', tool.name, JSON.stringify(tool.inputSchema));
+      }
+
+      this.client = client;
+    } catch (err) {
+      // never leave a half-connected client behind: without this a failed
+      // load would set this.client and every later load() would return early
+      try {
+        await client.close();
+      } catch {
+        // fall through, transport close below handles the process
+      }
+      try {
+        await this.transport?.close();
+      } catch {
+        // fall through
+      }
+      this.client = null;
+      this.transport = null;
+      this.tools = {};
+      throw err;
     }
   }
 
