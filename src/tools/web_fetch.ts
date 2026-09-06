@@ -6,7 +6,7 @@ import { Tool, type ToolMeta } from '../types.js';
 import type Engine from '../engine.js';
 import * as constants from '../constants.js';
 import logger from '../logger.js';
-import { stripTags } from '../helpers/index.js';
+import { stripTags, withRetry } from '../helpers/index.js';
 
 export default class WebFetchTool extends Tool {
   public meta: ToolMeta = {
@@ -63,9 +63,16 @@ export default class WebFetchTool extends Tool {
   public async call(args: { url: string }) {
     logger.debug('[WebFetchTool.call]', args.url.slice('https://'.length, 64));
 
-    const response = await fetch(args.url);
-    const contentType = response.headers.get('content-type') || '';
-    const text = await response.text();
+    const { contentType, text } = await withRetry(async () => {
+      const response = await fetch(args.url, { signal: AbortSignal.timeout(5000) });
+      // retry transient server errors, not client errors
+      if (response.status === 429 || response.status >= 500) {
+        throw new Error(`web_fetch: ${args.url} responded with ${response.status}`);
+      }
+      const contentType = response.headers.get('content-type') || '';
+      const text = await response.text();
+      return { contentType, text };
+    });
 
     let result: string;
 
@@ -73,9 +80,9 @@ export default class WebFetchTool extends Tool {
       result = this.turndown.turndown(text);
     } else if (contentType.includes('application/json')) {
       try {
-        const parsed = JSON.parse(text);
-        result = JSON.stringify(parsed, null, 2);
+        result = JSON.stringify(JSON.parse(text));
       } catch {
+        logger.warn('[WebFetchTool.call]', 'JSON error:', text);
         result = text;
       }
     } else if (contentType.includes('rss+xml') || contentType.includes('xml')) {
