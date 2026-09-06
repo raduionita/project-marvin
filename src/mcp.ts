@@ -209,40 +209,66 @@ export function makeMcpToolName(mcp: string, tool: string): string {
   return `${mcp}__${sanitizeToolName(tool)}`;
 }
 
+// build a single tool meta for one mcp tool
+function buildMcpToolMeta(id: string, tool: { name: string; description?: string; inputSchema: { [key: string]: any } }): ToolMeta {
+  const schema = tool.inputSchema || {};
+  return {
+    type: 'function',
+    group: id,
+    function: {
+      name: makeMcpToolName(id, tool.name),
+      description: tool.description || `Call "${tool.name}" on the "${id}" mcp server`,
+      parameters: {
+        type: 'object',
+        properties: schema.properties || {},
+        ...(Array.isArray(schema.required) && schema.required.length ? { required: schema.required } : {}),
+      },
+    },
+  };
+}
+
+// ensure the client exists and is connected, or null when unavailable
+async function ensureMcpLoaded(engine: Engine, id: string): Promise<Mcp | null> {
+  const client = engine.mcps[id];
+  if (!client) {
+    logger.warn('[loadMcpTool]', `mcp "${id}" not loaded, skipping`);
+    return null;
+  }
+
+  try {
+    if (!client.isLoaded) await client.load();
+  } catch (err) {
+    logger.warn('[loadMcpTool]', `mcp "${id}" failed to connect:`, (err as Error).message);
+    return null;
+  }
+
+  return client;
+}
+
+// build the tool meta for a single mcp tool. name accepts the full
+// `<mcpId>__<toolName>` form or the short server-side name.
+export async function loadMcpTool(engine: Engine, id: string, name: string): Promise<ToolMeta | null> {
+  const short = name.includes('__') ? name.slice(name.lastIndexOf('__') + 2) : name;
+  const client = await ensureMcpLoaded(engine, id);
+  if (!client) return null;
+
+  const tool = client.tools[sanitizeToolName(short)] || Object.values(client.tools).find(t => t.name === short);
+  if (!tool) return null;
+
+  return buildMcpToolMeta(id, tool);
+}
+
 // build the tool metas for a task's linked mcps. loaded dynamically at
 // execTask time and merged with the engine (default) tools. ensures each
 // client is connected so its cached tool list is fresh.
 export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<ToolMeta[]> {
   const tools: ToolMeta[] = [];
   for (const id of mcps || []) {
-    const client = engine.mcps[id];
-    if (!client) {
-      logger.warn('[loadMcpTools]', `mcp "${id}" not loaded, skipping`);
-      continue;
-    }
-
-    try {
-      if (!client.isLoaded) await client.load();
-    } catch (err) {
-      logger.warn('[loadMcpTools]', `mcp "${id}" failed to connect:`, (err as Error).message);
-      continue;
-    }
+    const client = await ensureMcpLoaded(engine, id);
+    if (!client) continue;
 
     for (const tool of Object.values(client.tools)) {
-      const schema = tool.inputSchema || {};
-      tools.push({
-        type: 'function',
-        group: id,
-        function: {
-          name: makeMcpToolName(id, tool.name),
-          description: tool.description || `Call "${tool.name}" on the "${id}" mcp server`,
-          parameters: {
-            type: 'object',
-            properties: schema.properties || {},
-            ...(Array.isArray(schema.required) && schema.required.length ? { required: schema.required } : {}),
-          },
-        },
-      });
+      tools.push(buildMcpToolMeta(id, tool));
     }
   }
 

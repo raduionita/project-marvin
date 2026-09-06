@@ -1,7 +1,7 @@
-import { Tool, ToolMeta } from '../types.js';
+import { Tool, type ToolMeta } from '../types.js';
 import type { Agent } from '../agent.js';
 import type { Chat } from '../types.js';
-import { loadMcpTools } from '../mcp.js';
+import { loadMcpTool } from '../mcp.js';
 import { splitMcpToolName } from '../helpers/index.js';
 import logger from '../logger.js';
 
@@ -27,7 +27,7 @@ export default class LoadToolsTool extends Tool {
   }
 
   public async call(args: { tools: string[] }, agent: Agent, chat: Chat): Promise<{ [key: string]: any }> {
-    logger.debug('[LoadToolsTool.call]', `[${(args?.tools || []).join(',')}]`);
+    logger.debug('[LoadToolsTool.call]', `[${(Array.isArray(args?.tools) ? args.tools : []).join(',')}]`);
 
     const names = Array.isArray(args?.tools) ? args.tools : [];
     if (!names.length) {
@@ -37,13 +37,12 @@ export default class LoadToolsTool extends Tool {
     const loaded: string[] = [];
     const missing: string[] = [];
 
-    const mcpCache = new Map<string, ToolMeta[]>();
+    chat.tools ||= [];
 
     for (const name of names) {
       // 1) engine tool (internal + custom)
       const tool = this.engine.tools[name];
       if (tool) {
-        chat.tools ||= [];
         if (!chat.tools.some(t => t.function.name === name)) {
           chat.tools.push(tool.meta);
         }
@@ -51,27 +50,16 @@ export default class LoadToolsTool extends Tool {
         continue;
       }
 
-      // 2) mcp tool (<mcpId>__<toolName>) - built via loadMcpTools
-      let found = false;
+      // 2) mcp tool (<mcpId>__<toolName>) - loaded one-by-one
       const mcpSplit = splitMcpToolName(name);
       if (mcpSplit) {
-        const mcp = this.engine.mcps[mcpSplit.id];
-        if (mcp) {
-          let metas = mcpCache.get(mcpSplit.id);
-          if (!metas) {
-            metas = await loadMcpTools(this.engine, [mcpSplit.id]);
-            mcpCache.set(mcpSplit.id, metas);
+        const meta = await loadMcpTool(this.engine, mcpSplit.id, name);
+        if (meta) {
+          if (!chat.tools.some(t => t.function.name === name)) {
+            chat.tools.push(meta);
           }
-          const meta = metas.find(m => m.function.name === name);
-          if (meta) {
-            chat.tools ||= [];
-            if (!chat.tools.some(t => t.function.name === name)) {
-              chat.tools.push(meta);
-            }
-            loaded.push(name);
-            continue;
-          }
-          found = true;
+          loaded.push(name);
+          continue;
         }
       }
 
@@ -79,8 +67,22 @@ export default class LoadToolsTool extends Tool {
       missing.push(name);
     }
 
+    // drop duplicates shadowing engine tools (engine meta wins)
+    if (chat.tools) {
+      for (const [toolName, tool] of Object.entries(this.engine.tools)) {
+        const idx = chat.tools.findIndex(t => t.function.name === toolName);
+        if (idx !== -1) chat.tools[idx] = tool.meta;
+      }
+      const seen = new Set<string>();
+      chat.tools = chat.tools.filter(t => {
+        if (seen.has(t.function.name)) return false;
+        seen.add(t.function.name);
+        return true;
+      });
+    }
+
     for (const [name, tool] of Object.entries(this.engine.tools)) {
-      logger.debug('[LoadToolsTool.call]', name, JSON.stringify(tool.meta));
+      logger.debug('[LoadToolsTool.call]', name, JSON.stringify(tool.meta).slice(0, 128));
     }
 
     return { loaded , missing };
