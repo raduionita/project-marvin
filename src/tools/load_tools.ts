@@ -81,8 +81,8 @@ export default class LoadToolsTool extends Tool {
       });
     }
 
-    for (const [name, tool] of Object.entries(this.engine.tools)) {
-      logger.debug('[LoadToolsTool.call]', name, JSON.stringify(tool.meta).slice(0, 128));
+    for (const [name, meta] of Object.entries(chat.tools)) {
+      logger.debug('[LoadToolsTool.call]', name, JSON.stringify(meta).slice(0, 128));
     }
 
     return { loaded , missing };
