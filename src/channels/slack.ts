@@ -241,8 +241,6 @@ export default class SlackChannel extends Channel {
         channel: group,
         thread_ts: thread || undefined,
         blocks: [{
-          type: "divider"
-        },{
           "type": "markdown",
           "text": '> ' + update,
         }]

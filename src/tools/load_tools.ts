@@ -81,6 +81,13 @@ export default class LoadToolsTool extends Tool {
       missing.push(name);
     }
 
-    return { loaded, missing };
+    for (const [name, meta] of Object.entries(this.engine.tools)) {
+      logger.debug('[LoadToolsTool.call]', name, JSON.stringify(meta));
+    }
+
+    const result : {[key:string]:any} = {};
+    result.loaded = loaded;
+    if (result.missing) result.missing = missing;
+    return result;
   }
 }

@@ -84,7 +84,7 @@ export class Mcp {
 
         // TODO: debug info, should remove this eventually
         for (const tool of result.tools || []) {
-          logger.debug(`[Mcp.load]`, this.id, 'result', tool.name, JSON.stringify(tool.inputSchema));
+          logger.debug(`[Mcp.load]`, this.id, 'tool', tool.name, JSON.stringify(tool.inputSchema));
         }
 
         this.client = client;
@@ -232,7 +232,7 @@ export async function loadMcpTools(engine: Engine, mcps: string[]): Promise<Tool
       const schema = tool.inputSchema || {};
       tools.push({
         type: 'function',
-        group: 'mcp',
+        group: id,
         function: {
           name: makeMcpToolName(id, tool.name),
           description: tool.description || `Call "${tool.name}" on the "${id}" mcp server`,
