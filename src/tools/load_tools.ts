@@ -76,18 +76,13 @@ export default class LoadToolsTool extends Tool {
       }
 
       // neither engine nor mcp matched
-      if (!found) {
-      }
       missing.push(name);
     }
 
-    for (const [name, meta] of Object.entries(this.engine.tools)) {
-      logger.debug('[LoadToolsTool.call]', name, JSON.stringify(meta));
+    for (const [name, tool] of Object.entries(this.engine.tools)) {
+      logger.debug('[LoadToolsTool.call]', name, JSON.stringify(tool.meta));
     }
 
-    const result : {[key:string]:any} = {};
-    result.loaded = loaded;
-    if (result.missing) result.missing = missing;
-    return result;
+    return { loaded , missing };
   }
 }
