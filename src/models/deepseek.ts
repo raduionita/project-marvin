@@ -115,6 +115,10 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
+    for (const meta of body.tools) {
+      logger.debug('[DeepseekModel.execChat]', meta.function.name, JSON.stringify(meta.function.parameters));
+    }
+
     appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
 
     // TODO: remove this
