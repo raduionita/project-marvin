@@ -1,5 +1,5 @@
 import { SocketModeClient, LogLevel, SMWebsocketError } from '@slack/socket-mode';
-import { WebClient, ChatPostMessageArguments, ChatPostMessageResponse, ViewsPublishResponse,ViewsOpenArguments, ViewsOpenResponse, ViewsUpdateArguments, ViewsPublishArguments} from '@slack/web-api';
+import { WebClient, ChatUpdateArguments, ChatUpdateResponse, ChatPostMessageArguments, ChatPostMessageResponse, ViewsPublishResponse,ViewsOpenArguments, ViewsOpenResponse, ViewsUpdateArguments, ViewsPublishArguments} from '@slack/web-api';
 import { Channel, Command, Message, ChannelMeta } from '../types.js';
 import { Agent } from '../agent.js';
 import type Engine from '../engine.js';
@@ -159,7 +159,7 @@ export default class SlackChannel extends Channel {
   // send a message to Slack, optionally as a thread reply
   public async sendMessage(message: Message) : Promise<SlackResponse> {
     try {
-      logger.info('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'} agent=${message.agent || '(none)'}`);
+      logger.info('[SlackChannel.sendMessage]', `group=${message.group || '(none)'} thread=${message.thread || '(none)'}}`);
 
       // need web client
       if (!this.webClient) {
@@ -182,16 +182,7 @@ export default class SlackChannel extends Channel {
         },{ 
           type: 'markdown', 
           text: message.content 
-        },{
-          type: "divider"
-        },{
-          type: "markdown",
-          text: '**Agent**: `'   + (message.agent  || '(none)') + '`\n' +
-                '**Model**: `'   + (message.model  || '(none)') + '`\n' +
-                '**Channel**: `' + (message.group  || '(none)') + '`\n' +
-                '**Thread**: `'  + (message.thread || '(none)') + '`\n' + 
-                '**Usage**: `'   + (message.usage  || '(none)') + '`\n'
-        },
+        }
       ]});
 
       // check if response is ok
@@ -220,63 +211,6 @@ export default class SlackChannel extends Channel {
     }
   }
 
-  // send an "status" update (not the final answer) message to Slaxk 
-  private async sendUpdates(update: string, group?: string, thread?: string, chatId?: string, done: boolean = false) : Promise<boolean> {
-    try {
-      // need web client
-      if (!this.webClient) {
-        logger.error('[SlackChannel.sendUpdate]', 'not attached, skipping submit');
-        return false;
-      }
-
-      if (!group) {
-        logger.warn('[SlackChannel.sendUpdate]', 'no channel, skipping submit');
-        return false;
-      }
-
-      // todo: views
-      // this.webClient.v
-
-      const response = await this.webClient.chat.postMessage({
-        channel: group,
-        thread_ts: thread || undefined,
-        blocks: [{
-          "type": "markdown",
-          "text": '> ' + update,
-        }]
-      });
-
-      if (!response.ok) {
-        const hint = this.errorToHint(response.error);
-        logger.error('[SlackChannel.sendUpdate]', 'response NOT ok:', response.error, hint);
-        return false;
-      }
-
-      return true;
-    } catch (err) {
-      logger.error('[SlackChannel.sendUpdate]', 'failed to send update:', readError(err));
-      return false;
-    }
-  }
-
-  // socket mode client factory
-  protected newSocketClient(appToken: string): ISocketModeClient {
-    return new SocketModeClient({
-      appToken,
-      logLevel: LogLevel.ERROR,
-      autoReconnectEnabled: true,
-      clientOptions: { retryConfig: { retries: 5 } }
-    });
-  }
-
-  // web client factory
-  protected newWebClient(botToken: string): IWebClient {
-    return new WebClient(botToken, {
-      logLevel: LogLevel.ERROR,
-      retryConfig: { retries: 5 }
-    });
-  }
-
   // handles both app_mention events and DM messages (via onSocketMessage)
   protected async onMessage({ event, body, ack }: HandlerParams) {
     const thread = event.thread_ts || event.ts || event.event_ts;
@@ -301,19 +235,34 @@ export default class SlackChannel extends Channel {
 
       logger.debug('[SlackChannel.onMessage]', `processing agent=${agentId} "${text.slice(0, 64)}"`);
 
-      const sendUpdates = (update:string) => this.sendUpdates(update, event.channel, thread, chatId);
+      const header = `${agentId} is thinking...`;
+      const head = await this.sendMessage({ role: 'assistant', content: header, group: event.channel, thread});
+      if (!head.ok) {
+        logger.warn('[SlackChannel.onMessage]', 'failed to post header:', head.error, head.message);
+      }
 
       // ! process through Marvin's AI loop (executes model calls + tool execution)
-      const result = await agent.sendChat(chatId, text, sendUpdates);
+      const result = await agent.sendChat(chatId, text);
       if (result.error) {
         logger.error('[SlackChannel.onMessage]', `AI loop failed for agent ${agentId}:`, result.error);
         result.content = `(AI loop error: ${result.error})`;
       }
 
       // ! reply to user // send the result to the user
-      const res = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread, agent: agentId, model: modelId, usage: result.usage });
-      if (!res.ok) {
-        logger.warn('[SlackChannel.onMessage]', 'failed to post reply:', res.error, res.message);
+      const body = await this.sendMessage({ role: 'assistant', content: result.content || '(no response)', group: event.channel, thread});
+      if (!body.ok) {
+        logger.warn('[SlackChannel.onMessage]', 'failed to post respose:', body.error, body.message);
+      }
+
+      // message footer
+      const footer = '**Agent**: `'   + (agentId  || '(none)') + '`\n' +
+                     '**Model**: `'   + (modelId  || '(none)') + '`\n' +
+                     '**Channel**: `' + (event.channel  || '(none)') + '`\n' +
+                     '**Thread**: `'  + (thread || '(none)') + '`\n' + 
+                     '**Usage**: `'   + (result.usage  || '(none)') + '`\n';
+      const foot = await this.sendMessage({ role: 'assistant', content: footer, group: event.channel, thread});
+      if (!foot.ok) {
+        logger.warn('[SlackChannel.onMessage]', 'failed to post footer:', foot.error, foot.message);
       }
     } catch (error) {
       logger.error('[SlackChannel.onMessage]', error);
@@ -342,7 +291,7 @@ export default class SlackChannel extends Channel {
         logger.info('[SlackChannel.onSlashCommand]', hint, '(available:', cmds.join(', '), ')');
         output = `${hint}\navailable commands: ${cmds.join(', ')}`;
       } else {
-        output = await this.runCommand(name, args);
+        output = await this.execCommand(name, args);
         logger.info('[SlackChannel.onSlashCommand]', `command ${name} output:\n${output}`);
       }
 
@@ -400,7 +349,7 @@ export default class SlackChannel extends Channel {
 // dynamically load a command class (mirrors marvin.ts execCommand), execute it
 // capturing its logger output, then drop it. swaps the shared default output
 // for the duration of the command so nothing leaks to the global console
-  protected async runCommand(name: string, args: string[]): Promise<string> {
+  protected async execCommand(name: string, args: string[]): Promise<string> {
     const Module = await import(`../commands/${name}.ts`);
     const Class = Module.default;
     if (!Class || !(Class.prototype instanceof Command)) {
@@ -476,5 +425,23 @@ export default class SlackChannel extends Channel {
       default:
         return '';
     }
+  }
+
+  // socket mode client factory
+  protected newSocketClient(appToken: string): ISocketModeClient {
+    return new SocketModeClient({
+      appToken,
+      logLevel: LogLevel.ERROR,
+      autoReconnectEnabled: true,
+      clientOptions: { retryConfig: { retries: 5 } }
+    });
+  }
+
+  // web client factory
+  protected newWebClient(botToken: string): IWebClient {
+    return new WebClient(botToken, {
+      logLevel: LogLevel.ERROR,
+      retryConfig: { retries: 5 }
+    });
   }
 }
