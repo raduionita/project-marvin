@@ -99,9 +99,7 @@ export type ToolMeta = {
 };
 
 export abstract class Tool {
-  constructor(public engine: Engine) {
-    logger.debug(`[${this.constructor.name||'Tool'}.constructor]`);
-  }
+  constructor(public engine: Engine) { }
 
   // there might be multiple tools that end the chat (end_chat, ask_question, etc.)
   public readonly stop: boolean = false;
@@ -173,7 +171,7 @@ export abstract class Model {
   }
 
   // sends messages to LLM model
-  abstract execChat(chat: Chat): Promise<Reply>;
+  abstract sendChat(chat: Chat): Promise<Reply>;
 }
 
 // task keeps track of the setTimeout id, schedule

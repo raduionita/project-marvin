@@ -157,7 +157,7 @@ class MockModel extends Model {
     this.replies = replies;
   }
 
-  async execChat(_chat: Chat): Promise<Reply> {
+  async sendChat(_chat: Chat): Promise<Reply> {
     this.callCount++;
     if (this.fail) {
       throw new Error('mock model failure');

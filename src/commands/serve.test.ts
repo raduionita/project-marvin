@@ -55,7 +55,7 @@ class MockModel extends Model {
     this._reply = reply;
   }
 
-  async execChat(chat: Chat): Promise<Reply> {
+  async sendChat(chat: Chat): Promise<Reply> {
     this.callCount++;
     return this._reply;
   }

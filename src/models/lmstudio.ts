@@ -5,7 +5,7 @@ export class LmstudioModel extends Model {
   provider: Provider = 'lmstudio';
   public baseUrl: string = 'http://localhost:1234';
 
-  async execChat(chat: Chat) : Promise<any> {
+  async sendChat(chat: Chat) : Promise<any> {
     logger.debug('[LmstudioModel.sendChat]', 'chat:', JSON.stringify(chat));
 
     // role: system, user, assistant

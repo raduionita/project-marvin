@@ -297,7 +297,7 @@ export class Agent {
         this.packChat(chat);
 
         // ! AI call // core of the AI loop: call model, execute tool calls, repeat until done
-        reply = await this.model.execChat(chat);
+        reply = await this.model.sendChat(chat);
         // count usage
         usage += reply.usage.completion + reply.usage.prompt;
 

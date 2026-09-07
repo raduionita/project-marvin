@@ -77,7 +77,7 @@ export default class DeepseekModel extends Model {
     return choice;
   }
 
-  async execChat(chat: Chat) : Promise<Reply> {
+  async sendChat(chat: Chat) : Promise<Reply> {
     const chatId = chat.id || 'deepseek-' + Date.now();
     const body: { [key: string]: any } = {};
 
@@ -116,7 +116,7 @@ export default class DeepseekModel extends Model {
     body.max_tokens = this.maxTokens;
 
     for (const meta of body.tools) {
-      logger.debug('[DeepseekModel.execChat]', meta.function.name, JSON.stringify(meta.function.parameters));
+      logger.debug('[DeepseekModel.sendChat]', meta.function.name, JSON.stringify(meta.function.parameters));
     }
 
     appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM request ---\n' + JSON.stringify(body, null, 2));

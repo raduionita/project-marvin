@@ -67,13 +67,13 @@ export default class SlackChannel extends Channel {
 
   async load() {
     try {
-      logger.debug('[SlackChannel.load]');
-
       const config = this.engine.config.channels.slack as SlackConfig | undefined;
       if (!config) {
         logger.error('[SlackChannel.load]', 'no settings found, skipping');
         return;
       }
+
+      logger.debug('[SlackChannel.load]', JSON.stringify(config).slice(0, 128));
 
       const appToken = (config?.appToken || process.env.SLACK_APP_TOKEN);
       if (!appToken || !appToken.startsWith('xapp-')) {
@@ -339,7 +339,7 @@ export default class SlackChannel extends Channel {
   }
 
   protected async onConnected() {
-    logger.info('connected!');
+    logger.info('[SlackChannel.onConnected]', 'connected!');
   }
 
   protected async onDisconnected(error: Error) {

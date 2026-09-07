@@ -242,7 +242,6 @@ export default class ToolsCommand extends Command {
     await this.engine.loadTools();
   }
 
-
   async loadSystems() {
     logger.debug('[ToolCommand.loadSystems]');
 

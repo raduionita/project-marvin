@@ -198,6 +198,8 @@ export default class Engine {
       }
     }
 
+    logger.debug('[Engine.loadTools]', 'loading custom tools...');
+
     // custom tools in the workspace (~/.marvin/tools)
     const cdir = join(this.work, 'tools');
     const cfiles = listCustomTools(this);
@@ -223,6 +225,8 @@ export default class Engine {
       }
     }
 
+    logger.debug('[Engine.loadTools]', 'loading mcp tools...');
+
     // mcp tools: one Tool instance per server tool, so callers only use Engine.tools.
     // lazily connects servers registered but not loaded yet; internal and
     // custom tools win on name collisions.
@@ -237,8 +241,10 @@ export default class Engine {
       for (const tool of Object.values(client.tools)) {
         const name = makeMcpToolName(id, tool.name);
         if (this.tools[name]) continue;
-        this.tools[name] = new McpTool(this, id, tool);
-        logger.info('[Engine.loadTools]', `tool "${name}" loaded (mcp ${id})`);
+        const instance = new McpTool(this, id, tool);
+        const meta = instance.meta as ToolMeta;
+        this.tools[name] = instance;
+        logger.info('[Engine.loadTools]', `tool "${name}" + [${meta.function.parameters.required?.join(',')}]`);
       }
     }
 
@@ -451,7 +457,7 @@ export default class Engine {
       logger.info('[Engine.loadAgents]',`agent "${agentId}" loaded`);
     }
 
-    logger.debug('[Engine.loadAgents]', 'agents:', Object.keys(this.agents));
+    logger.debug('[Engine.loadAgents]', `[${Object.keys(this.agents).join(',')}]`);
   }
 
   // loads tasks: the internal monitor/sweep tasks run on the orchestrator
@@ -475,6 +481,8 @@ export default class Engine {
         input: 'monitor',
       } as Task;
 
+      logger.info('[Engine.loadTasks]', `task "monitor" created (agent ${marvinId})`);
+
       this.tasks['sweep'] = {
         id: 'sweep',
         enabled: true,
@@ -486,7 +494,7 @@ export default class Engine {
         input: 'sweep',
       } as Task;
 
-      logger.info('[Engine.loadTasks]', `tasks "monitor" and "sweep" created (agent ${marvinId})`);
+      logger.info('[Engine.loadTasks]', `task "sweep" created (agent ${marvinId})`);
     }
 
     // config tasks

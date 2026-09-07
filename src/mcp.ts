@@ -226,7 +226,6 @@ export class McpTool extends Tool {
     super(engine);
     this.toolName = tool.name;
     this.meta = buildMcpToolMeta(mcpId, tool);
-    logger.debug(`[McpTool.constructor]`, this.meta.function.name);
   }
 
   public async call(args: { [key: string]: any }, _agent?: Agent, _chat?: Chat): Promise<{ [key: string]: any }> {

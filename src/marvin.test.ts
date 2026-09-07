@@ -127,7 +127,7 @@ class FakeBrowserSystem extends System {
 class FlowModel extends Model {
   public callCount = 0;
 
-  async execChat(chat: Chat): Promise<Reply> {
+  async sendChat(chat: Chat): Promise<Reply> {
     this.callCount++;
     if (this.callCount === 1) {
       // research step

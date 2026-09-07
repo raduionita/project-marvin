@@ -9,7 +9,7 @@ export default class LoadToolsTool extends Tool {
     group: 'control',
     function: {
       name: 'load_tools',
-      description: 'Load one or more callable tools into this chat.',
+      description: 'Load needed tools into this chat. ALWAYS load tools with `load_tools` before calling them.',
       parameters: {
         type: 'object',
         properties: {
