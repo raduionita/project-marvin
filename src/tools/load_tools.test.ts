@@ -1,4 +1,6 @@
 import { test, expect } from 'bun:test';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
 import { join } from 'path';
 import Engine from '../engine.js';
 import { Logger } from '../logger.js';
@@ -116,20 +118,22 @@ test('loadTools reports loaded/missing with chat required', async () => {
   expect(result.missing).toEqual(['nope']);
 });
 
-// mcp-backed .call coverage: mock stdio server exposes echo, peek_env, weird.name
-function mockEngineWithMcp(id = 'mock'): Engine {
+// mcp-backed engines: mock stdio server exposes echo, peek_env, weird.name.
+// goes through Engine.loadTools() so mcp tools land in Engine.tools.
+async function mockEngineWithMcp(id = 'mock'): Promise<Engine> {
   const engine = mockEngine();
-  engine.tools['read_file'] = new ReadFileTool(engine);
+  engine.work = mkdtempSync(join(tmpdir(), 'marvin-loadtools-'));
   engine.mcps[id] = new Mcp(engine, id, {
     enabled: true,
     command: process.execPath,
     args: [MOCK_SERVER],
   });
+  await engine.loadTools();
   return engine;
 }
 
 test('loadTools loads internal + mcp tools into chat.tools and reports loaded/missing', async () => {
-  const engine = mockEngineWithMcp();
+  const engine = await mockEngineWithMcp();
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
   try {
@@ -148,7 +152,7 @@ test('loadTools loads internal + mcp tools into chat.tools and reports loaded/mi
 });
 
 test('loadTools loads sanitized mcp tool names', async () => {
-  const engine = mockEngineWithMcp();
+  const engine = await mockEngineWithMcp();
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
   try {
@@ -162,7 +166,7 @@ test('loadTools loads sanitized mcp tool names', async () => {
 });
 
 test('loadTools reports unknown mcp id and unknown mcp tool as missing', async () => {
-  const engine = mockEngineWithMcp();
+  const engine = await mockEngineWithMcp();
   const tool = new LoadToolsTool(engine);
   try {
     const chat = mockChat();
@@ -181,8 +185,7 @@ test('loadTools reports unknown mcp id and unknown mcp tool as missing', async (
 });
 
 test('loadTools handles mixed internal/mcp/missing batches', async () => {
-  const engine = mockEngineWithMcp();
-  engine.tools['web_search'] = new WebSearchTool(engine);
+  const engine = await mockEngineWithMcp();
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
   try {
@@ -200,7 +203,7 @@ test('loadTools handles mixed internal/mcp/missing batches', async () => {
 });
 
 test('loadTools dedupes duplicates within a single call (internal + mcp)', async () => {
-  const engine = mockEngineWithMcp();
+  const engine = await mockEngineWithMcp();
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
   try {
@@ -215,7 +218,7 @@ test('loadTools dedupes duplicates within a single call (internal + mcp)', async
 });
 
 test('loadTools mcp load is idempotent across calls', async () => {
-  const engine = mockEngineWithMcp();
+  const engine = await mockEngineWithMcp();
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
   const agent = mockAgent(engine);
@@ -229,8 +232,7 @@ test('loadTools mcp load is idempotent across calls', async () => {
 });
 
 test('loadTools preserves pre-existing chat.tools entries', async () => {
-  const engine = mockEngineWithMcp();
-  engine.tools['web_search'] = new WebSearchTool(engine);
+  const engine = await mockEngineWithMcp();
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
   chat.tools!.push(engine.tools['web_search']!.meta);
@@ -257,17 +259,15 @@ test('loadTools engine meta wins over stale chat.tools duplicates', async () => 
 });
 
 test('loadTools treats malformed mcp-like names as missing without crashing', async () => {
-  const engine = mockEngineWithMcp();
+  const engine = mockEngine();
+  engine.tools['read_file'] = new ReadFileTool(engine);
   const tool = new LoadToolsTool(engine);
   const chat = mockChat();
-  try {
-    const result = await tool.call({ tools: ['trailing__', 'mock', '__echo'] }, mockAgent(engine), chat);
-    expect(result.loaded).toEqual([]);
-    expect(result.missing.sort()).toEqual(['__echo', 'mock', 'trailing__']);
-    expect(chat.tools).toEqual([]);
-  } finally {
-    await engine.mcps['mock']?.drop();
-  }
+
+  const result = await tool.call({ tools: ['trailing__', 'mock', '__echo'] }, mockAgent(engine), chat);
+  expect(result.loaded).toEqual([]);
+  expect(result.missing.sort()).toEqual(['__echo', 'mock', 'trailing__']);
+  expect(chat.tools).toEqual([]);
 });
 
 test('loadTools rejects non-array tools input', async () => {

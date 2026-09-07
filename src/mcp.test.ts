@@ -5,7 +5,7 @@ import { join } from 'path';
 
 import Engine from './engine.js';
 import { Logger } from './logger.js';
-import { Mcp, makeMcpToolName, loadMcpTools } from './mcp.js';
+import { Mcp, McpTool, makeMcpToolName } from './mcp.js';
 import { splitMcpToolName } from './helpers/index.js';
 import { sanitizeToolName } from './helpers/index.js';
 
@@ -108,7 +108,7 @@ test('callTool reconnects after drop', async () => {
   await client.drop();
 });
 
-test('loadMcpTools builds metas from the server tool list', async () => {
+test('loadTools registers one McpTool per server tool in Engine.tools', async () => {
   const engine = buildEngine();
 
   const client = new Mcp(engine, 'mock', {
@@ -118,21 +118,48 @@ test('loadMcpTools builds metas from the server tool list', async () => {
   });
   engine.mcps['mock'] = client;
 
-  const tools = await loadMcpTools(engine, ['mock']);
+  await engine.loadTools();
 
-  const echo = tools.find(t => t.function.name === 'mock__echo');
-  expect(echo).toBeDefined();
-  expect(echo!.function.description).toBe('Echo the input text');
-  expect(echo!.function.parameters.type).toBe('object');
-  expect(echo!.function.parameters.properties.text).toBeDefined();
-  expect(echo!.function.parameters.required).toEqual(['text']);
+  const echo = engine.tools['mock__echo'];
+  expect(echo).toBeInstanceOf(McpTool);
+  expect(echo!.meta.function.description).toBe('Echo the input text');
+  expect(echo!.meta.function.parameters.type).toBe('object');
+  expect(echo!.meta.function.parameters.properties.text).toBeDefined();
+  expect(echo!.meta.function.parameters.required).toEqual(['text']);
 
   // sanitized tool names
-  expect(tools.map(t => t.function.name)).toContain('mock__weird_name');
+  expect(engine.tools['mock__weird_name']).toBeInstanceOf(McpTool);
 
-  // unknown ids are skipped (warned), missing clients too
-  const none = await loadMcpTools(engine, ['nope']);
-  expect(none).toEqual([]);
+  await client.drop();
+});
+
+test('loadTools skips servers that fail to connect', async () => {
+  const engine = buildEngine();
+  engine.mcps['dead'] = new Mcp(engine, 'dead', {
+    enabled: true,
+    command: 'marvin-definitely-not-a-binary',
+    args: [],
+  });
+
+  await engine.loadTools();
+
+  expect(Object.keys(engine.tools).filter(n => n.startsWith('dead__'))).toEqual([]);
+});
+
+test('McpTool.call forwards to the server', async () => {
+  const engine = buildEngine();
+
+  const client = new Mcp(engine, 'mock', {
+    enabled: true,
+    command: process.execPath,
+    args: [MOCK_SERVER],
+  });
+  engine.mcps['mock'] = client;
+
+  await engine.loadTools();
+
+  const result = await (engine.tools['mock__echo'] as McpTool).call({ text: 'hi marvin' });
+  expect(result.schemas[0]!.text).toBe('echo: hi marvin');
 
   await client.drop();
 });

@@ -258,7 +258,8 @@ export class Agent {
         return await instance.call(args, this, chat);
       }
 
-      // mcp tools (<mcpId>__<toolName>) loaded per-task
+      // mcp tools (<mcpId>__<toolName>) registered in Engine.tools;
+      // fall back to a direct server call when the mcp connected after loadTools
       const split = splitToolName(tool);
       const mcp = split ? this.engine.mcps[split.id] : undefined;
       if (mcp) {

@@ -8,7 +8,7 @@ import { Agent } from './agent.js';
 import * as constants from './constants.js';
 import { listInternalTools, listCustomTools } from "./tools/index.js";
 import { listChannels } from "./channels/index.js";
-import { Mcp } from "./mcp";
+import { Mcp, McpTool, makeMcpToolName } from "./mcp";
 import { listSkills, loadSkill } from "./skills/index.js";
 import { listModels } from "./models/index.js";
 
@@ -48,9 +48,9 @@ export default class Engine {
 
     await this.scanProject();
     await this.loadSystems();
+    await this.loadMcps();
     await this.loadTools();
     await this.loadChannels();
-    await this.loadMcps();
     await this.loadSkills();
     await this.loadModels();
     await this.loadAgents();
@@ -174,6 +174,7 @@ export default class Engine {
   async loadTools() {
     logger.debug('[Engine.loadTools]', 'loading internal tools...');
 
+    // internal marvin tools
     const files = listInternalTools(this);
     for (const file of files) {
       const name = file;
@@ -219,6 +220,25 @@ export default class Engine {
         logger.info('[Engine.loadTools]', `tool "${meta.function.name}" + [${meta.function.parameters.required?.join(',')}]`);
       } catch (err) {
         logger.error('[Engine.loadTools]', `failed to load custom tool "${file}":`, err);
+      }
+    }
+
+    // mcp tools: one Tool instance per server tool, so callers only use Engine.tools.
+    // lazily connects servers registered but not loaded yet; internal and
+    // custom tools win on name collisions.
+    for (const [id, client] of Object.entries(this.mcps)) {
+      try {
+        if (!client.isLoaded) await client.load();
+      } catch (err) {
+        logger.warn('[Engine.loadTools]', `mcp "${id}" failed to connect:`, (err as Error).message);
+        continue;
+      }
+
+      for (const tool of Object.values(client.tools)) {
+        const name = makeMcpToolName(id, tool.name);
+        if (this.tools[name]) continue;
+        this.tools[name] = new McpTool(this, id, tool);
+        logger.info('[Engine.loadTools]', `tool "${name}" loaded (mcp ${id})`);
       }
     }
 

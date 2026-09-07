@@ -1,8 +1,6 @@
 import { Tool, type ToolMeta } from '../types.js';
 import type { Agent } from '../agent.js';
 import type { Chat } from '../types.js';
-import { loadMcpTool } from '../mcp.js';
-import { splitMcpToolName } from '../helpers/index.js';
 import logger from '../logger.js';
 
 export default class LoadToolsTool extends Tool {
@@ -40,7 +38,7 @@ export default class LoadToolsTool extends Tool {
     chat.tools ||= [];
 
     for (const name of names) {
-      // 1) engine tool (internal + custom)
+      // engine tool (internal + custom + mcp, all registered in Engine.tools)
       const tool = this.engine.tools[name];
       if (tool) {
         if (!chat.tools.some(t => t.function.name === name)) {
@@ -48,19 +46,6 @@ export default class LoadToolsTool extends Tool {
         }
         loaded.push(name);
         continue;
-      }
-
-      // 2) mcp tool (<mcpId>__<toolName>) - loaded one-by-one
-      const mcpSplit = splitMcpToolName(name);
-      if (mcpSplit) {
-        const meta = await loadMcpTool(this.engine, mcpSplit.id, name);
-        if (meta) {
-          if (!chat.tools.some(t => t.function.name === name)) {
-            chat.tools.push(meta);
-          }
-          loaded.push(name);
-          continue;
-        }
       }
 
       // neither engine nor mcp matched
