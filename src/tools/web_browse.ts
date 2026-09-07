@@ -70,7 +70,7 @@ export default class WebBrowseTool extends Tool {
     const url = args.url;
 
     const page = await system.newPage();
-    page.setDefaultNavigationTimeout(15_000);
+    page.setDefaultNavigationTimeout(10_000);
 
     let error = '';
     let title = '';

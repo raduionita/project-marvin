@@ -215,7 +215,8 @@ test('full flow: slack research request replies in the thread', async () => {
   expect(browser.pagesOpened).toBe(1);
 
   // the final Slack reply is posted in the original thread
-  const posted = channel.mockWeb.postMessageCalls.at(-1)!;
+  // onMessage posts header, body, footer — the body is second-to-last
+  const posted = channel.mockWeb.postMessageCalls.at(-2)!;
   expect(posted.blocks![1]!.text).toBe('Here is the history of coffee...');
   expect(posted.channel).toBe('C123');
   expect(posted.thread_ts).toBe('1700000000.001');

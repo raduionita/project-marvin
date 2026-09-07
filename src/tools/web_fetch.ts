@@ -64,7 +64,7 @@ export default class WebFetchTool extends Tool {
     logger.debug('[WebFetchTool.call]', args.url.slice('https://'.length, 64));
 
     const { contentType, text } = await withRetry(async () => {
-      const response = await fetch(args.url, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+      const response = await fetch(args.url, { redirect: 'follow', signal: AbortSignal.timeout(5_000) });
       // retry transient server errors, not client errors
       if (response.status === 429 || response.status >= 500) {
         throw new Error(`web_fetch: ${args.url} responded with ${response.status}`);

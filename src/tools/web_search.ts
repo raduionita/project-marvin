@@ -92,12 +92,12 @@ export default class WebSearchTool extends Tool {
           return request.continue();
         }
       });
-      page.setDefaultNavigationTimeout(15_000);
+      page.setDefaultNavigationTimeout(10_000);
 
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10_000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5_000 });
 
       // after the html/doc is loaded, duck requests d.js that contains the search results
-      const script = await page.waitForResponse((response) => response.url().includes('links.duckduckgo.com/d.js'), { timeout: 10_000 });
+      const script = await page.waitForResponse((response) => response.url().includes('links.duckduckgo.com/d.js'), { timeout: 5_000 });
       const text = await script.text();
 
       // done with the page
