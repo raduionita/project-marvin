@@ -1,10 +1,8 @@
 import TurndownService from 'turndown';
 
-import { HTTPRequest } from 'puppeteer';
-
 import { Tool } from '../types.js';
 import type { ToolMeta } from '../types.js';
-import { delay, rand, readError, tryJsonParse } from '../helpers/index.js';
+import { delay, readError, tryJsonParse } from '../helpers/index.js';
 import type BrowserSystem from '../systems/browser.js';
 import Engine from '../engine.js';
 import logger from '../logger.js';
@@ -19,13 +17,13 @@ export default class WebSearchTool extends Tool {
     group: 'web',
     function: {
       name: 'web_search',
-      description: 'Search the web',
+      description: 'Search the internet (using DuckDuckGo).',
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
-            description: 'Search query',
+            description: 'Search query.',
           },
           type: {
             type: 'string',
@@ -92,7 +90,7 @@ export default class WebSearchTool extends Tool {
     }
 
     const browser = this.engine.systems['browser'] as BrowserSystem;
-    const query = args.query;
+    const query = encodeURIComponent(args.query);
     const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
     const src = 'links.duckduckgo.com/d.js';
 
@@ -169,11 +167,15 @@ export default class WebSearchTool extends Tool {
 
     const browser = this.engine.systems['browser'] as BrowserSystem;
     const query = args.query;
-    const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt&ia=images&iax=images`;
+    const url = `https://duckduckgo.com?q=${encodeURIComponent(query)}&ia=images&iax=images`;
     const src = 'duckduckgo.com/i.js';
 
+    // TODO: extract vqd
+
+    // /i.js?o=json&q=afd+germany&l=us-en&vqd=4-307215789159282919134252067145111687984&p=-1&ct=RO&jsa=245125&jsa_hash=09eed7f067daf771ddd8297c13766231&dp=pduMs2gm4I2aTazs5pw4kEJheYOjtgxF-GLulvgG6bg0pqbjp6OOlMfguichkA8l4o1MxqLSOJCfk8Ir3CfRruad8w-Nk_x4MBjreD2SMDsp8XUecNSjOD3Umj01C7Z6X4mZTbsT3Y9CTGS3hdeBcZMcrQrdGfafjaRjPlrBCWs.rVyubAvHCp28alYSvexvVQ&f=hide_ai_images%3A1&j_id=98ba56774b9a5b8fe1aabc734bcb5db3
+
     let page: Awaited<ReturnType<BrowserSystem['newPage']>> | undefined;
-    let raw: string | undefined;
+    let text: string = '';
     try {
       page = await browser.newPage((request) => {
         const type = request.resourceType();
@@ -193,16 +195,23 @@ export default class WebSearchTool extends Tool {
 
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5_000 });
 
-      // after the html/doc is loaded, duck requests d.js that contains the search results
-      const script = await page.waitForResponse((response) => response.url().includes(src), { timeout: 5_000 });
-      const text = await script.text();
+      // the i.js endpoint requires the per-search vqd token rendered into the page
+      await page.waitForFunction(() => typeof (window as unknown as { vqd?: unknown }).vqd === 'string', { timeout: 5_000 });
+      const vqd = await page.evaluate(() => (window as unknown as { vqd: string }).vqd);
+      if (!vqd) throw new Error('no images found on the page');
+
+      // attach the response waiter before injecting, then fetch results with the vqd token
+      const pending = page.waitForResponse((response) => response.url().includes(src), { timeout: 5_000 });
+      await page.addScriptTag({ url: `https://${src}?o=json&q=${encodeURIComponent(query)}&vqd=${vqd}` });
+      const script = await pending;
+            text = await script.text();
 
       // done with the page
       await page.close();
 
       // parse the results
       const json = tryJsonParse<{results:{image:string, title:string}[]}>(text) || {results:[]};
-            json.results.length = Math.min(json.results.length, 20);
+            json.results.length = Math.min(json.results.length, 10);
 
       return { 
         description: json.results.length ? `${json.results.length} results` : 'no results',
@@ -218,7 +227,7 @@ export default class WebSearchTool extends Tool {
       }
       // distinguish "search failed" from "no results", so the LLM does not
       // conclude nothing exists when the scrape/parse simply failed
-      logger.error('[WebSearchTool.callImages]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw?.substring(0,100));
+      logger.error('[WebSearchTool.callImages]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', text?.substring(0,100));
       return { 
         results: [], 
         error: `web_search failed: ${(error as Error).message}` 
@@ -239,34 +248,34 @@ export default class WebSearchTool extends Tool {
     }
 
     const browser = this.engine.systems['browser'] as BrowserSystem;
-    const query = args.query;
-    const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt&ia=news&iar=news`;
+    const query = encodeURIComponent(args.query);
+    const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
     const src = 'duckduckgo.com/news.js';
 
     let page: Awaited<ReturnType<BrowserSystem['newPage']>> | undefined;
-    let raw: string | undefined;
+    let text: string = '';
     try {
       page = await browser.newPage((request) => {
         const type = request.resourceType();
         const url = request.url();
-        if (type === 'script' && !url.includes(src)) {
-          // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
-          return request.abort();
-        } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
-          // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
-          return request.abort();
-        } else {
+        if (type === 'document' || ((type === 'xhr' || type === 'fetch') && url.includes(src))) {
           logger.debug('[WebSearchTool.newPage]', 'allowing', type, url);
           return request.continue();
         }
+        // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+        return request.abort();
       });
       page.setDefaultNavigationTimeout(10_000);
 
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5_000 });
 
-      // after the html/doc is loaded, duck requests d.js that contains the search results
-      const script = await page.waitForResponse((response) => response.url().includes(src), { timeout: 5_000 });
-      const text = await script.text();
+      // the news.js endpoint requires the per-search vqd token rendered into the page
+      await page.waitForFunction(() => typeof (window as unknown as { vqd?: unknown }).vqd === 'string', { timeout: 5_000 });
+      const vqd = await page.evaluate(() => (window as unknown as { vqd: string }).vqd);
+      if (!vqd) throw new Error('no news found on the page');
+
+      // news.js is an XHR endpoint returning raw JSON - fetch it from the page context
+      text = await page.evaluate(async (url: string) => ((await fetch(url)).text()), `https://${src}?o=json&q=${query}&vqd=${vqd}`);
 
       // done with the page
       await page.close();
@@ -286,19 +295,19 @@ export default class WebSearchTool extends Tool {
       };
     } catch (error) {
       if (page && !page.isClosed()) {
-        logger.debug('[WebSearchTool.callWeb]', 'closing page');
+        logger.debug('[WebSearchTool.callNews]', 'closing page');
         await page.close();
       }
       // distinguish "search failed" from "no results", so the LLM does not
       // conclude nothing exists when the scrape/parse simply failed
-      logger.error('[WebSearchTool.callWeb]', 'error:', readError(error), 'url:', url, 'query:', query, 'raw:', raw?.substring(0,100));
+      logger.error('[WebSearchTool.callNews]', 'error:', readError(error), 'url:', url, 'query:', query, 'text:', text?.substring(0,100));
       return { 
         results: [], 
         error: `web_search failed: ${(error as Error).message}` 
       };
     } finally {
       if (page && !page.isClosed()) {
-        logger.debug('[WebSearchTool.callWeb]', 'closing page');
+        logger.debug('[WebSearchTool.callNews]', 'closing page');
         await page.close();
       }
     }

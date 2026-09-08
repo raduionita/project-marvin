@@ -1,19 +1,18 @@
-import { input } from '../terminal.js';
+import { input, select } from '../terminal.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { tryJsonParse } from "../helpers";
-import { listSystems, loadSystem } from "../systems";
-import { listTools as listToolFiles, listCustomTools, loadTool } from "../tools";
+import { listCustomTools, listInternalTools, listTools, loadTool } from "../tools";
 import { readSkill, loadSkill } from "../skills";
-import { Command, System, ToolMeta } from "../types";
+import { Chat, Command, ToolMeta } from "../types";
 import logger from '../logger.js';
 
 export default class ToolsCommand extends Command {
   async exec() {
     logger.debug('[ToolsCommand.exec]');
 
-    const cmd = this.args[0] || 'help';
+    const cmd = this.args[0] || '';
     switch (cmd) {
       case 'help':
         this.execHelp();
@@ -32,7 +31,7 @@ export default class ToolsCommand extends Command {
         // await this.engine.drop();
       break;
       default:
-        await this.execTool(cmd);
+        await this.execTool();
       break;
     }
   }
@@ -48,40 +47,86 @@ export default class ToolsCommand extends Command {
   }
 
   async listTools() {
-    logger.debug('[ToolCommand.listTools]', 'tools:');
-    const custom = new Set(listCustomTools(this.engine));
-    const files = listToolFiles(this.engine);
-    for (const file of files) {
+    logger.info('tools:');
+    const tools = listTools(this.engine);
+    for (const file of tools) {
       try {
         const instance = await loadTool(this.engine, file);
         const meta = instance.meta as ToolMeta;
         // register instance of Tool
         this.engine.tools[meta.function.name] = instance;
-        const kind = custom.has(file) ? 'custom tool' : 'tool';
-        logger.info('[ToolCommand.listTools]', `  ${kind} [${meta.function.name}]`, JSON.stringify(meta.function.parameters.properties));
+        logger.info(`- ${meta.function.name}`, JSON.stringify(meta.function.parameters.properties));
       } catch (err) {
         logger.error('[ToolCommand.listTools]', `failed to load ${file}:`, err);
       }
     }
   }
 
-  async execTool(name: string) {
-    logger.debug('[ToolCommand.execTool]', name);
+  async execTool() {
+    let name = this.args[0] || '';
     try {
-      const system = await loadSystem(this.engine, 'browser');
-      this.engine.systems['browser'] = system;
-      // call tool
-      const params = tryJsonParse(this.args.slice(1).join(' ')) || {} as { [key: string]: any };
+      // tools may depend on any system (browser, watch, ...), so load them all
+      await this.engine.loadSystems();
+
+      // resolve the tool name: CLI arg or interactive selection
+      if (!name) {
+        const tools = listTools(this.engine);
+        if (!tools.length) {
+          logger.error('[ToolCommand.execTool]', 'no tools available');
+          return;
+        }
+        name = await select({
+          message: 'Select a tool:',
+          choices: tools.map(t => ({ name: t, value: t })),
+        });
+      }
+      if (!name) {
+        logger.error('[ToolCommand.execTool]', 'no tool selected, exiting');
+        return;
+      }
+
       // load tool (repo tools first, then custom workspace tools)
       const tool = await loadTool(this.engine, name);
+      const meta = tool.meta as ToolMeta;
+      const props: ToolMeta['function']['parameters']['properties'] = meta.function.parameters.properties || {};
+      const required = new Set(meta.function.parameters.required || []);
+
+      // CLI params as JSON, prompted per-property for anything missing
+      const params: { [key: string]: any } = {};
+      for (const [key, prop] of Object.entries(props)) {
+        if (params[key] !== undefined && params[key] !== '') continue;
+        const label = prop.description ? `${key} (${prop.description})` : key;
+        if (prop.enum?.length) {
+          params[key] = await select({
+            message: `${label}:`,
+            choices: prop.enum.map(v => ({ name: v, value: v })),
+          });
+        } else if (prop.type === 'boolean') {
+          params[key] = await select({
+            message: `${label}:`,
+            choices: [{ name: 'true', value: true }, { name: 'false', value: false }],
+          });
+        } else {
+          const answer = await input({ message: `${label}:`, required: required.has(key) });
+          if (answer === '' && !required.has(key)) continue;
+          params[key] = prop.type === 'number' || prop.type === 'integer' ? Number(answer)
+            : prop.type === 'array' || prop.type === 'object' ? tryJsonParse(answer) ?? answer
+            : answer;
+        }
+      }
+
       // call the tool with agent/chat context (required by Tool.call)
-      const agent = this.engine.agents[this.engine.config.settings.name] ?? Object.values(this.engine.agents)[0]!;
-      const chat = agent ? agent.makeChat(undefined) : { id: 'cli', thinking: false, messages: [], tools: [] } as any;
-      const output = await tool.call(params, agent as any, chat);
+      const agent = this.engine.agents[this.engine.config.settings.name] ?? Object.values(this.engine.agents)[0] ?? ({} as never);
+      const chat = {} as Chat;
+
+      // call the tool with agent/chat context (required by Tool.call)
+      const output = await tool.call(params, agent, chat);
       // output
-      logger.info('[ToolCommand.execTool]', JSON.stringify(output, null, 2));
+      logger.info(JSON.stringify(output, null, 2));
     } catch (err) {
       logger.error('[ToolCommand.execTool]', `failed to load ${name}:`, err);
+    } finally {
+      this.engine.dropSystems();
     }
   }
 
@@ -155,8 +200,10 @@ export default class ToolsCommand extends Command {
     // persist the tool to ~/.marvin/tools/<name>.ts
     mkdirSync(join(this.engine.work, 'tools'), { recursive: true });
     writeFileSync(tpath, content + '\n');
-    // register the tool in the engine (no reload needed)
-    await this.reloadTools();
+
+    // reload
+    this.engine.tools = {};
+    await this.engine.loadTools();
 
     logger.info(`tool "${name}" created, saved to ${tpath}`);
   }
@@ -229,57 +276,11 @@ export default class ToolsCommand extends Command {
 
     // persist the edited tool back to ~/.marvin/tools/<name>.ts
     writeFileSync(tpath, content + '\n');
-    // re-register the tool in the engine (no reload needed)
-    await this.reloadTools();
-
-    logger.info(`tool "${name}" updated, saved to ${tpath}`);
-  }
-
-  // reload tool registrations so newly created/edited custom tools take effect
-  async reloadTools() {
-    logger.debug('[ToolCommand.reloadTools]');
+    
+    // reload
     this.engine.tools = {};
     await this.engine.loadTools();
-  }
 
-  async loadSystems() {
-    logger.debug('[ToolCommand.loadSystems]');
-
-    const files = listSystems(this.engine);
-    for (const name of files) {
-      try {
-        const Module = await import(`../systems/${name}.js`);
-        const Class = Module.default;
-        if (!Class || !(Class.prototype instanceof System)) {
-          logger.error('[ToolCommand.loadSystems]', `${name} does not export a System class, skipping`);
-          continue;
-        }
-        // register instance of System
-        const instance = new Class(this.engine);
-        await instance.load();
-        this.engine.systems[name] = instance;
-        logger.debug('[ToolCommand.loadSystems]', `system [${name}] loaded`);
-      } catch (err) {
-        logger.error('[ToolCommand.loadSystems]', `failed to load ${name}:`, err);
-        process.exit(1);
-      }
-    }
-  }
-
-  async dropSystems() {
-    logger.debug('[ToolCommand.dropSystems]');
-    for (const system of Object.values(this.engine.systems)) {
-      try {
-        await system.drop();
-      } catch (err) {
-        logger.error('[ToolCommand.dropSystems]', `error detaching system:`, err);
-      }
-    }
-    this.engine.systems = {};
-  }
-
-  async drop() {
-    logger.debug('[ToolCommand.drop]');
-    await this.dropSystems();
+    logger.info(`tool "${name}" updated, saved to ${tpath}`);
   }
 }

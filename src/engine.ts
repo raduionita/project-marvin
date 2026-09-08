@@ -543,14 +543,14 @@ export default class Engine {
   async dropAgents() {
     logger.debug('[Engine.dropAgents]', 'dropping agents...');
     this.agents = {};
-    logger.debug('[Engine.dropAgents]', 'done');
+    logger.info('agents dropped');
   }
 
   async dropTasks() {
     logger.debug('[Engine.dropTasks]', 'dropping tasks...');
     for (const [taskId, task] of Object.entries(this.tasks)) {
       if (task.timeout) {
-        logger.debug('[Engine.dropTasks]', `stopping task ${taskId}`);
+        logger.debug('[Engine.dropTasks]', `task "${taskId}" stopped`);
         clearTimeout(task.timeout);
       } else {
         logger.debug('[Engine.dropTasks]', `task ${taskId} not running, continuing`);
@@ -562,12 +562,13 @@ export default class Engine {
   async dropModels() {
     logger.debug('[Engine.dropModels]', 'dropping models...');
     this.models = {};
-    logger.debug('[Engine.dropModels]', 'done');
+    logger.info('models dropped');
   }
 
   async dropSkills() {
     logger.debug('[Engine.dropSkills]', 'dropping skills...');
     this.skills = {};
+    logger.info('skills dropped');
   }
 
   // will detach and delete ALL channels from the engine
@@ -575,7 +576,7 @@ export default class Engine {
     logger.debug('[Engine.dropChannels]', 'dropping channels...');
     for (const [channelId, channel] of Object.entries(this.channels)) {
       try {
-        logger.debug('[Engine.dropChannels]', `detaching channel ${channelId}`);
+        logger.debug('[Engine.dropChannels]', `channel "${channelId}" dropped`);
         await channel.drop();
       } catch (err) {
         logger.error('[Engine.dropChannels]', `error detaching channel:`, err);
@@ -590,6 +591,7 @@ export default class Engine {
     if (this.channels[id]) {
       try {
         this.channels[id].drop();
+        logger.debug('[Engine.dropChannel]', `channel "${id}" dropped`);
       } catch (err) {
         logger.error('[Engine.dropChannel]', `error detaching channel:`, err);
       }
@@ -602,7 +604,7 @@ export default class Engine {
     logger.debug('[Engine.dropMcps]', 'dropping mcps...');
     for (const [id, client] of Object.entries(this.mcps)) {
       try {
-        logger.debug('[Engine.dropMcps]', `disconnecting mcp ${id}`);
+        logger.debug('[Engine.dropMcps]', `mcp "${id}" dropped`);
         await client.drop();
       } catch (err) {
         logger.error('[Engine.dropMcps]', `error disconnecting mcp ${id}:`, err);
@@ -618,6 +620,7 @@ export default class Engine {
     if (client) {
       try {
         await client.drop();
+        logger.debug('[Engine.dropMcp]', `mcp "${id}" dropped`);
       } catch (err) {
         logger.error('[Engine.dropMcp]', `error disconnecting mcp ${id}:`, err);
       }
@@ -629,7 +632,7 @@ export default class Engine {
     logger.debug('[Engine.dropSystems]', 'dropping systems...');
     for (const [name, system] of Object.entries(this.systems)) {
       try {
-        logger.debug('[Engine.dropSystems]', `detaching system ${name}`);
+        logger.debug('[Engine.dropSystems]', `system "${name}" dropped`);
         await system.drop();
       } catch (err) {
         logger.error('[Engine.dropSystems]', `error detaching system:`, err);

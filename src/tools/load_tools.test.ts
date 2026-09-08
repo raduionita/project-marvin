@@ -29,7 +29,7 @@ test('loadTools tool metadata', () => {
   const engine = mockEngine();
   const tool = new LoadToolsTool(engine);
   expect(tool.meta.function.name).toBe('load_tools');
-  expect(tool.meta.function.description).toContain('Load one or more callable tools');
+  expect(tool.meta.function.description).toContain('Load needed tools into this chat. ALWAYS load tools with `load_tools` before calling them');
   expect(tool.meta.function.parameters.required).toContain('tools');
   expect(tool.meta.function.parameters.properties.tools!.type).toBe('array');
   expect(tool.meta.group).toBe('control');

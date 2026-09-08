@@ -13,7 +13,7 @@ export default class WebBrowseTool extends Tool {
     group: 'web',
     function: {
       name: 'web_browse',
-      description: 'Browse the web',
+      description: 'Browse a website',
       parameters: {
         type: 'object',
         properties: {
