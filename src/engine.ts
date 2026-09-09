@@ -697,7 +697,7 @@ export default class Engine {
       logger.info('[Engine.execMonitor]', `  ${agentId}:`);
       logger.info('[Engine.execMonitor]', `  - model: ${agent.model.model}`);
       logger.info('[Engine.execMonitor]', `  - channels: ${Object.keys(agent.channels)}`);
-      logger.info('[Engine.execMonitor]', `  - tools: ${Object.keys(agent.tools).join(',')}`);
+      logger.info('[Engine.execMonitor]', `  - tools: ${[...new Set(Object.values(agent.tools).map(t => t.meta.group))].join(',')}`);
     }
 
     logger.info('[Engine.execMonitor]', `tasks:`);

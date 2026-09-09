@@ -112,12 +112,12 @@ export class Mcp {
         logger.error(`[Mcp.drop]`, this.id, err);
       }
     }
-    
+
     this.isLoaded = false;
   }
 
   // call a tool by its sanitized name, returning the flattened result content.
-  async call(name: string, args: { [key: string]: any } = {}): Promise<{ schemas: {[key: string]: any}[] }> {
+  async call(name: string, args: { [key: string]: any } = {}): Promise<{ results: {[key: string]: any}[] }> {
     logger.debug(`[Mcp.call]`, this.id, name, JSON.stringify(args).slice(0, 128));
 
     if (!this.client) {
@@ -140,7 +140,7 @@ export class Mcp {
       throw new Error(errror || `tool ${name}(${Object.keys(args).join(',')}) failed on "${this.id}" mpc tool call`);
     }
 
-    const schemas: { [key: string]: any }[] = [];
+    const outputs: { [key: string]: any }[] = [];
     let count: number = 0;
     for (const block of blocks as { type: string, text?: string, data?: string, uri?: string }[]) {
       if (block.type === 'text' && typeof block.text === 'string') {
@@ -148,19 +148,27 @@ export class Mcp {
         let parsed = tryJsonParse(block.text);
         // must be a non-empty object
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) {
-          schemas.push(parsed);
+          outputs.push(parsed);
         } else {
-          schemas.push({ 'text': block.text });
+          outputs.push({ 'text': block.text });
         }
       } else {
-        schemas.push({ [block.type]: block });
+        outputs.push({ [block.type]: block });
       }
       count++;
     }
 
-    logger.debug(`[Mcp.call]`, this.id, name, count, JSON.stringify(schemas).slice(0, 128));
+    // to be removed in the future
+    for (const output of outputs) {
+      // for each field in the output, log its type and value
+      for (const key of Object.keys(output)) {
+        logger.debug(`[Mcp.call]`, this.id, name, key, typeof output[key], JSON.stringify(output[key]));
+      }
+    }
 
-    return { schemas: schemas };
+    return { 
+      results: outputs,
+    };
   }
 
   private onStderr(chunk: Buffer) {

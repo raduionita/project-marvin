@@ -115,11 +115,7 @@ export default class DeepseekModel extends Model {
     body.top_p = this.topP;
     body.max_tokens = this.maxTokens;
 
-    for (const meta of body.tools) {
-      logger.debug('[DeepseekModel.sendChat]', meta.function.name, JSON.stringify(meta.function.parameters));
-    }
-
-    appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
+    // appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM request ---\n' + JSON.stringify(body, null, 2));
 
     // TODO: remove this
     logger.debug('[DeepseekModel.sendChat]', '-->', `id=${chat.id} userId=${chat.userId}`);
@@ -145,7 +141,7 @@ export default class DeepseekModel extends Model {
     const json = await response.json();
 
     // TODO: remove this
-    appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM response ---\n' + JSON.stringify(json, null, 2));
+    // appendFileSync(join(this.engine.work,'logs', `${chatId}.log`), '\n--- LLM response ---\n' + JSON.stringify(json, null, 2));
 
     // no choices, no reply
     if (!json.choices || json.choices.length === 0) {

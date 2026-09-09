@@ -72,7 +72,7 @@ export default class WebBrowseTool extends Tool {
     const page = await browser.newPage((request) => {
       const type = request.resourceType();
       const url = request.url();
-      if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'media'].includes(type)) {
+      if (['script', 'image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'media', 'xhr', 'fetch'].includes(type)) {
         // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
         return request.abort();
       } else {

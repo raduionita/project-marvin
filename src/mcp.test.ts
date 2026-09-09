@@ -64,7 +64,7 @@ test('callTool echoes arguments and flattens text content', async () => {
   await client.load();
 
   const result = await client.call('echo', { text: 'hi marvin' });
-  expect(result.schemas[0]!.text).toBe('echo: hi marvin');
+  expect(result.results[0]!.text).toBe('echo: hi marvin');
 
   await client.drop();
 });
@@ -75,7 +75,7 @@ test('callTool forwards configured env to the server process', async () => {
   await client.load();
 
   const result = await client.call('peek_env');
-  expect(result.schemas[0]!.text).toBe('MOCK_MCP_TOKEN=secret-token');
+  expect(result.results[0]!.text).toBe('MOCK_MCP_TOKEN=secret-token');
 
   await client.drop();
 });
@@ -103,7 +103,7 @@ test('callTool reconnects after drop', async () => {
 
   // callTool must lazily reconnect
   const result = await client.call('echo', { text: 'again' });
-  expect(result.schemas[0]!.text).toBe('echo: again');
+  expect(result.results[0]!.text).toBe('echo: again');
 
   await client.drop();
 });
@@ -159,7 +159,7 @@ test('McpTool.call forwards to the server', async () => {
   await engine.loadTools();
 
   const result = await (engine.tools['mock__echo'] as McpTool).call({ text: 'hi marvin' });
-  expect(result.schemas[0]!.text).toBe('echo: hi marvin');
+  expect(result.results[0]!.text).toBe('echo: hi marvin');
 
   await client.drop();
 });

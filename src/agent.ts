@@ -72,7 +72,7 @@ export class Agent {
     {
       system += '\n\n';
       system += '## Context\n';
-      system += ' - now:' + (new Date()).toUTCString();
+      system += ' - Date/Time:' + (new Date()).toUTCString();
       // last run?
       // trigger?
     } // state / world state
@@ -189,7 +189,12 @@ export class Agent {
 
   // tool call: prefer the agent's own tools, fall back to engine tools with a warning
   async execTool(tool: string, args: {[key:string]:any}, chat: Chat) : Promise<{[key:string]:any}> {
-    logger.info('[Agent.execTool]', tool, JSON.stringify(args).slice(0, 128));
+    logger.info('[Agent.execTool]', tool);
+    // for each argument key
+    for (const key of Object.keys(args)) {
+      logger.debug('[Agent.execTool]', tool, key, typeof args[key], JSON.stringify(args[key]).slice(0, 128));
+    }
+
     try {
       const instance = this.tools[tool] || (() => {
         const fallback = this.engine.tools[tool];
