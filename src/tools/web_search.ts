@@ -91,7 +91,7 @@ export default class WebSearchTool extends Tool {
 
     const browser = this.engine.systems['browser'] as BrowserSystem;
     const query = encodeURIComponent(args.query);
-    const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
+    const url = `https://duckduckgo.com?q=${query}&df=y&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
     const src = 'links.duckduckgo.com/d.js';
 
     let page: Awaited<ReturnType<BrowserSystem['newPage']>> | undefined;
@@ -103,7 +103,7 @@ export default class WebSearchTool extends Tool {
         if (type === 'script' && !url.includes(src)) {
           // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
           return request.abort();
-        } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
+        } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr', 'fetch'].includes(type)) {
           // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
           return request.abort();
         } else {
@@ -183,7 +183,7 @@ export default class WebSearchTool extends Tool {
         if (type === 'script' && !url.includes(src)) {
           // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
           return request.abort();
-        } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr'].includes(type)) {
+        } else if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'xhr', 'fetch'].includes(type)) {
           // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
           return request.abort();
         } else {

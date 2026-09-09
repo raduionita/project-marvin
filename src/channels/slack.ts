@@ -229,7 +229,7 @@ export default class SlackChannel extends Channel {
 
       logger.debug('[SlackChannel.onMessage]', `processing agent=${agentId} "${text.slice(0, 64)}"`);
 
-      const header = `${agentId} is thinking...`;
+      const header = constants.ACK_MESSAGES[Math.floor(Math.random() * constants.ACK_MESSAGES.length)] || `${agentId} is thinking...`;
       const head = await this.sendMessage({ role: 'assistant', content: header, group: event.channel, thread});
       if (!head.ok) {
         logger.warn('[SlackChannel.onMessage]', 'failed to post header:', head.error, head.message);

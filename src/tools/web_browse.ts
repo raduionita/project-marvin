@@ -66,10 +66,21 @@ export default class WebBrowseTool extends Tool {
       return { title:'', body:'', error: 'webBrowse: Browser is not loaded in the server engine' }
     }
 
-    const system = this.engine.systems['browser'] as BrowserSystem;
+    const browser = this.engine.systems['browser'] as BrowserSystem;
     const url = args.url;
 
-    const page = await system.newPage();
+    const page = await browser.newPage((request) => {
+      const type = request.resourceType();
+      const url = request.url();
+      if (['image', 'stylesheet', 'font', 'media', 'other', 'manifest', 'media'].includes(type)) {
+        // logger.debug('[WebSearchTool.newPage]', 'blocking', type, url);
+        return request.abort();
+      } else {
+        logger.debug('[WebSearchTool.newPage]', 'allowing', type, url);
+        return request.continue();
+      }
+    });
+
     page.setDefaultNavigationTimeout(10_000);
 
     let error = '';

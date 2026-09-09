@@ -55,3 +55,5 @@ export const AGENTS_FOLDER = 'agents';
 export const SKILLS_FOLDER = 'skills';
 export const TOOLS_FOLDER = 'tools';
 export const CHANNELS_FOLDER = 'channels';
+
+export const ACK_MESSAGES = ['On it...', 'Jut a sec...', 'Thinking...', 'Working on it...', 'Please stand by...', 'Give me a sec...', 'Hold on a sec...', 'Just a moment...'];
