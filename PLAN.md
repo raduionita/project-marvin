@@ -28,7 +28,7 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` open
 - [ ] **Tests for the guard** — extend `serve.test.ts`: repeated identical tool call stops/stears; failing-tool escalation; identical replies; ping-pong; update the intentionally-changed count assertions.
 
 ## Phase 3 — (retired)
-- [x] **Internal toolset exists** — `src/tools/` now ships list/read/edit/append/move/delete, grep, web_search/fetch/browse, get_date, memory, marvin_state/config, load_tools, end_chat. Future tool ideas live in Phase 11.
+- [x] **Internal toolset exists** — `src/tools/` now ships list/read/edit/append/move/delete, grep, web_search/fetch/browse, get_date, memory, marvin_state/config, end_chat. Future tool ideas live in Phase 11.
 
 ## Phase 4 — LLM-assisted authoring
 - [ ] **LLM-assisted generation of `TASK.md` & `IDENTITY.md`** — NOT implemented. `commands/agents.ts:153` and `commands/tasks.ts` currently use plain `input()` for raw markdown.

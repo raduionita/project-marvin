@@ -3,9 +3,9 @@ import { join } from 'path';
 
 import type Engine from './engine.js';
 import logger from './logger.js';
-import type { Channel, Chat, Message, Model, Reply, Result, ToolMeta } from './types.js';
+import type { Channel, Chat, Message, Model, Reply, Result, Tool, ToolMeta } from './types.js';
 import * as constants from './constants.js';
-import { readMemorySummary } from './memory.js';
+import { loadMemory } from './memory.js';
 import { truncate, splitMcpToolName as splitToolName, readError } from './helpers/index.js';
 
 // agent: an identity (system prompt) + a model + output channels. runs the AI loop (sendChat)
@@ -21,6 +21,8 @@ export class Agent {
   public channels: Record<string, string> = {};
   // will use this model to communicate with the LLMs
   public model!: Model;
+  // tools assigned to this agent (subset of engine.tools by group, control always included)
+  public tools: Record<string, Tool> = {};
   // chat cache (chatId: chat), swept by the engine's execSweep task
   public cache: Record<string, Chat> = {};
 
@@ -65,8 +67,7 @@ export class Agent {
     logger.debug('[Agent.makeChat]', chatId);
 
     let system: string = this.identity;
-
-    system += '\n\n---';
+        system += '\n\n---';
 
     {
       system += '\n\n';
@@ -80,7 +81,7 @@ export class Agent {
       // inject a compact summary of the most recently updated memory notes, so
       // the agent keeps cross-run context (facts, preferences, progress)
       if (this.engine.config.settings.memory || this.memory) {
-        const memory = readMemorySummary(this.engine, this.id);
+        const memory = loadMemory(this.engine, this.id);
         if (memory) {
           system += '\n\n';
           system += '## Memory\n';
@@ -91,75 +92,14 @@ export class Agent {
       }
     } // memories
 
-    {
-      // inject the mcps block: loaded servers list their tools, config-only entries just their spawn spec
-      if (Object.keys(this.engine.mcps).length) {
-        system += '\n\n';
-        system += '## MCPs';
-        for (const [id, mcp] of Object.entries(this.engine.mcps)) {
-          if (mcp.isLoaded) {
-            system += '\n';
-            system += `- ${id}`;
-          }
-        }
-      }
-    } // mcps
-
-    {
-      // inject a compact catalog of loadable tools so the agent can discover and load them on demand via the load_tools
-      system += '\n\n';
-      system += '## Tools\n';
-
-      // group internal tools
-      const available = Object.values(this.engine.tools);
-      const groups: Record<string, { name: string, info: string, args: string }[]> = {};
-      for (const tool of available) {
-        (groups[tool.meta.group] ||= []).push({ 
-          name: tool.meta.function.name, 
-          info: tool.meta.function.description, 
-          args: Object.keys(tool.meta.function.parameters.properties).map(p => tool.meta.function.parameters.required?.includes(p) ? `?${p}` : p).join(',')
-        });
-      }
-
-      // control tools first
-      for (const [group, tools] of Object.entries(groups).filter(g => g[0] === 'control')) {
-        system += `### ${group} tools:`;
-        for (const { name, info, args } of tools) {
-          system += '\n';
-          system += `- \`${name}\`: ${info}\n`;
-        }
-      }
-
-      // internal tools
-      for (const [group, tools] of Object.entries(groups).filter(g => g[0] !== 'control')) {
-        system += `### ${group} tools:`;
-        for (const { name, info, args } of tools) {
-          system += '\n';
-          system += `- \`${name}\`: ${info}\n`;
-        }
-      }
-
-      // mcp tools
-      for (const [id, mcp] of Object.entries(this.engine.mcps)) {
-        if (mcp.isLoaded) {
-          system += `### ${id} MCP tools:`;
-          for (const tool of Object.values(mcp.tools)) {
-            system += '\n';
-            system += `- \`${id}__${tool.name}\`: ${tool.description}`;
-          }
-        }
-      }
-    } // tools
-
-    const chat = {} as Chat;
-          chat.id =  chatId || '';
-          chat.messages = [{ role: 'system', content: system }];
-          chat.thinking = false;
-          chat.userId = '';
-          chat.tools = Object.values(this.engine.tools).filter(t => t.stop || t.meta.function.name === 'load_tools').map(t => t.meta);
-          chat.updated = Date.now();
-
-    return chat;
+    return {
+      id      : chatId || '',
+      messages: [{ role: 'system', content: system }],
+      thinking: false,
+      userId  : '',
+      tools   : Object.values(this.tools).map(t => t.meta),
+      updated : Date.now(),
+    } as Chat;
   }
 
   // save chat to cache (and persist it to ~/.marvin/chats/<chatId>.json)
@@ -247,12 +187,15 @@ export class Agent {
     // if (scan > keep) chat.messages = [...chat.messages.slice(0, keep), ...chat.messages.slice(scan)];
   }
 
-  // tool call
+  // tool call: prefer the agent's own tools, fall back to engine tools with a warning
   async execTool(tool: string, args: {[key:string]:any}, chat: Chat) : Promise<{[key:string]:any}> {
     logger.info('[Agent.execTool]', tool, JSON.stringify(args).slice(0, 128));
     try {
-      // internal tools
-      const instance = this.engine.tools[tool];
+      const instance = this.tools[tool] || (() => {
+        const fallback = this.engine.tools[tool];
+        if (fallback) logger.warn('[Agent.execTool]', `tool ${tool} not in agent "${this.id}" tools, using engine tool`);
+        return fallback;
+      })();
       if (instance) {
         // ! tool call
         return await instance.call(args, this, chat);
@@ -308,7 +251,7 @@ export class Agent {
         // execute any tool calls (engine tools, mcp __ tools via execTool)
         for (const call of reply.message.tools || []) {
           logger.debug('[Agent.sendChat]', `executing tool: ${call.name}`, JSON.stringify(call.arguments).slice(0, 64));
-          const tool = this.engine.tools[call.name];
+          const tool = this.tools[call.name] || this.engine.tools[call.name];
           if (tool?.stop) {
             ended = true;
             chat.messages.push({role: 'tool', content: JSON.stringify({ ended: true }), toolId: call.id});

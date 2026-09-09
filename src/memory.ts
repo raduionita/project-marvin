@@ -89,7 +89,7 @@ export function listMemories(engine: Engine, agentId: string): { key: string; pr
 
 // build a compact summary of the most recently updated memory notes for this
 // agent, used in the system prompt. bounded: at most MAX_NOTES and MAX_CHARS.
-export function readMemorySummary(engine: Engine, agentId: string, maxNotes = 10, maxChars = 2048): string {
+export function loadMemory(engine: Engine, agentId: string, maxNotes = 10, maxChars = 2048): string {
   const notes = listMemories(engine, agentId).slice(0, maxNotes);
   if (notes.length === 0) return '';
 

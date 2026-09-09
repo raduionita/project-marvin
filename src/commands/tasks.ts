@@ -103,7 +103,7 @@ export default class TasksCommand extends Command {
       writeFileSync(ppath, taskInput + '\n');
     }
 
-    // register the task in config (tools now load lazily via load_tools)
+    // register the task in config (tools come from the agent's tool groups)
     this.engine.config.tasks = this.engine.config.tasks || {};
     this.engine.config.tasks[taskId] = {
       enabled: true,
@@ -112,9 +112,14 @@ export default class TasksCommand extends Command {
     };
 
     // persist to marvin.json
-    const cpath = join(this.engine.work, 'marvin.json');
-    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+    this.saveConfig();
 
     logger.info(`task "${taskId}" configured for agent "${taskAgent}" (schedule: ${taskSchedule}s ${ppath ? `, prompt saved to ${ppath}` : ''}`);
+  }
+
+  saveConfig() {
+    const cpath = join(this.engine.work, 'marvin.json');
+    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
+    logger.info(`config updated: ${cpath}`);
   }
 }

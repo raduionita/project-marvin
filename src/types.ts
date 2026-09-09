@@ -40,6 +40,8 @@ export interface Config {
     default?: boolean;
     model?: string;
     channels: Record<string, string>;
+    // tool groups to load (group = Tool.meta.group, mcp tools use the mcp id).
+    // empty = only the control group; the orchestrator always loads all tools.
     tools?: string[];
   }>;
   tasks: Record<string, {
@@ -55,18 +57,14 @@ export class Command {
   // shared logger (default-exported singleton from ./logger.js); see `setLoggerMode`
   // to flip the shared prefix/stripTags behavior, and `setDefaultOutput` to swap
   // the sink shared by every Logger (used by tests + the daemon).
-  constructor(public engine: Engine, public args: string[], public readonly deamon: boolean = false) {
-    logger.debug(`[${this.constructor.name||'Command'}.constructor]`, JSON.stringify(args));
-  }
+  constructor(public engine: Engine, public args: string[], public readonly deamon: boolean = false) { }
 
   async exec(): Promise<void> { logger.debug(`[${this.constructor.name||'Command'}.exec]`); }
   async drop(): Promise<void> { logger.debug(`[${this.constructor.name||'Command'}.drop]`); }
 }
 
 export abstract class System {
-  constructor(public readonly engine: Engine) {
-    logger.debug(`[${this.constructor.name||'System'}.constructor]`);
-  }
+  constructor(public readonly engine: Engine) { }
 
   abstract load(): Promise<void>;
   abstract drop(): Promise<void>;
@@ -117,9 +115,7 @@ export interface ChannelMeta {
 // channel interface
 export abstract class Channel {
   abstract meta: ChannelMeta;
-  constructor(public engine: Engine) {
-    logger.debug(`[${this.constructor.name||'Channel'}.constructor]`);
-  }
+  constructor(public engine: Engine) { }
 
   abstract load(): Promise<void>;
   abstract drop(): Promise<void>;

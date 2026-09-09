@@ -216,7 +216,7 @@ function buildMcpToolMeta(id: string, tool: { name: string; description?: string
 }
 
 // a single mcp server tool registered in Engine.tools: forwards calls to
-// the server so execTool/load_tools use Engine.tools with no mcp special-case
+// the server so execTool uses Engine.tools with no mcp special-case
 export class McpTool extends Tool {
   public override readonly meta: ToolMeta;
   // raw server-side tool name (Mcp.call maps sanitized keys back to it)

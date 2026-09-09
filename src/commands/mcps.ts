@@ -4,7 +4,7 @@ import { join } from 'path';
 import { Command } from "../types";
 import { Mcp, testMcp, specMcp } from '../mcp.js';
 import { tryJsonParse } from '../helpers/index.js';
-import { editor, confirm, input, select } from '../terminal.js';
+import { checkbox, editor, confirm, input, select } from '../terminal.js';
 import logger from '../logger.js';
 
 // `marvin mcps [command]` list, add, edit, info, drop mcp connectors
@@ -78,20 +78,20 @@ export default class McpsCommand extends Command {
     logger.debug('[McpsCommand.execAdd]', 'adding an mcp...');
 
     // ask for the mcp name
-    const name = this.args[1] || await input({
+    const mname = this.args[1] || await input({
       message: 'Enter mcp name (e.g. gloobeam):',
       required: true,
       pattern: /^[a-zA-Z0-9_-]+$/,
       patternError: 'invalid name (use a-z, 0-9, _ and -)',
     });
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      logger.error('[McpsCommand.execAdd]', 'invalid name (use a-z, 0-9, _ and -):', name);
+    if (!/^[a-zA-Z0-9_-]+$/.test(mname)) {
+      logger.error('[McpsCommand.execAdd]', 'invalid name (use a-z, 0-9, _ and -):', mname);
       return;
     }
 
     // must NOT exist
-    if (this.engine.config.mcps?.[name]) {
-      logger.error('[McpsCommand.execAdd]', `mcp "${name}" is already configured`);
+    if (this.engine.config.mcps?.[mname]) {
+      logger.error('[McpsCommand.execAdd]', `mcp "${mname}" is already configured`);
       return;
     }
 
@@ -114,7 +114,7 @@ export default class McpsCommand extends Command {
     logger.log('testing connection...');
 
     // verify connectivity before saving (spawn + initialize + listTools)
-    const ok = await testMcp(this.engine, name, conf);
+    const ok = await testMcp(this.engine, mname, conf);
     if (!ok) {
       const saveAnyway = await confirm({ message: 'Connection failed. Save anyway?', default: false });
       // stop early
@@ -124,17 +124,23 @@ export default class McpsCommand extends Command {
       }
     }
 
-    // register the mcp in config (tools now load lazily via load_tools)
+    // register the mcp in config (tools load per agent tool groups)
     const mcps = this.engine.config.mcps || {};
     conf.enabled = true;
-    mcps[name] = conf;
+    mcps[mname] = conf;
     this.engine.config.mcps = mcps;
 
+    // attach the mcp as a tool group to the picked agents
+    for (const agentId of await this.pickAgents(mname, this.args[2])) {
+      const agent = this.engine.config.agents[agentId]!;
+      agent.tools ||= [];
+      if (!agent.tools.includes(mname)) agent.tools.push(mname);
+      logger.info('[McpsCommand.execAdd]', `mcp "${mname}" attached to agent "${agentId}"`);
+    }
+
     // save config
-    const cpath = join(this.engine.work, 'marvin.json');
-    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    
-    logger.info(`config updated: ${cpath}`);
+    this.saveConfig();
+
     logger.info('mcp added');
   }
 
@@ -147,15 +153,15 @@ export default class McpsCommand extends Command {
       logger.warn('[McpsCommand.execEdit]', 'no mcps configured');
       return;
     }
-    const pname = this.args[1] || await select({
+    const mname = this.args[1] || await select({
       message: 'Select mcp to edit:',
       choices: mcps.map(id => ({ name: id, value: id })),
     });
 
     // must exist
-    const current = this.engine.config.mcps[pname];
+    const current = this.engine.config.mcps[mname];
     if (!current) {
-      logger.error('[McpsCommand.execEdit]', `mcp "${pname}" not found in config`);
+      logger.error('[McpsCommand.execEdit]', `mcp "${mname}" not found in config`);
       return;
     }
 
@@ -175,7 +181,7 @@ export default class McpsCommand extends Command {
     // replace the spawn spec, keeping the previous enabled flag unless set
     if (config.enabled === undefined) config.enabled = current.enabled;
 
-    const ok = await testMcp(this.engine, pname, config);
+    const ok = await testMcp(this.engine, mname, config);
     if (!ok) {
       const saveAnyway = await confirm({ message: 'Connection failed. Save anyway?', default: false });
       if (!saveAnyway) {
@@ -184,15 +190,22 @@ export default class McpsCommand extends Command {
       }
     }
 
-    this.engine.config.mcps![pname] = config;
+    this.engine.config.mcps![mname] = config;
+
+    // attach the mcp as a tool group to the picked agents (already attached pre-selected)
+    for (const agentId of await this.pickAgents(mname, this.args[2])) {
+      const agent = this.engine.config.agents[agentId]!;
+      agent.tools ||= [];
+      if (!agent.tools.includes(mname)) agent.tools.push(mname);
+      logger.info('[McpsCommand.execEdit]', `mcp "${mname}" attached to agent "${agentId}"`);
+    }
 
     // save config
-    const cpath = join(this.engine.work, 'marvin.json');
-    writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-    
-    logger.info(`config updated: ${cpath}`);
+    this.saveConfig();
+
     logger.info('mcp updated');
   }
+
 
   // `marvin mcps info <name>`: connect and list the server's tools
   async execInfo() {
@@ -262,11 +275,53 @@ export default class McpsCommand extends Command {
     // remove the mcp from the config
     delete this.engine.config.mcps![pname];
 
+    // detach the mcp tool group from all agents
+    for (const agent of Object.values(this.engine.config.agents || {})) {
+      if (agent.tools?.includes(pname)) {
+        agent.tools = agent.tools.filter(g => g !== pname);
+      }
+    }
+
     // save config
+    this.saveConfig();
+
+    logger.info('mcp dropped');
+  }
+
+  // ask which agents to attach the mcp tool group to (already attached pre-selected).
+  // the orchestrator (settings.name) always loads all tools, so it is excluded.
+  // arg overrides the prompt (`marvin mcps add <name> <agent>` / `edit <name> <agent>`).
+  // returns the picked agent ids (empty = attach nowhere)
+  async pickAgents(mname: string, arg?: string): Promise<string[]> {
+    const orchestrator = this.engine.config.settings?.name;
+    const agentIds = Object.keys(this.engine.config.agents || {}).filter(id => id !== orchestrator);
+    if (!agentIds.length) return [];
+
+    if (arg) {
+      if (arg === orchestrator) {
+        logger.info('[McpsCommand.pickAgents]', `agent "${arg}" is the orchestrator (always has all tools), nothing to attach`);
+        return [];
+      }
+      if (!this.engine.config.agents[arg]) {
+        logger.warn('[McpsCommand.pickAgents]', `unknown agent "${arg}", skipping attach`);
+        return [];
+      }
+      return [arg];
+    }
+
+    return checkbox({
+      message: `Select agents to attach "${mname}" tools to (space to toggle, enter to confirm):`,
+      choices: agentIds.map(id => ({
+        name: id,
+        value: id,
+        checked: this.engine.config.agents[id]?.tools?.includes(mname),
+      })),
+    });
+  }
+
+  saveConfig() {
     const cpath = join(this.engine.work, 'marvin.json');
     writeFileSync(cpath, JSON.stringify(this.engine.config, null, 2));
-
     logger.info(`config updated: ${cpath}`);
-    logger.info('mcp dropped');
   }
 }

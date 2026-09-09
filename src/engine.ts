@@ -30,6 +30,8 @@ export default class Engine {
   public tools       : Record<string, Tool> = {};
   public mcps        : Record<string, Mcp> = {};
 
+  public prompt: string = '';
+
   // workspace (~/.marvin) data folder
   public work: string = process.env.HOME + '/.marvin';
   // root (~/) app folder
@@ -396,6 +398,23 @@ export default class Engine {
     logger.debug('[Engine.loadModels]', `[${Object.keys(this.models).join(',')}]`);
   }
 
+  // picks the tool subset for an agent from its configured groups. the control group is always included; empty groups = only control.
+  pickTools(groups: string[]): Record<string, Tool> {
+    const wanted = new Set(groups);
+    const picked: Record<string, Tool> = {};
+    for (const [name, tool] of Object.entries(this.tools)) {
+      if (tool.meta.group === 'control' || wanted.has(tool.meta.group)) {
+        picked[name] = tool;
+      }
+    }
+    for (const group of wanted) {
+      if (!Object.values(picked).some(t => t.meta.group === group)) {
+        logger.warn('[Engine.pickTools]', `unknown tool group "${group}", skipping`);
+      }
+    }
+    return picked;
+  }
+
   async loadAgents() {
     logger.debug('[Engine.loadAgents]', 'loading agents...');
 
@@ -414,7 +433,7 @@ export default class Engine {
         logger.warn('[Engine.loadAgents]', `no MARVIN.md found for agent "${marvinId}", using default`);
       }
 
-      // add ochestrator agent
+      // add ochestrator agent (always has all tools loaded)
       this.agents[marvinId] = new Agent(this, {
         id: marvinId,
         enabled: true,
@@ -422,6 +441,7 @@ export default class Engine {
         identity: identity,
         channels: {},
         model: model,
+        tools: { ...this.tools },
       });
 
       logger.info('[Engine.loadAgents]',`agent "${marvinId}" loaded`);
@@ -452,6 +472,7 @@ export default class Engine {
         identity: identity,
         channels: agent.channels,
         model: model,
+        tools: this.pickTools(agent.tools || []),
       });
 
       logger.info('[Engine.loadAgents]',`agent "${agentId}" loaded`);
@@ -751,26 +772,26 @@ export default class Engine {
     // check if task is enabled
     if (!task.enabled) {
       logger.info('[Engine.execTask]', `task ${taskId} skipped (task disabled)`);
-      return;
+      return task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
     }
 
     // task must have an input
     if (!task.input) {
       logger.info('[Engine.execTask]', `task ${taskId} skipped (no input)`);
-      return;
+      return task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
     }
 
     // check if agent exists
     const agent = task.agent;
     if (!agent) {
       logger.info('[Engine.execTask]', `task ${taskId} skipped (agent not found)`);
-      return;
+      return task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
     }
 
     // check if agent is enabled
     if (!agent.enabled) {
       logger.info('[Engine.execTask]', `task ${taskId} skipped (agent disabled)`);
-      return;
+      return task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
     }
 
     // TODO: `task-${agentId}-${taskId}` - need a way to decide if chatId should be reused OR new (stateless) chat (current)
@@ -780,7 +801,7 @@ export default class Engine {
     const result = await agent.sendChat(chatId, task.input);
     if (result.error) {
       logger.error('[Engine.execTask]', `no result from sendChat for task ${taskId}:`, result.error);
-      return;
+      return task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
     }
 
     // send final result through configured channels
@@ -808,6 +829,6 @@ export default class Engine {
     }
 
     // ! re-schedule next execution
-    task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
+    return task.timeout = setTimeout(this.execTask.bind(this), task.schedule, taskId);
   }
 }

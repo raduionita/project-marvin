@@ -53,12 +53,6 @@ export default class SlackChannel extends Channel {
     },
   }
 
-  // slack uses the shared default logger from ./logger.js; per-command capture is
-// built inline in `runCommand` (a fresh `new Logger({...})` with its own sink).
-  constructor(engine: Engine) {
-    super(engine);
-  }
-
   protected socketClient!: ISocketModeClient;
   protected webClient!: IWebClient;
 

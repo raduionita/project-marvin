@@ -18,7 +18,7 @@ export default class ToolsCommand extends Command {
         this.execHelp();
       break;
       case 'list':
-        await this.listTools();
+        await this.execList();
       break;
       case 'add':
         // await this.engine.load();
@@ -46,7 +46,7 @@ export default class ToolsCommand extends Command {
     logger.info('  [name]       ', 'call a tool, pass params as a JSON object');
   }
 
-  async listTools() {
+  async execList() {
     logger.info('tools:');
     const tools = listTools(this.engine);
     for (const file of tools) {
@@ -57,7 +57,7 @@ export default class ToolsCommand extends Command {
         this.engine.tools[meta.function.name] = instance;
         logger.info(`- ${meta.function.name}`, JSON.stringify(meta.function.parameters.properties));
       } catch (err) {
-        logger.error('[ToolCommand.listTools]', `failed to load ${file}:`, err);
+        logger.error('[ToolCommand.execList]', `failed to load ${file}:`, err);
       }
     }
   }

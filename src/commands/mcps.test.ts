@@ -63,7 +63,7 @@ test('execList lists configured mcps', async () => {
   restore();
 });
 
-test('execDrop removes an mcp and persists (no task unlinking via load_tools)', async () => {
+test('execDrop removes an mcp and persists (no task unlinking, per-agent tools)', async () => {
   const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
   engine.config.tasks = { post: { enabled: true, schedule: 60 } } as Config['tasks'];
   const cmd = new McpsCommand(engine, ['drop', 'gloobeam']);
@@ -93,7 +93,7 @@ test('execAdd validates, connects and persists an mcp from a pasted snippet', as
   injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
   const cmd = new McpsCommand(engine, ['add']);
 
-  // scripted answers: name (no tasks configured -> no linking prompt)
+  // scripted answers: name (no agents configured -> no attach prompt)
   answers = ['gloobeam'];
 
   await cmd.exec();
@@ -106,7 +106,7 @@ test('execAdd validates, connects and persists an mcp from a pasted snippet', as
   restore();
 });
 
-test('execAdd no longer links the mcp to tasks (tools load via load_tools)', async () => {
+test('execAdd no longer links the mcp to tasks (tools load per agent groups)', async () => {
   const engine = buildEngine();
   engine.config.tasks = {
     post: { enabled: true, schedule: 3600 },
@@ -122,6 +122,59 @@ test('execAdd no longer links the mcp to tasks (tools load via load_tools)', asy
 
   expect((engine.config.tasks!['post'] as any).mcps).toBeUndefined();
   expect((engine.config.tasks!['digest'] as any).mcps).toBeUndefined();
+});
+
+test('execAdd attaches the mcp as a tool group to the selected agents', async () => {
+  const engine = buildEngine();
+  engine.config.agents = {
+    a1: { enabled: true, model: 'm', channels: {}, tools: ['web'] },
+    a2: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['add']);
+
+  // scripted answers: name + agents to attach to (1-based checkbox indices)
+  answers = ['gloobeam', '1,2'];
+
+  await cmd.exec();
+
+  expect(readConfig(engine).mcps['gloobeam']).toBeDefined();
+  expect(engine.config.agents['a1']!.tools).toEqual(['web', 'gloobeam']);
+  expect(engine.config.agents['a2']!.tools).toEqual(['gloobeam']);
+});
+
+test('pickAgents excludes the orchestrator (always has all tools)', async () => {
+  const engine = buildEngine();
+  engine.config.agents = {
+    marvin: { enabled: true, model: 'm', channels: {}, tools: [] },
+    a1: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['add']);
+
+  // scripted answers: name + blank (selects all offered agents)
+  answers = ['gloobeam', ''];
+
+  await cmd.exec();
+
+  expect(engine.config.agents['a1']!.tools).toEqual(['gloobeam']);
+  // orchestrator untouched (never offered, always loads everything)
+  expect(engine.config.agents['marvin']!.tools).toEqual([]);
+});
+
+test('execDrop detaches the mcp tool group from all agents', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  engine.config.agents = {
+    a1: { enabled: true, model: 'm', channels: {}, tools: ['web', 'gloobeam'] },
+    a2: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  const cmd = new McpsCommand(engine, ['drop', 'gloobeam']);
+
+  await cmd.exec();
+
+  expect(readConfig(engine).mcps['gloobeam']).toBeUndefined();
+  expect(engine.config.agents['a1']!.tools).toEqual(['web']);
+  expect(engine.config.agents['a2']!.tools).toEqual([]);
 });
 
 test('execAdd rejects invalid json snippets', async () => {
@@ -197,6 +250,366 @@ test('execEdit replaces the spawn spec and persists', async () => {
   expect(config.mcps['gloobeam'].command).toBe(process.execPath);
   // previous enabled flag kept when the snippet does not set one
   expect(config.mcps['gloobeam'].enabled).toBe(false);
+});
+
+test('execEdit attaches the mcp to the selected agent', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: false, command: 'old-cmd', args: [] }]);
+  engine.config.agents = {
+    a1: { enabled: true, model: 'm', channels: {}, tools: ['web'] },
+    a2: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam']);
+
+  // scripted answers: attach to a2 (1-based checkbox index)
+  answers = ['2'];
+
+  await cmd.exec();
+
+  const config = readConfig(engine);
+  expect(config.mcps['gloobeam'].command).toBe(process.execPath);
+  expect(engine.config.agents['a2']!.tools).toEqual(['gloobeam']);
+  expect(engine.config.agents['a1']!.tools).toEqual(['web']);
+});
+
+test('execEdit attach keeps the already attached agent (idempotent)', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: false, command: 'old-cmd', args: [] }]);
+  engine.config.agents = {
+    a1: { enabled: true, model: 'm', channels: {}, tools: ['gloobeam'] },
+    a2: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam']);
+
+  // blank answer -> all offered agents (mock), re-attaching a1 is idempotent
+  answers = [''];
+
+  await cmd.exec();
+
+  expect(engine.config.agents['a1']!.tools).toEqual(['gloobeam']);
+  expect(engine.config.agents['a2']!.tools).toEqual(['gloobeam']);
+});
+
+test('execAdd rejects invalid names', async () => {
+  const engine = buildEngine();
+  const { lines, restore } = captureLogger();
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['add', 'bad name!']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('invalid name');
+  expect(readConfig(engine).mcps).toEqual({});
+  restore();
+});
+
+test('execAdd refuses already configured mcps', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  const cmd = new McpsCommand(engine, ['add', 'gloobeam']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('already configured');
+  expect(readConfig(engine).mcps['gloobeam'].command).toBe('npx');
+  restore();
+});
+
+test('execAdd saves anyway when confirmed after a failed connection', async () => {
+  const engine = buildEngine();
+  const { lines, restore } = captureLogger();
+  // command that exits immediately -> initialize fails
+  injectedSnippet = JSON.stringify({ command: 'false', args: [] });
+  const cmd = new McpsCommand(engine, ['add']);
+
+  // scripted answers: name -> confirm prompt ("y" = save anyway)
+  answers = ['broken', 'y'];
+
+  await cmd.exec();
+
+  const config = readConfig(engine);
+  expect(config.mcps['broken']).toBeDefined();
+  expect(config.mcps['broken'].enabled).toBe(true);
+  expect(lines.join('\n')).toContain('mcp added');
+  restore();
+});
+
+test('execAdd attaches via the agent arg without prompting', async () => {
+  const engine = buildEngine();
+  engine.config.agents = {
+    a1: { enabled: true, model: 'm', channels: {}, tools: ['web'] },
+    a2: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['add', 'gloobeam', 'a2']);
+
+  // no prompts consumed (name + agent both from args)
+  answers = [];
+
+  await cmd.exec();
+
+  expect(engine.config.agents['a2']!.tools).toEqual(['gloobeam']);
+  expect(engine.config.agents['a1']!.tools).toEqual(['web']);
+});
+
+test('execAdd warns on unknown agent arg but still saves', async () => {
+  const engine = buildEngine();
+  engine.config.agents = {
+    a1: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  const { lines, restore } = captureLogger();
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['add', 'gloobeam', 'nope']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('unknown agent');
+  expect(readConfig(engine).mcps['gloobeam']).toBeDefined();
+  expect(engine.config.agents['a1']!.tools).toEqual([]);
+  restore();
+});
+
+test('execAdd skips attach for the orchestrator arg', async () => {
+  const engine = buildEngine();
+  engine.config.agents = {
+    marvin: { enabled: true, model: 'm', channels: {}, tools: [] },
+    a1: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  const { lines, restore } = captureLogger();
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['add', 'gloobeam', 'marvin']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('orchestrator');
+  expect(readConfig(engine).mcps['gloobeam']).toBeDefined();
+  expect(engine.config.agents['marvin']!.tools).toEqual([]);
+  expect(engine.config.agents['a1']!.tools).toEqual([]);
+  restore();
+});
+
+test('execAdd without agents still saves the mcp', async () => {
+  const engine = buildEngine();
+  const { lines, restore } = captureLogger();
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['add']);
+
+  answers = ['gloobeam'];
+
+  await cmd.exec();
+
+  expect(readConfig(engine).mcps['gloobeam']).toBeDefined();
+  expect(lines.join('\n')).toContain('mcp added');
+  restore();
+});
+
+test('execEdit warns when no mcps are configured', async () => {
+  const engine = buildEngine();
+  const { lines, restore } = captureLogger();
+  const cmd = new McpsCommand(engine, ['edit']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('no mcps configured');
+  restore();
+});
+
+test('execEdit errors for unknown mcps', async () => {
+  const engine = buildEngine(['other', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  const cmd = new McpsCommand(engine, ['edit', 'nope']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('not found in config');
+  expect(Object.keys(readConfig(engine).mcps)).toEqual(['other']);
+  restore();
+});
+
+test('execEdit prompts to select the mcp', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: false, command: 'old-cmd', args: [] }]);
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['edit']);
+
+  // scripted answers: mcp name (no agents -> no attach prompt)
+  answers = ['gloobeam'];
+
+  await cmd.exec();
+
+  expect(readConfig(engine).mcps['gloobeam'].command).toBe(process.execPath);
+});
+
+test('execEdit rejects invalid json snippets', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  injectedSnippet = '{not json';
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('invalid json');
+  expect(readConfig(engine).mcps['gloobeam'].command).toBe('npx');
+  restore();
+});
+
+test('execEdit rejects snippets without a command', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  injectedSnippet = JSON.stringify({ args: ['-y', '@x/y'] });
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('invalid mcp snippet');
+  expect(readConfig(engine).mcps['gloobeam'].command).toBe('npx');
+  restore();
+});
+
+test('execEdit aborts on failed connection unless confirmed', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  // command that exits immediately -> initialize fails
+  injectedSnippet = JSON.stringify({ command: 'false', args: [] });
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam']);
+
+  // scripted answers: confirm prompt ("n" = do not save anyway)
+  answers = ['n'];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('aborted');
+  expect(readConfig(engine).mcps['gloobeam'].command).toBe('npx');
+  restore();
+});
+
+test('execEdit saves anyway when confirmed after a failed connection', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  injectedSnippet = JSON.stringify({ command: 'false', args: [] });
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam']);
+
+  // scripted answers: confirm prompt ("y" = save anyway, no agents -> no attach prompt)
+  answers = ['y'];
+
+  await cmd.exec();
+
+  const config = readConfig(engine);
+  expect(config.mcps['gloobeam'].command).toBe('false');
+  expect(lines.join('\n')).toContain('mcp updated');
+  restore();
+});
+
+test('execEdit attaches via the agent arg without prompting', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: false, command: 'old-cmd', args: [] }]);
+  engine.config.agents = {
+    a1: { enabled: true, model: 'm', channels: {}, tools: [] },
+    a2: { enabled: true, model: 'm', channels: {}, tools: [] },
+  } as Config['agents'];
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam', 'a1']);
+
+  // no prompts consumed (mcp + agent both from args)
+  answers = [];
+
+  await cmd.exec();
+
+  expect(engine.config.agents['a1']!.tools).toEqual(['gloobeam']);
+  expect(engine.config.agents['a2']!.tools).toEqual([]);
+});
+
+test('execEdit without agents still saves the mcp', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: false, command: 'old-cmd', args: [] }]);
+  const { lines, restore } = captureLogger();
+  injectedSnippet = JSON.stringify(MOCK_SPEC(), null, 2);
+  const cmd = new McpsCommand(engine, ['edit', 'gloobeam']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(readConfig(engine).mcps['gloobeam'].command).toBe(process.execPath);
+  expect(lines.join('\n')).toContain('mcp updated');
+  restore();
+});
+
+test('execInfo warns when no mcps are configured', async () => {
+  const engine = buildEngine();
+  const { lines, restore } = captureLogger();
+  const cmd = new McpsCommand(engine, ['info']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('no mcps configured');
+  restore();
+});
+
+test('execInfo errors for unknown mcps', async () => {
+  const engine = buildEngine(['other', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  const cmd = new McpsCommand(engine, ['info', 'nope']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('not found in config');
+  restore();
+});
+
+test('execDrop warns for unknown mcps', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  const { lines, restore } = captureLogger();
+  const cmd = new McpsCommand(engine, ['drop', 'nope']);
+
+  answers = [];
+
+  await cmd.exec();
+
+  expect(lines.join('\n')).toContain('not found in config');
+  expect(readConfig(engine).mcps['gloobeam']).toBeDefined();
+  restore();
+});
+
+test('execDrop prompts to select the mcp', async () => {
+  const engine = buildEngine(['gloobeam', { enabled: true, command: 'npx', args: [] }]);
+  const cmd = new McpsCommand(engine, ['drop']);
+
+  // scripted answers: mcp name
+  answers = ['gloobeam'];
+
+  await cmd.exec();
+
+  expect(readConfig(engine).mcps['gloobeam']).toBeUndefined();
+});
+
+test('exec routes help and unknown commands', async () => {
+  const { lines, restore } = captureLogger();
+
+  await new McpsCommand(buildEngine(), []).exec();
+  expect(lines.join('\n')).toContain('usage: marvin mcps');
+
+  lines.length = 0;
+  await new McpsCommand(buildEngine(), ['frobnicate']).exec();
+  expect(lines.join('\n')).toContain('unknown command');
+  restore();
 });
 
 test('execInfo connects and prints the server tools', async () => {

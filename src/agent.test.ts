@@ -6,7 +6,6 @@ import { Channel, ChannelMeta, Config, Model, Chat, Reply, Message, Tool, ToolMe
 import { Agent } from './agent.js';
 import EndChatTool from './tools/end_chat.js';
 import GetDateTool from './tools/get_date.js';
-import LoadToolsTool from './tools/load_tools.js';
 import ReadFileTool from './tools/read_file.js';
 import WebSearchTool from './tools/web_search.js';
 import * as constants from './constants.js';
@@ -34,7 +33,6 @@ function mockEngine(): Engine {
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-agent-'));
   engine.config = mockConfig();
   engine.tools['end_chat'] = new EndChatTool(engine);
-  engine.tools['load_tools'] = new LoadToolsTool(engine);
   return engine;
 }
 
@@ -167,8 +165,8 @@ function buildTestEngine(opts?: {
   engine.tools['mock_tool'] = new MockTool(engine);
   // end_chat stops the AI loop via its Tool.stop flag
   engine.tools['end_chat'] = new EndChatTool(engine);
-  // load_tools is required by makeChat
-  engine.tools['load_tools'] = new LoadToolsTool(engine);
+  // the agent owns its tool subset (mirrors Engine.loadAgents per-group selection)
+  engine.agents[agentId]!.tools = { ...engine.tools };
 
   return engine;
 }
@@ -813,10 +811,10 @@ test('makeChat creates a fresh chat (with system prompt) when none was saved', (
   const prompt = chat.messages[0]!.content as string;
   expect(prompt).toContain('my identity');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tools');
-  expect(prompt).toContain('### control tools:');
-  expect(prompt).toContain('`end_chat`');
-  expect(prompt).toContain('`load_tools`');
+  // no tool catalog in the system prompt (tools ride in chat.tools)
+  expect(prompt).not.toContain('## Tools');
+  expect(prompt).not.toContain('## MCPs');
+  expect(prompt).not.toContain('`end_chat`');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -831,8 +829,7 @@ test('makeChat seeds only the identity', () => {
   const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
   expect(prompt).toContain('my identity');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tools');
-  expect(prompt).toContain('### control tools:');
+  expect(prompt).not.toContain('## Tools');
 });
 
 test('makeChat renders a memory block when memory notes exist', () => {
@@ -851,7 +848,7 @@ test('makeChat renders a memory block when memory notes exist', () => {
   expect(prompt).toContain('prefs: Prefers concise answers');
   expect(prompt).toContain('goals: Ship marvin 1.0');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tools');
+  expect(prompt).not.toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -863,18 +860,16 @@ test('makeChat omits the memory block when memory is disabled', () => {
   expect(prompt).toContain('my identity');
   expect(prompt).not.toContain('## Memory');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tools');
-  expect(prompt).toContain('### control tools:');
+  expect(prompt).not.toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
-test('makeChat seeds a system prompt with an MCPs block for loaded mcps', () => {
+test('makeChat has no MCPs block even when mcps are loaded', () => {
   const engine = mockEngine();
   engine.mcps['my_mcp'] = {
     isLoaded: true,
     tools: {
       my_tool: { name: 'my_tool', description: 'Does a thing', inputSchema: { type: 'object', properties: {} } },
-      other_tool: { name: 'other_tool', description: 'Other', inputSchema: { type: 'object', properties: {} } },
     },
   } as any;
 
@@ -882,29 +877,11 @@ test('makeChat seeds a system prompt with an MCPs block for loaded mcps', () => 
 
   const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
 
-  expect(prompt).toContain('## MCPs');
-  expect(prompt).toContain('### my_mcp MCP tools:');
-  expect(prompt).toContain('`my_mcp__my_tool`: Does a thing');
-  expect(prompt).toContain('`my_mcp__other_tool`: Other');
+  expect(prompt).toContain('my identity');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tools');
-  rmSync(engine.work, { recursive: true, force: true });
-});
-
-test('makeChat omits MCP tools when mcp is not loaded', () => {
-  const engine = mockEngine();
-  engine.mcps['my_mcp'] = {
-    isLoaded: false,
-    tools: {},
-  } as any;
-
-  const agent = new Agent(engine, { memory: false, identity: 'my identity' });
-  const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
-
-  expect(prompt).toContain('## MCPs');
-  expect(prompt).not.toContain('my_mcp__');
-  expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tools');
+  expect(prompt).not.toContain('## MCPs');
+  expect(prompt).not.toContain('my_mcp__my_tool');
+  expect(prompt).not.toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
@@ -915,62 +892,22 @@ test('makeChat omits MCP block when no mcps are configured', () => {
   expect(prompt).toContain('my identity');
   expect(prompt).not.toContain('## MCPs');
   expect(prompt).toContain('\n\n---');
-  expect(prompt).toContain('## Tools');
+  expect(prompt).not.toContain('## Tools');
   rmSync(engine.work, { recursive: true, force: true });
 });
 
-// ==================== Available Tools (lazy loading) tests ====================
+// ==================== Per-agent tools tests ====================
 
-// install a representative set of tools so makeChat has something to summarize
-function installSampleTools(engine: Engine) {
+// install a representative set of tools on the engine and the agent
+function installSampleTools(engine: Engine, agentId = 'marvin') {
   engine.tools['read_file'] = new ReadFileTool(engine);
   engine.tools['web_search'] = new WebSearchTool(engine);
   engine.tools['get_date'] = new GetDateTool(engine);
   engine.tools['end_chat'] = new EndChatTool(engine);
-  engine.tools['load_tools'] = new LoadToolsTool(engine);
+  engine.agents[agentId]!.tools = { ...engine.tools };
 }
 
-test('makeChat seeds the system prompt with a grouped "## Internal Tools" block', () => {
-  const engine = buildTestEngine();
-  installSampleTools(engine);
-  const agent = engine.agents['marvin']!;
-  rmSync(engine.work, { recursive: true, force: true });
-
-  const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
-
-  expect(prompt).toContain('## Tools');
-  // grouped entries: "### <group> tools:" with "- `name`: desc"
-  expect(prompt).toContain('### control tools:');
-  expect(prompt).toContain('### filesystem tools:');
-  expect(prompt).toContain('`read_file`');
-  expect(prompt).toContain('### web tools:');
-  expect(prompt).toContain('`web_search`');
-  expect(prompt).toContain('### general tools:');
-  expect(prompt).toContain('`get_date`');
-  expect(prompt).toContain('`end_chat`');
-  expect(prompt).toContain('`load_tools`');
-});
-
-test('makeChat only includes always-known tools in chat.tools by default', () => {
-  const engine = buildTestEngine();
-  installSampleTools(engine);
-  const agent = engine.agents['marvin']!;
-  rmSync(engine.work, { recursive: true, force: true });
-
-  const chat = agent.loadChat('chat-1');
-  const names = chat.tools?.map(t => t.function.name) || [];
-
-  // always-known: end_chat (stop) + load_tools
-  expect(names).toContain('end_chat');
-  expect(names).toContain('load_tools');
-  // engine tools are NOT loaded by default
-  expect(names).not.toContain('read_file');
-  expect(names).not.toContain('web_search');
-  expect(names).not.toContain('get_date');
-  expect(names).not.toContain('mock_tool');
-});
-
-test('makeChat no longer merges per-task tools (tools load via load_tools)', async () => {
+test('makeChat takes chat.tools from the agent tools', () => {
   const engine = buildTestEngine();
   installSampleTools(engine);
   const agent = engine.agents['marvin']!;
@@ -980,59 +917,51 @@ test('makeChat no longer merges per-task tools (tools load via load_tools)', asy
   const names = chat.tools?.map(t => t.function.name) || [];
 
   expect(names).toContain('end_chat');
-  expect(names).toContain('load_tools');
-  // per-task tools are not passed via loadChat anymore; they load lazily via load_tools
-  expect(names).not.toContain('custom__do');
-  expect(names).not.toContain('read_file');
-
-  // verify lazy loading via load_tools still works
-  const tool = engine.tools['load_tools']!;
-  const result = await tool.call({ tools: ['read_file'] }, agent, chat);
-  expect(result.loaded).toContain('read_file');
-  expect(chat.tools!.map(t => t.function.name)).toContain('read_file');
-  rmSync(engine.work, { recursive: true, force: true });
+  expect(names).toContain('read_file');
+  expect(names).toContain('web_search');
+  expect(names).toContain('get_date');
+  expect(names).toContain('mock_tool');
 });
 
-test('makeChat omits the available-tools block when no loadable tools are configured', () => {
+test('makeChat only exposes the agent subset, not all engine tools', () => {
   const engine = buildTestEngine();
-  // remove mock_tool so only always-known tools remain (buildTestEngine installs mock_tool)
-  delete engine.tools['mock_tool'];
+  installSampleTools(engine);
   const agent = engine.agents['marvin']!;
-  rmSync(engine.work, { recursive: true, force: true });
-
-  const prompt = agent.loadChat('chat-1').messages[0]!.content as string;
-
-  expect(prompt).toContain('## Tools');
-  expect(prompt).toContain('### control tools:');
-  expect(prompt).toContain('`end_chat`');
-  expect(prompt).not.toContain('### general tools:');
-});
-
-test('loadTools tool is always present in chat.tools even when the tool itself is not installed', () => {
-  // mirrors the real engine: load_tools is loaded from disk by Engine.loadTools
-  // and makeChat picks it up via the always-known filter
-  const engine = buildTestEngine();
-  engine.tools['load_tools'] = new LoadToolsTool(engine);
-  const agent = engine.agents['marvin']!;
+  // agent restricted to the control tool
+  agent.tools = { 'end_chat': engine.tools['end_chat']! };
   rmSync(engine.work, { recursive: true, force: true });
 
   const chat = agent.loadChat('chat-1');
   const names = chat.tools?.map(t => t.function.name) || [];
-  expect(names).toContain('load_tools');
+
+  expect(names).toEqual(['end_chat']);
 });
 
-test('the loadTools tool adds a tool to the live chat, making it available to the model', async () => {
+test('execTool falls back to engine tools for unknown tools', async () => {
   const engine = buildTestEngine();
   installSampleTools(engine);
   const agent = engine.agents['marvin']!;
+  // agent restricted to the control tool; read_file only on the engine
+  agent.tools = { 'end_chat': engine.tools['end_chat']! };
   rmSync(engine.work, { recursive: true, force: true });
 
-  // load the chat, then have the agent call load_tools to pull in read_file
   const chat = agent.loadChat('chat-1');
-  const tool = engine.tools['load_tools']!;
-  const result = await tool.call({ tools: ['read_file'] }, agent, chat);
+  const result = await agent.execTool('mock_tool', {}, chat);
+  expect(result).toEqual({ result: 'tool output' });
+});
+
+test('selectAgentTools always includes control and picked groups only', () => {
+  const engine = buildTestEngine();
+  installSampleTools(engine);
   rmSync(engine.work, { recursive: true, force: true });
 
-  expect(result.loaded).toEqual(['read_file']);
-  expect(chat.tools!.map(t => t.function.name)).toContain('read_file');
+  // empty groups = only control (mock_tool is group general, so excluded)
+  expect(Object.keys(engine.pickTools([])).sort()).toEqual(['end_chat']);
+
+  // filesystem group adds read_file on top of control
+  const picked = engine.pickTools(['filesystem']);
+  expect(Object.keys(picked).sort()).toEqual(['end_chat', 'read_file']);
+
+  // unknown groups are skipped
+  expect(Object.keys(engine.pickTools(['nope'])).sort()).toEqual(['end_chat']);
 });
