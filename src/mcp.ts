@@ -15,6 +15,7 @@ import { sanitizeToolName, tryJsonParse, withRetry } from './helpers/index.js';
 // client for one mcp server over stdio: spawns the process on load, lists its
 // tools and forwards tool calls. reconnects lazily if the process died.
 export class Mcp {
+  public isLoaded: boolean = false;
   public client: Client | null = null;
   public transport: StdioClientTransport | null = null;
   // tools as listed on load, keyed by sanitized name
@@ -25,13 +26,7 @@ export class Mcp {
   }> = {};
 
   // shared logger (default-exported singleton from ./logger.js)
-  constructor(public engine: Engine, public id: string, public config: Config['mcps'][string]) {
-    logger.debug(`[Mcp.constructor]`, this.id);
-  }
-
-  get isLoaded(): boolean {
-    return !!this.client;
-  }
+  constructor(public engine: Engine, public id: string, public config: Config['mcps'][string]) {}
 
   // spawn the server process and run the initialize handshake, retrying a
   // few times. each attempt cleans up so a failure never leaves a dead
@@ -76,6 +71,7 @@ export class Mcp {
         ]));
 
         this.client = client;
+        this.isLoaded = true;
       } catch (err) {
         // never leave a half-connected client behind: without this a failed
         // load would set this.client and every later load() would return early
@@ -94,13 +90,12 @@ export class Mcp {
 
   // close the connection and kill the server process
   async drop(): Promise<void> {
-    logger.debug(`[Mcp.drop]`, this.id);
-
     const client = this.client;
     this.client = null;
     if (client) {
       try {
         await client.close();
+        logger.debug(`[Mcp.drop]`, this.id, 'client closed');
       } catch (err) {
         logger.error(`[Mcp.drop]`, this.id, err);
       }
@@ -112,10 +107,13 @@ export class Mcp {
     if (transport) {
       try {
         await transport.close();
+        logger.debug(`[Mcp.drop]`, this.id, 'transport closed');
       } catch (err) {
         logger.error(`[Mcp.drop]`, this.id, err);
       }
     }
+    
+    this.isLoaded = false;
   }
 
   // call a tool by its sanitized name, returning the flattened result content.

@@ -277,6 +277,7 @@ export default class AgentsCommand extends Command {
       choices: groups.map(g => ({ name: g, value: g, checked: prev.includes(g) })),
     });
     if (!tools.length) return null;
+    await this.engine.dropMcps();
     return tools;
   }
 
