@@ -7,6 +7,7 @@ import { Agent } from '../agent.js';
 import SlackChannel from './slack.js';
 import { type HandlerParams, type ISocketModeClient, type IWebClient } from './slack.js'
 import GetDateTool from '../tools/get_date.js';
+import * as constants from '../constants.js';
 
 // ============================================================================
 // Mocks - Slack SDK clients + LLM model (no real external calls)
@@ -540,7 +541,7 @@ test('E2E: app_mention → LLM → Slack reply', async () => {
   expect(model.callCount).toBe(1);
   expect(channel.mockWeb.postMessageCalls.length).toBe(3);
   const [head, posted, foot] = channel.mockWeb.postMessageCalls;
-  expect(head!.blocks![1]!.text).toBe('marvin is thinking...');
+  expect(constants.ACK_MESSAGES).toContain(head!.blocks![1]!.text);
   expect(posted!.channel).toBe('C123');
   expect(posted!.thread_ts).toBe('1700000000.001');
   expect(posted!.blocks![1]!.text).toBe('Hello there!');
@@ -564,7 +565,7 @@ test('E2E: app_mention runs tools then posts the final answer', async () => {
 
   expect(model.callCount).toBe(2);
   expect(channel.mockWeb.postMessageCalls.length).toBe(3);
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![1]!.text).toBe('marvin is thinking...');
+  expect(constants.ACK_MESSAGES).toContain(channel.mockWeb.postMessageCalls[0]!.blocks![1]!.text);
   expect(channel.mockWeb.postMessageCalls.at(-2)!.blocks![1]!.text).toBe('The date is 1/1/1970');
   expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toContain('**Agent**: `marvin`');
 
@@ -590,7 +591,7 @@ test('E2E: message (im) → LLM → Slack DM reply', async () => {
 
   expect(model.callCount).toBe(1);
   expect(channel.mockWeb.postMessageCalls.length).toBe(3);
-  expect(channel.mockWeb.postMessageCalls[0]!.blocks![1]!.text).toBe('marvin is thinking...');
+  expect(constants.ACK_MESSAGES).toContain(channel.mockWeb.postMessageCalls[0]!.blocks![1]!.text);
   expect(channel.mockWeb.postMessageCalls.at(-2)!.channel).toBe('D123');
   expect(channel.mockWeb.postMessageCalls.at(-2)!.blocks![1]!.text).toBe('Direct message reply');
   expect(channel.mockWeb.postMessageCalls.at(-1)!.blocks![1]!.text).toContain('**Agent**: `marvin`');
