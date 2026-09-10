@@ -158,17 +158,7 @@ export class Mcp {
       count++;
     }
 
-    // to be removed in the future
-    for (const output of outputs) {
-      // for each field in the output, log its type and value
-      for (const key of Object.keys(output)) {
-        logger.debug(`[Mcp.call]`, this.id, name, key, typeof output[key], JSON.stringify(output[key]));
-      }
-    }
-
-    return { 
-      results: outputs,
-    };
+    return { results: outputs };
   }
 
   private onStderr(chunk: Buffer) {

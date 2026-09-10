@@ -15,6 +15,7 @@ export default class HelpCommand extends Command {
     logger.log('  serve   ', 'start the app service');
     logger.log('  tools   ', 'list, add, edit, call tools');
     logger.log('  update  ', 'update Marvin to the latest version');
+    logger.log('  uninstall ', 'stop the service and remove Marvin');
     logger.log('  skills  ', 'list, add skills');
     logger.log('  version ', 'show the current version');
     logger.log('  reload  ', 'reload the daemon');
