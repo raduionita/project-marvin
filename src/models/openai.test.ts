@@ -1,13 +1,12 @@
 import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
-import { Logger } from '../logger.js';
-import DeepseekModel, { Choice } from './deepseek.js';
+import OpenaiModel, { Choice } from './openai.js';
 
-class DeepseekMock extends DeepseekModel {}
+class OpenaiMock extends OpenaiModel {}
 
-function mockdModel(): DeepseekModel {
+function mockdModel(): OpenaiModel {
   const engine = new Engine();
-  return new DeepseekMock(engine, {});
+  return new OpenaiMock(engine, {});
 }
 
 function mockChoice(content: string, toolCalls?: Choice['message']['tool_calls']): Choice {

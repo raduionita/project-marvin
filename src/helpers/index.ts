@@ -2,6 +2,8 @@ import { existsSync, lstatSync, realpathSync } from 'fs';
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'path';
 import { readdirSync } from 'fs';
 import TurndownService from 'turndown';
+import { MODEL_BASE_URLS } from '../constants.js';
+import type { Provider } from '../types.js';
 
 export * from './error.js';
 export * from './json.js';
@@ -161,4 +163,44 @@ export function splitMcpToolName(name: string): { id: string, name: string } | n
 
 export function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, '').trim();
+}
+
+// substring matchers (first wins) mapping a model name to a MODEL_BASE_URLS key
+const BASE_URL_MATCHERS: [string, keyof typeof MODEL_BASE_URLS][] = [
+  // host indicators win: localhost/qwen3 is a local server serving qwen
+  ['localhost', 'local'],
+  ['127.0.0.1', 'local'],
+  ['deepseek', 'deepseek'],
+  ['qwen', 'qwen'],
+  ['kimi', 'moonshot'],
+  ['moonshot', 'moonshot'],
+  ['openrouter', 'openrouter'],
+  ['gemini', 'google'],
+  ['claude', 'anthropic'],
+  ['gpt', 'openai'],
+  ['openai', 'openai'],
+  ['llama', 'meta'],
+  ['meta', 'meta'],
+  ['spark', 'meta'],
+  ['local', 'local'],
+];
+
+// guess the api base url from a model name (e.g. "deepseek-chat" ->
+// https://api.deepseek.com), falling back to the provider default. used by
+// `models add` to prefill baseUrl.
+export function detectBaseUrl(model: string, provider: Provider = 'openai'): string {
+  const name = (model || '').toLowerCase();
+  for (const [sub, key] of BASE_URL_MATCHERS) {
+    if (name.includes(sub)) return MODEL_BASE_URLS[key];
+  }
+  return MODEL_BASE_URLS[provider] ?? MODEL_BASE_URLS.openai;
+}
+
+// guess the provider from a model name (e.g. "claude-sonnet-4" -> "anthropic").
+// everything OpenAI-compatible (deepseek, qwen, kimi, ...) uses "openai".
+export function detectProvider(model: string): Provider {
+  const name = (model || '').toLowerCase();
+  if (name.includes('gemini') || name.includes('google')) return 'google';
+  if (name.includes('claude') || name.includes('anthropic')) return 'anthropic';
+  return 'openai';
 }

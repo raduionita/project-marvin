@@ -33,7 +33,7 @@ test('tasks add writes TASK.md and persists config', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
-    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} },
+    'my-agent': { enabled: true, model: 'openai/gpt-4o-mini', channels: {} },
   });
 
   const cmd = new TasksCommand(engine, []);
@@ -73,7 +73,7 @@ test('tasks add refuses existing task', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} } },
+    { 'my-agent': { enabled: true, model: 'openai/gpt-4o-mini', channels: {} } },
     { 'my-task': { enabled: true, agent: 'my-agent', schedule: 3600 } },
   );
 
@@ -89,7 +89,7 @@ test('tasks add skips TASK.md when prompt is blank', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
-    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} },
+    'my-agent': { enabled: true, model: 'openai/gpt-4o-mini', channels: {} },
   });
 
   const cmd = new TasksCommand(engine, []);
@@ -109,7 +109,7 @@ test('tasks add persists task without extra fields', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig({
-    'my-agent': { enabled: true, model: 'deepseek/deepseek-chat', channels: {} },
+    'my-agent': { enabled: true, model: 'openai/gpt-4o-mini', channels: {} },
   });
 
   const cmd = new TasksCommand(engine, []);

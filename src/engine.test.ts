@@ -71,3 +71,23 @@ test('execSweep removes chats idle longer than the TTL and reschedules', async (
   clearTimeout(task.timeout!);
   rmSync(engine.work, { recursive: true, force: true });
 });
+
+test('loadModels defaults unknown provider to openai', async () => {
+  const engine = buildEngine();
+  engine.config.models = {
+    'legacy': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } as never,
+  };
+  await engine.loadModels();
+  expect(engine.models['legacy']?.provider).toBe('openai');
+  rmSync(engine.work, { recursive: true, force: true });
+});
+
+test('loadModels defaults missing provider to openai', async () => {
+  const engine = buildEngine();
+  engine.config.models = {
+    'mystery': { enabled: true, model: 'gpt-4o-mini' } as never,
+  };
+  await engine.loadModels();
+  expect(engine.models['mystery']?.provider).toBe('openai');
+  rmSync(engine.work, { recursive: true, force: true });
+});

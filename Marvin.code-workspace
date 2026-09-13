@@ -5,9 +5,6 @@
 		},
 		{
 			"path": "../../../.config/opencode"
-		},
-		{
-			"path": "../../../.gemini"
 		}
 	],
 	"settings": {}

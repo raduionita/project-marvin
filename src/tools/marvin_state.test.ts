@@ -19,13 +19,13 @@ function mockEngine(): Engine {
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },
     channels: { slack: { enabled: true }, telegram: { enabled: false } },
-    models: { llm: { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    models: { llm: { enabled: true, provider: 'openai', model: 'gpt-4o-mini' } },
     agents: {},
     tasks: {},
     mcps: {},
   } as Config;
 
-  engine.models['llm'] = new FakeModel(engine, { enabled: true, provider: 'deepseek', model: 'deepseek-chat' });
+  engine.models['llm'] = new FakeModel(engine, { enabled: true, provider: 'openai', model: 'gpt-4o-mini' });
 
   engine.agents['marvin'] = new Agent(engine, {
     id: 'marvin',
@@ -63,9 +63,9 @@ test('marvinState returns a full summary', async () => {
   const result = await tool.call({});
 
   expect(result.agents['marvin'].enabled).toBe(true);
-  expect(result.agents['marvin'].model).toBe('deepseek-chat');
+  expect(result.agents['marvin'].model).toBe('gpt-4o-mini');
   expect(result.tasks['marvin/status'].schedule).toBe(3600000);
-  expect(result.models['llm'].provider).toBe('deepseek');
+  expect(result.models['llm'].provider).toBe('openai');
   expect(result.channels['slack'].enabled).toBe(true);
   expect(result.settings.name).toBe('marvin');
 });
@@ -79,7 +79,7 @@ test('marvinState filters by area', async () => {
   expect(agents.tasks).toBeUndefined();
 
   const models = await tool.call({ area: 'models' });
-  expect(models.models['llm'].model).toBe('deepseek-chat');
+  expect(models.models['llm'].model).toBe('gpt-4o-mini');
   expect(models.agents).toBeUndefined();
 });
 

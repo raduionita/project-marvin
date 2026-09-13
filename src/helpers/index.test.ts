@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
-import { withRetry, markdownToMrkdwn, mergeConfig, truncate } from './index.js';
+import { withRetry, markdownToMrkdwn, mergeConfig, truncate, detectBaseUrl, detectProvider } from './index.js';
+import { MODEL_BASE_URLS } from '../constants.js';
 
 test('truncate leaves short strings untouched', () => {
   expect(truncate('hello', 10)).toBe('hello');
@@ -112,6 +113,39 @@ test('mergeConfig treats empty incoming as full defaults', () => {
   const defaults = { settings: { name: 'marvin', port: 7331 }, channels: {} };
 
   expect(mergeConfig(defaults as any, {})).toEqual(defaults);
+});
+
+test('detectBaseUrl matches known vendors from the model name', () => {
+  expect(detectBaseUrl('deepseek-chat', 'openai')).toBe(MODEL_BASE_URLS.deepseek);
+  expect(detectBaseUrl('qwen3-35b', 'openai')).toBe(MODEL_BASE_URLS.qwen);
+  expect(detectBaseUrl('kimi-k2', 'openai')).toBe(MODEL_BASE_URLS.moonshot);
+  expect(detectBaseUrl('moonshot-v1-8k', 'openai')).toBe(MODEL_BASE_URLS.moonshot);
+  expect(detectBaseUrl('openrouter/auto', 'openai')).toBe(MODEL_BASE_URLS.openrouter);
+  expect(detectBaseUrl('meta-llama/llama-4-scout', 'openai')).toBe(MODEL_BASE_URLS.meta);
+  expect(detectBaseUrl('gemini-2.0-flash', 'openai')).toBe(MODEL_BASE_URLS.google);
+  expect(detectBaseUrl('claude-sonnet-4', 'openai')).toBe(MODEL_BASE_URLS.anthropic);
+  expect(detectBaseUrl('gpt-4o-mini', 'openai')).toBe(MODEL_BASE_URLS.openai);
+});
+
+test('detectBaseUrl is case-insensitive and falls back to the provider default', () => {
+  expect(detectBaseUrl('DeepSeek-Reasoner', 'openai')).toBe(MODEL_BASE_URLS.deepseek);
+  expect(detectBaseUrl('something-custom', 'openai')).toBe(MODEL_BASE_URLS.openai);
+  expect(detectBaseUrl('something-custom', 'anthropic')).toBe(MODEL_BASE_URLS.anthropic);
+  expect(detectBaseUrl('something-custom', 'google')).toBe(MODEL_BASE_URLS.google);
+  expect(detectBaseUrl('', 'openai')).toBe(MODEL_BASE_URLS.openai);
+});
+
+test('detectBaseUrl maps local model names to localhost', () => {
+  expect(detectBaseUrl('localhost/qwen3', 'openai')).toBe(MODEL_BASE_URLS.local);
+});
+
+test('detectProvider guesses the provider from the model name', () => {
+  expect(detectProvider('gemini-2.0-flash')).toBe('google');
+  expect(detectProvider('claude-sonnet-4')).toBe('anthropic');
+  expect(detectProvider('gpt-4o-mini')).toBe('openai');
+  expect(detectProvider('deepseek-chat')).toBe('openai');
+  expect(detectProvider('kimi-k2')).toBe('openai');
+  expect(detectProvider('')).toBe('openai');
 });
 
 test('mergeConfig does not merge arrays', () => {

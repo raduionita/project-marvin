@@ -23,7 +23,7 @@ function mockEngine(): Engine {
   engine.config = {
     settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info', apiToken: 'changeme' },
     channels: {},
-    models: { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    models: { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'gpt-4o-mini' } },
     agents: {},
     tasks: {},
     mcps: {},

@@ -21,7 +21,7 @@ function cleanup(home: string) {
 
 const sample = {
   settings: { name: 'marvin', host: '127.0.0.1', port: 7331, logLevel: 'info' },
-  models: { llm: { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+  models: { llm: { enabled: true, provider: 'openai', model: 'gpt-4o-mini' } },
   agents: {},
   channels: { slack: { enabled: true } },
 };
@@ -40,7 +40,7 @@ test('marvinConfig reads the whole config', async () => {
 
   expect(result.path).toBe(join(home, 'marvin.json'));
   expect(result.config.settings.port).toBe(7331);
-  expect(result.config.models.llm.provider).toBe('deepseek');
+  expect(result.config.models.llm.provider).toBe('openai');
   cleanup(home);
 });
 
@@ -49,7 +49,7 @@ test('marvinConfig reads a dotted key', async () => {
   const tool = new MarvinConfigTool(engine);
 
   const result = await tool.call({ key: 'models.llm.model' });
-  expect(result.value).toBe('deepseek-chat');
+  expect(result.value).toBe('gpt-4o-mini');
 
   const missing = await tool.call({ key: 'agents.foo.bar' });
   expect(missing.value).toBeUndefined();

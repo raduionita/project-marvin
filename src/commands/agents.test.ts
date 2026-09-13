@@ -37,7 +37,7 @@ test('agents add writes IDENTITY.md and persists config', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true } },
   );
 
@@ -53,7 +53,7 @@ test('agents add writes IDENTITY.md and persists config', async () => {
   // config entry persisted (tools checkbox defaults to all groups)
   expect(engine.config.agents['my-agent']).toEqual({
     enabled: true,
-    model: 'deepseek/deepseek-chat',
+    model: 'openai/gpt-4o-mini',
     channels: { slack: 'general' },
     tools: toolGroups(engine),
   });
@@ -67,7 +67,7 @@ test('agents add aborts when no tool groups are selected', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
 
@@ -83,10 +83,10 @@ test('agents add refuses existing agent', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
-  engine.config.agents['my-agent'] = { enabled: true, model: 'deepseek/deepseek-chat', channels: {} };
+  engine.config.agents['my-agent'] = { enabled: true, model: 'openai/gpt-4o-mini', channels: {} };
 
   const cmd = new AgentsCommand(engine, []);
   answers = ['my-agent'];
@@ -101,7 +101,7 @@ test('agents add uses default identity when blank', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
 
@@ -117,7 +117,7 @@ test('agents add picks the group from cached channel info', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true, groups: { C1: 'general', C2: 'random' } } },
   );
 
@@ -127,7 +127,7 @@ test('agents add picks the group from cached channel info', async () => {
 
   expect(engine.config.agents['my-agent']).toEqual({
     enabled: true,
-    model: 'deepseek/deepseek-chat',
+    model: 'openai/gpt-4o-mini',
     channels: { slack: 'C2' },
     tools: toolGroups(engine),
   });
@@ -155,11 +155,11 @@ test('agents edit updates identity/channels/tools, keeping the model', async () 
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true } },
   );
   seedAgent(engine, 'my-agent',
-    { enabled: true, model: 'deepseek/deepseek-chat', channels: { slack: 'old-group' }, tools: ['web'] },
+    { enabled: true, model: 'openai/gpt-4o-mini', channels: { slack: 'old-group' }, tools: ['web'] },
     'Old identity');
 
   const cmd = new AgentsCommand(engine, ['edit', 'my-agent']);
@@ -170,7 +170,7 @@ test('agents edit updates identity/channels/tools, keeping the model', async () 
   expect(readFileSync(join(engine.work, 'agents', 'my-agent', 'IDENTITY.md'), 'utf8').trim()).toBe('New identity');
   expect(engine.config.agents['my-agent']).toEqual({
     enabled: true,
-    model: 'deepseek/deepseek-chat',
+    model: 'openai/gpt-4o-mini',
     channels: { slack: 'old-group' },
     tools: toolGroups(engine).slice(0, 2),
   });
@@ -180,11 +180,11 @@ test('agents edit keeps current values when answers are blank', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true } },
   );
   seedAgent(engine, 'my-agent',
-    { enabled: true, model: 'deepseek/deepseek-chat', channels: { slack: 'C1' }, tools: ['web'] },
+    { enabled: true, model: 'openai/gpt-4o-mini', channels: { slack: 'C1' }, tools: ['web'] },
     'Old identity');
 
   // tools answer targets the current 'web' group index (keeps tools unchanged)
@@ -198,7 +198,7 @@ test('agents edit keeps current values when answers are blank', async () => {
   expect(readFileSync(join(engine.work, 'agents', 'my-agent', 'IDENTITY.md'), 'utf8').trim()).toBe('Old identity');
   expect(engine.config.agents['my-agent']).toEqual({
     enabled: true,
-    model: 'deepseek/deepseek-chat',
+    model: 'openai/gpt-4o-mini',
     channels: { slack: 'C1' },
     tools: ['web'],
   });
@@ -208,11 +208,11 @@ test('agents edit aborts when no tool groups are selected', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
   seedAgent(engine, 'my-agent',
-    { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tools: ['web'] },
+    { enabled: true, model: 'openai/gpt-4o-mini', channels: {}, tools: ['web'] },
     'Old identity');
 
   const cmd = new AgentsCommand(engine, ['edit', 'my-agent']);
@@ -222,7 +222,7 @@ test('agents edit aborts when no tool groups are selected', async () => {
   // config and identity untouched
   expect(engine.config.agents['my-agent']).toEqual({
     enabled: true,
-    model: 'deepseek/deepseek-chat',
+    model: 'openai/gpt-4o-mini',
     channels: {},
     tools: ['web'],
   });
@@ -233,7 +233,7 @@ test('agents edit errors for unknown agents', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
 
@@ -248,7 +248,7 @@ test('agents edit warns when no agents are configured', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
 
@@ -280,7 +280,7 @@ test('exec routes add (agent id from prompt)', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
 
@@ -296,7 +296,7 @@ test('agents add rejects invalid names', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
 
@@ -325,7 +325,7 @@ test('agents add creates control-only agents when no tool groups exist', async (
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
   // stub the loaders so no tool groups are available (control only)
@@ -339,7 +339,7 @@ test('agents add creates control-only agents when no tool groups exist', async (
 
   expect(engine.config.agents['my-agent']).toEqual({
     enabled: true,
-    model: 'deepseek/deepseek-chat',
+    model: 'openai/gpt-4o-mini',
     channels: {},
     tools: [],
   });
@@ -350,13 +350,13 @@ test('agents edit changes the model', async () => {
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
     {
-      'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' },
+      'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' },
       'openai/gpt-5': { enabled: true, provider: 'openai', model: 'gpt-5' },
     },
     {},
   );
   seedAgent(engine, 'my-agent',
-    { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tools: ['web'] },
+    { enabled: true, model: 'openai/gpt-4o-mini', channels: {}, tools: ['web'] },
     'Old identity');
 
   const cmd = new AgentsCommand(engine, ['edit', 'my-agent']);
@@ -372,11 +372,11 @@ test('agents edit drops unselected channels', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true }, telegram: { enabled: true } },
   );
   seedAgent(engine, 'my-agent',
-    { enabled: true, model: 'deepseek/deepseek-chat', channels: { slack: 'C1', telegram: 'C2' }, tools: ['web'] },
+    { enabled: true, model: 'openai/gpt-4o-mini', channels: { slack: 'C1', telegram: 'C2' }, tools: ['web'] },
     'Old identity');
 
   const cmd = new AgentsCommand(engine, ['edit', 'my-agent']);
@@ -391,11 +391,11 @@ test('agents edit prompts to select the agent', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true } },
   );
   seedAgent(engine, 'my-agent',
-    { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tools: ['web'] },
+    { enabled: true, model: 'openai/gpt-4o-mini', channels: {}, tools: ['web'] },
     'Old identity');
 
   const cmd = new AgentsCommand(engine, ['edit']);
@@ -411,11 +411,11 @@ test('agents edit changes the group from cached channel info', async () => {
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true, groups: { C1: 'general', C2: 'random' } } },
   );
   seedAgent(engine, 'my-agent',
-    { enabled: true, model: 'deepseek/deepseek-chat', channels: { slack: 'C1' }, tools: ['web'] },
+    { enabled: true, model: 'openai/gpt-4o-mini', channels: { slack: 'C1' }, tools: ['web'] },
     'Old identity');
 
   const cmd = new AgentsCommand(engine, ['edit', 'my-agent']);
@@ -430,11 +430,11 @@ test('agents edit falls back to default identity when IDENTITY.md is missing', a
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     {},
   );
   // config entry only, no IDENTITY.md on disk
-  engine.config.agents['my-agent'] = { enabled: true, model: 'deepseek/deepseek-chat', channels: {}, tools: ['web'] };
+  engine.config.agents['my-agent'] = { enabled: true, model: 'openai/gpt-4o-mini', channels: {}, tools: ['web'] };
 
   const cmd = new AgentsCommand(engine, ['edit', 'my-agent']);
   // model (keep), identity (keep -> default), tools (all)
@@ -462,7 +462,7 @@ test('agents add falls back to manual group entry via the (type manually) choice
   const engine = new Engine();
   engine.work = mkdtempSync(join(tmpdir(), 'marvin-test-'));
   engine.config = mockConfig(
-    { 'deepseek/deepseek-chat': { enabled: true, provider: 'deepseek', model: 'deepseek-chat' } },
+    { 'openai/gpt-4o-mini': { enabled: true, provider: 'openai', model: 'openai-chat' } },
     { slack: { enabled: true, groups: { C1: 'general' } } },
   );
 

@@ -5,7 +5,7 @@ import logger from "./logger.js";
 export type Mode = 'client' | 'server';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type Provider = 'fallback' | 'deepseek' | 'lmstudio' | 'openai' | 'qwen' | 'anthropic' | 'google';
+export type Provider = 'openai' | 'anthropic' | 'google';
 export type Thinking = 'enabled' | 'disabled';
 export type Role = 'system' | 'user' | 'assistant' | 'tool';
 
@@ -146,12 +146,12 @@ export abstract class Model {
   public enabled: boolean = true;
   // model is the default model for the agent
   public default: boolean = false;
-  // model provider (e.g. lmstudio, openai, anthropic, deepseek, etc.)
-  public provider: Provider = 'lmstudio';
+  // model provider (openai, anthropic, google)
+  public provider: Provider = 'openai';
   // model field refers to the LLM identifier.
-  public model: string = 'qwen/qwen3.6-35b-a3b';
+  public model: string = 'gpt-4o-mini';
   // baseUrl is the url to the model provider's API endpoint
-  public baseUrl: string = 'http://localhost:1234';
+  public baseUrl: string = 'https://api.openai.com';
   // apiKey is the API key for the model provider
   public apiKey: string = 'NO_API_KEY';
 

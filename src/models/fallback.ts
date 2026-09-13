@@ -2,7 +2,8 @@ import { Chat, Model, Provider, Reply, Message } from '../types.js';
 import logger from '../logger.js';
 
 export default class FallbackModel extends Model {
-  provider: Provider = 'fallback';
+  // internal no-models-defined model, intentionally outside the Provider union
+  provider = 'fallback' as unknown as Provider;
   public baseUrl: string = 'http://localhost:1234';
 
   async sendChat(chat: Chat) : Promise<Reply> {

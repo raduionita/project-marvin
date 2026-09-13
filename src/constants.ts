@@ -31,6 +31,20 @@ export const MCP_LOAD_RETRY_DELAY_MS = 500;
 // mcp client: timeout for a single tools/call request
 export const MCP_CALL_TIMEOUT_MS = 60 * 1000;
 
+// well-known api base urls: the openai/anthropic/google providers plus popular
+// OpenAI-compatible endpoints (used via provider "openai" with a custom baseUrl)
+export const MODEL_BASE_URLS = {
+  openai: 'https://api.openai.com',
+  anthropic: 'https://api.anthropic.com',
+  google: 'https://generativelanguage.googleapis.com',
+  deepseek: 'https://api.deepseek.com',
+  qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+  moonshot: 'https://api.moonshot.ai/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+  meta: 'https://api.llama.com/compat/v1',
+  local: 'http://localhost:1234',
+} as const;
+
 export const DEFAULT_CONFIG = {
   settings: {
     name: 'marvin',

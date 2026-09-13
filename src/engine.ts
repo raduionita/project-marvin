@@ -344,14 +344,21 @@ export default class Engine {
           continue;
         }
 
-        const file = files.find(f => f === config.provider);
+        // only openai/anthropic/google are supported; default to openai
+        const allowed = ['openai', 'anthropic', 'google'];
+        const provider = allowed.includes(config.provider) ? config.provider : 'openai';
+        if (provider !== config.provider) {
+          logger.warn('[Engine.loadModels]', `unknown/missing provider "${config.provider}" for "${modelId}", defaulting to "openai"`);
+        }
+
+        const file = files.find(f => f === provider);
         if (!file) {
-          logger.error('[Engine.loadModels]', `no file for provider ${config.provider}, skipping "${modelId}"`);
+          logger.error('[Engine.loadModels]', `no file for provider ${provider}, skipping "${modelId}"`);
           continue;
         }
 
         // import the model provider
-        const Module = await import(`./models/${config.provider}.js`);
+        const Module = await import(`./models/${provider}.js`);
         const Class = Module.default;
 
         // must be a Model class
@@ -361,10 +368,10 @@ export default class Engine {
         }
         
         // save instance (needed by agents)
-        const instance = new Class(this, config);
+        const instance = new Class(this, { ...config, provider });
         this.models[modelId] = instance;
 
-        logger.info('[Engine.loadModels]', `model "${modelId}" loaded (${config.provider} ${config.model})`);
+        logger.info('[Engine.loadModels]', `model "${modelId}" loaded (${provider} ${config.model})`);
       } catch (err) {
         logger.error('[Engine.loadModels]', `failed to load "${modelId}":`, err);
       }

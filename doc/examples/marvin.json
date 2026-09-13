@@ -15,6 +15,7 @@
   },
   "agents": {
     "my-agent": {
+      "model": "deepseek/deepseek-v4-flash",
       "enabled": true,
       "channels": {
         "slack": "C123"
