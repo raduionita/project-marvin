@@ -1,4 +1,12 @@
 
+// http error carrying the response status, so callers can decide on retries
+export class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = 'HttpError';
+  }
+}
+
 // read error message + fist line
 export function readError(error: unknown): string {
   if (error instanceof Error) {

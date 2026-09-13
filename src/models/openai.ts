@@ -1,5 +1,7 @@
-import { tryJsonParse } from '../helpers/index.js';
+import { tryJsonParse, withRetry, HttpError } from '../helpers/index.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
+import type Engine from '../engine.js';
+import * as constants from '../constants.js';
 import logger from '../logger.js';
 
 export interface Choice {
@@ -32,6 +34,15 @@ export interface Choice {
 export default class OpenaiModel extends Model {
   provider: Provider = 'openai';
   public baseUrl: string = 'https://api.openai.com';
+  // timeout for a single chat completion request (overridable per model config).
+  // `declare` emits no define, so a value from config (via super()) survives.
+  declare public timeoutMs: number;
+
+  constructor(engine: Engine, config: { [key: string]: any } = {}) {
+    super(engine, config);
+    // field initializers run after super(), so the default goes last
+    this.timeoutMs ??= constants.MODEL_CALL_TIMEOUT_MS;
+  }
 
   // moves DSML tools int .tools, cleans the content
   prepChoice(choice: Choice): Choice {
@@ -114,22 +125,31 @@ export default class OpenaiModel extends Model {
 
     logger.debug('[OpenaiModel.sendChat]', '-->', `id=${chat.id} userId=${chat.userId}`);
 
-    // ! call the model api
-    const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey || process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
+    // ! call the model api, with a timeout and retries on transient failures
+    const response = await withRetry(async () => {
+      const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey || process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
-    // check if response is ok
-    if (!response.ok) {
-      logger.error('[OpenaiModel.sendChat]', 'response NOT ok:', response);
-      const body = await response.json();
-      throw new Error(`[OpenaiModel.sendChat] ERROR ${body.error?.message || body.message || response.statusText}`);
-    }
+      // check if response is ok
+      if (!res.ok) {
+        logger.error('[OpenaiModel.sendChat]', 'response NOT ok:', res.status);
+        const errBody = await res.json().catch(() => ({}));
+        throw new HttpError(res.status, `[OpenaiModel.sendChat] ERROR ${errBody.error?.message || errBody.message || res.statusText}`);
+      }
+
+      return res;
+    }, {
+      retries: constants.MODEL_CALL_RETRIES,
+      // retry network errors, timeouts, 429 and 5xx; not other client errors
+      shouldRetry: (err) => err instanceof HttpError ? (err.status === 429 || err.status >= 500) : true,
+    });
 
     // extract json from response
     const json = await response.json();

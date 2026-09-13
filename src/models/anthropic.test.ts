@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
-import GoogleModel from './google.js';
+import AnthropicModel from './anthropic.js';
 import type { Chat } from '../types.js';
 
 const origFetch = globalThis.fetch;
@@ -9,19 +9,16 @@ function restoreFetch() {
   globalThis.fetch = origFetch;
 }
 
-function mockModel(config: { [key: string]: any } = {}): GoogleModel {
+function mockModel(config: { [key: string]: any } = {}): AnthropicModel {
   const engine = new Engine();
-  return new GoogleModel(engine, { model: 'gemini-2.0-flash', apiKey: 'test-key', ...config });
+  return new AnthropicModel(engine, { model: 'claude-sonnet-4-5', apiKey: 'test-key', ...config });
 }
 
 function mockChat(): Chat {
   return {
     id: 'test-chat',
     thinking: false,
-    messages: [
-      { role: 'system', content: 'You are helpful.' },
-      { role: 'user', content: 'hi' },
-    ],
+    messages: [{ role: 'user', content: 'hi' }],
   };
 }
 
@@ -29,64 +26,24 @@ function jsonResponse(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
 }
 
-test('sendChat maps text + functionCall parts to a Reply with tools', async () => {
+function okBody() {
+  return {
+    id: 'msg_1',
+    content: [{ type: 'text', text: 'ok' }],
+    stop_reason: 'end_turn',
+    usage: { input_tokens: 1, output_tokens: 1 },
+  };
+}
+
+test('sendChat maps text blocks to a Reply and stops the loop', async () => {
   const model = mockModel();
-  let seenUrl = '';
-  let seenBody: any;
-  globalThis.fetch = (async (url: any, init: any) => {
-    seenUrl = String(url);
-    seenBody = JSON.parse(init.body);
-    return jsonResponse({
-      candidates: [{
-        finishReason: 'STOP',
-        content: { parts: [
-          { text: 'hello' },
-          { functionCall: { name: 'get_date', args: {} } },
-        ] },
-      }],
-      usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 7 },
-    });
-  }) as typeof fetch;
-
-  const reply = await model.sendChat(mockChat());
-
-  expect(seenUrl).toContain('/v1beta/models/gemini-2.0-flash:generateContent');
-  expect(seenBody.systemInstruction.parts[0].text).toBe('You are helpful.');
-  expect(seenBody.contents[0].role).toBe('user');
-  expect(reply.stop).toBe(false);
-  expect(reply.finish).toBe('tool_calls');
-  expect(reply.message.content).toBe('hello');
-  expect(reply.message.tools!.length).toBe(1);
-  expect(reply.message.tools![0]!.name).toBe('get_date');
-  expect(reply.usage).toEqual({ completion: 7, prompt: 5 });
-  restoreFetch();
-});
-
-test('sendChat text-only reply stops the loop', async () => {
-  const model = mockModel();
-  globalThis.fetch = (async () =>
-    jsonResponse({
-      candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '  done  ' }] } }],
-      usageMetadata: {},
-    })) as typeof fetch;
+  globalThis.fetch = (async () => jsonResponse(okBody())) as typeof fetch;
 
   const reply = await model.sendChat(mockChat());
 
   expect(reply.stop).toBe(true);
-  expect(reply.message.content).toBe('done');
-  expect(reply.message.tools).toBeUndefined();
-  restoreFetch();
-});
-
-test('sendChat with no candidates returns empty finish', async () => {
-  const model = mockModel();
-  globalThis.fetch = (async () => jsonResponse({})) as typeof fetch;
-
-  const reply = await model.sendChat(mockChat());
-
-  expect(reply.stop).toBe(true);
-  expect(reply.finish).toBe('empty');
-  expect(reply.message.content).toBe('');
+  expect(reply.message.content).toBe('ok');
+  expect(reply.usage).toEqual({ completion: 1, prompt: 1 });
   restoreFetch();
 });
 
@@ -95,18 +52,11 @@ test('sendChat throws on non-OK response', async () => {
   globalThis.fetch = (async () =>
     jsonResponse({ error: { message: 'bad key' } }, 400)) as typeof fetch;
 
-  await expect(model.sendChat(mockChat())).rejects.toThrow('[GoogleModel.sendChat] ERROR bad key');
+  await expect(model.sendChat(mockChat())).rejects.toThrow('[AnthropicModel.sendChat] ERROR bad key');
   restoreFetch();
 });
 
 // ==================== sendChat retry + timeout ====================
-
-function okBody() {
-  return {
-    candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'ok' }] } }],
-    usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-  };
-}
 
 test('sendChat retries transient network failures and succeeds', async () => {
   const model = mockModel();

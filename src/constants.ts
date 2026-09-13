@@ -31,6 +31,11 @@ export const MCP_LOAD_RETRY_DELAY_MS = 500;
 // mcp client: timeout for a single tools/call request
 export const MCP_CALL_TIMEOUT_MS = 60 * 1000;
 
+// model api: timeout for a single chat completion request (thinking mode can be slow)
+export const MODEL_CALL_TIMEOUT_MS = 120 * 1000;
+// model api: how many times to retry a failed chat completion request
+export const MODEL_CALL_RETRIES = 2;
+
 // well-known api base urls: the openai/anthropic/google providers plus popular
 // OpenAI-compatible endpoints (used via provider "openai" with a custom baseUrl)
 export const MODEL_BASE_URLS = {

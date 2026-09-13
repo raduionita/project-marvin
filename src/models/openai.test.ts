@@ -1,12 +1,13 @@
 import { test, expect } from 'bun:test';
 import Engine from '../engine.js';
 import OpenaiModel, { Choice } from './openai.js';
+import type { Chat } from '../types.js';
 
 class OpenaiMock extends OpenaiModel {}
 
-function mockdModel(): OpenaiModel {
+function mockdModel(config: { [key: string]: any } = {}): OpenaiModel {
   const engine = new Engine();
-  return new OpenaiMock(engine, {});
+  return new OpenaiMock(engine, config);
 }
 
 function mockChoice(content: string, toolCalls?: Choice['message']['tool_calls']): Choice {
@@ -66,4 +67,85 @@ test('prepChoice trims content', () => {
   const result = model.prepChoice(mockChoice('  hello world  '));
 
   expect(result.message.content).toBe('hello world');
+});
+
+// ==================== sendChat retry + timeout ====================
+
+const origFetch = globalThis.fetch;
+
+function restoreFetch() {
+  globalThis.fetch = origFetch;
+}
+
+function jsonResponse(body: any, status = 200): Response {
+  return new Response(JSON.stringify(body), { status });
+}
+
+function mockChat(): Chat {
+  return { id: 'test-chat', thinking: false, messages: [{ role: 'user', content: 'hi' }] };
+}
+
+function okBody() {
+  return { id: 'chat-1', choices: [mockChoice('ok')], usage: { prompt_tokens: 1, completion_tokens: 1 } };
+}
+
+test('sendChat retries transient network failures and succeeds', async () => {
+  const model = mockdModel();
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    if (calls < 3) throw new TypeError('fetch failed');
+    return jsonResponse(okBody());
+  }) as typeof fetch;
+
+  const reply = await model.sendChat(mockChat());
+
+  expect(calls).toBe(3);
+  expect(reply.message.content).toBe('ok');
+  restoreFetch();
+});
+
+test('sendChat does not retry client errors (400)', async () => {
+  const model = mockdModel();
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return jsonResponse({ error: { message: 'bad request' } }, 400);
+  }) as typeof fetch;
+
+  await expect(model.sendChat(mockChat())).rejects.toThrow('bad request');
+  expect(calls).toBe(1);
+  restoreFetch();
+});
+
+test('sendChat retries 5xx and succeeds', async () => {
+  const model = mockdModel();
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    if (calls < 2) return jsonResponse({ error: { message: 'server error' } }, 500);
+    return jsonResponse(okBody());
+  }) as typeof fetch;
+
+  const reply = await model.sendChat(mockChat());
+
+  expect(calls).toBe(2);
+  expect(reply.message.content).toBe('ok');
+  restoreFetch();
+});
+
+test('sendChat times out a hung request and retries', async () => {
+  const model = mockdModel({ timeoutMs: 50 });
+  let calls = 0;
+  globalThis.fetch = (async (_url: any, init: any) => {
+    calls = calls + 1;
+    // hang until the abort signal fires, then reject like a real timeout
+    return new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+    });
+  }) as typeof fetch;
+
+  await expect(model.sendChat(mockChat())).rejects.toThrow();
+  expect(calls).toBe(3); // initial + 2 retries
+  restoreFetch();
 });

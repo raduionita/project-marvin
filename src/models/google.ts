@@ -1,9 +1,21 @@
+import { withRetry, HttpError } from '../helpers/index.js';
 import { Chat, Model, Provider, Reply } from '../types.js';
+import type Engine from '../engine.js';
+import * as constants from '../constants.js';
 import logger from '../logger.js';
 
 export default class GoogleModel extends Model {
   provider: Provider = 'google';
   public baseUrl: string = 'https://generativelanguage.googleapis.com';
+  // timeout for a single chat completion request (overridable per model config).
+  // `declare` emits no define, so a value from config (via super()) survives.
+  declare public timeoutMs: number;
+
+  constructor(engine: Engine, config: { [key: string]: any } = {}) {
+    super(engine, config);
+    // field initializers run after super(), so the default goes last
+    this.timeoutMs ??= constants.MODEL_CALL_TIMEOUT_MS;
+  }
 
   async sendChat(chat: Chat): Promise<Reply> {
     logger.debug('[GoogleModel.sendChat]', '-->', `id=${chat.id} userId=${chat.userId}`);
@@ -62,20 +74,30 @@ export default class GoogleModel extends Model {
       };
     }
 
-    const response = await fetch(`${this.baseUrl}/v1beta/models/${this.model}:generateContent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey || process.env.GOOGLE_API_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
+    // ! call the model api, with a timeout and retries on transient failures
+    const response = await withRetry(async () => {
+      const res = await fetch(`${this.baseUrl}/v1beta/models/${this.model}:generateContent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey || process.env.GOOGLE_API_KEY}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
-    if (!response.ok) {
-      logger.error('[GoogleModel.sendChat]', 'response NOT ok:', response);
-      const errBody = await response.json();
-      throw new Error(`[GoogleModel.sendChat] ERROR ${errBody?.error?.message || errBody?.message || response.statusText}`);
-    }
+      if (!res.ok) {
+        logger.error('[GoogleModel.sendChat]', 'response NOT ok:', res.status);
+        const errBody = await res.json().catch(() => ({}));
+        throw new HttpError(res.status, `[GoogleModel.sendChat] ERROR ${errBody?.error?.message || errBody?.message || res.statusText}`);
+      }
+
+      return res;
+    }, {
+      retries: constants.MODEL_CALL_RETRIES,
+      // retry network errors, timeouts, 429 and 5xx; not other client errors
+      shouldRetry: (err) => err instanceof HttpError ? (err.status === 429 || err.status >= 500) : true,
+    });
 
     const json = await response.json();
     const candidate = json.candidates?.[0];
