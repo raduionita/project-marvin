@@ -5,15 +5,17 @@ import * as constants from '../constants.js';
 import logger from '../logger.js';
 
 export default class GoogleModel extends Model {
-  provider: Provider = 'google';
-  public baseUrl: string = 'https://generativelanguage.googleapis.com';
+  // `declare` emits no defines, so config values (via super()) survive;
+  // defaults are applied at the end of the constructor instead
+  declare public provider: Provider;
+  declare public baseUrl: string;
   // timeout for a single chat completion request (overridable per model config).
-  // `declare` emits no define, so a value from config (via super()) survives.
   declare public timeoutMs: number;
 
   constructor(engine: Engine, config: { [key: string]: any } = {}) {
     super(engine, config);
-    // field initializers run after super(), so the default goes last
+    this.provider = config.provider || 'google';
+    this.baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com';
     this.timeoutMs ??= constants.MODEL_CALL_TIMEOUT_MS;
   }
 

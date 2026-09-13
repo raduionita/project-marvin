@@ -149,3 +149,20 @@ test('sendChat times out a hung request and retries', async () => {
   expect(calls).toBe(3); // initial + 2 retries
   restoreFetch();
 });
+
+// ==================== config survives construction ====================
+
+test('config provider and baseUrl survive construction', () => {
+  const model = mockdModel({ provider: 'deepseek', model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com', apiKey: 'sk-test' });
+
+  expect(model.provider as string).toBe('deepseek');
+  expect(model.baseUrl).toBe('https://api.deepseek.com');
+  expect(model.apiKey).toBe('sk-test');
+});
+
+test('openai defaults apply without config', () => {
+  const model = mockdModel({ model: 'gpt-4o-mini' });
+
+  expect(model.provider).toBe('openai');
+  expect(model.baseUrl).toBe('https://api.openai.com');
+});

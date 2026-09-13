@@ -118,3 +118,8 @@ test('sendChat times out a hung request and retries', async () => {
   expect(calls).toBe(3); // initial + 2 retries
   restoreFetch();
 });
+
+test('config baseUrl survives construction, default otherwise', () => {
+  expect(mockModel({ baseUrl: 'http://proxy:8080' }).baseUrl).toBe('http://proxy:8080');
+  expect(mockModel().baseUrl).toBe('https://api.anthropic.com');
+});
