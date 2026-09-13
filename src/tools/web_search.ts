@@ -2,7 +2,7 @@ import TurndownService from 'turndown';
 
 import { Tool } from '../types.js';
 import type { ToolMeta } from '../types.js';
-import { delay, readError, tryJsonParse } from '../helpers/index.js';
+import { delay, readError, tryJsonParse, urlEncode } from '../helpers/index.js';
 import type BrowserSystem from '../systems/browser.js';
 import Engine from '../engine.js';
 import logger from '../logger.js';
@@ -90,7 +90,7 @@ export default class WebSearchTool extends Tool {
     }
 
     const browser = this.engine.systems['browser'] as BrowserSystem;
-    const query = encodeURIComponent(args.query);
+    const query = urlEncode(args.query);
     const url = `https://duckduckgo.com?q=${query}&df=y&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
     const src = 'links.duckduckgo.com/d.js';
 
@@ -166,8 +166,8 @@ export default class WebSearchTool extends Tool {
     }
 
     const browser = this.engine.systems['browser'] as BrowserSystem;
-    const query = args.query;
-    const url = `https://duckduckgo.com?q=${encodeURIComponent(query)}&ia=images&iax=images`;
+    const query = urlEncode(args.query);
+    const url = `https://duckduckgo.com?q=${query}&ia=images&iax=images`;
     const src = 'duckduckgo.com/i.js';
 
     // TODO: extract vqd
@@ -202,7 +202,7 @@ export default class WebSearchTool extends Tool {
 
       // attach the response waiter before injecting, then fetch results with the vqd token
       const pending = page.waitForResponse((response) => response.url().includes(src), { timeout: 5_000 });
-      await page.addScriptTag({ url: `https://${src}?o=json&q=${encodeURIComponent(query)}&vqd=${vqd}` });
+      await page.addScriptTag({ url: `https://${src}?o=json&q=${query}&vqd=${vqd}` });
       const script = await pending;
             text = await script.text();
 
@@ -248,7 +248,7 @@ export default class WebSearchTool extends Tool {
     }
 
     const browser = this.engine.systems['browser'] as BrowserSystem;
-    const query = encodeURIComponent(args.query);
+    const query = urlEncode(args.query);
     const url = `https://duckduckgo.com?q=${query}&df=d&kp=-1&kc=-1&kz=-1&kl=wt-wt`;
     const src = 'duckduckgo.com/news.js';
 

@@ -204,3 +204,8 @@ export function detectProvider(model: string): Provider {
   if (name.includes('claude') || name.includes('anthropic')) return 'anthropic';
   return 'openai';
 }
+
+// repace space with + and %20 with +
+export function urlEncode(str: string): string {
+  return encodeURIComponent(str).replace(/%20/g, '+').replace(/ /g, '+');
+}
