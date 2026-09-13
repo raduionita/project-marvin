@@ -207,5 +207,6 @@ export function detectProvider(model: string): Provider {
 
 // repace space with + and %20 with +
 export function urlEncode(str: string): string {
-  return encodeURIComponent(str).replace(/%20/g, '+').replace(/ /g, '+');
+  // return encodeURIComponent(str)
+  return str.replace(/%20/g, '+').replace(/ /g, '+');
 }
